@@ -1,0 +1,6 @@
+{
+  "name": "أسطول النقل الثقيل - إدارة الحمولات والمحاجر",
+  "description": "منظومة رقمية متكاملة لإدارة أسطول النقل الثقيل، توزيع حصص نقلات المحاجر إلى المصانع، وتتبع السائقين والحمولات اليومية لحظة بلحظة.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
