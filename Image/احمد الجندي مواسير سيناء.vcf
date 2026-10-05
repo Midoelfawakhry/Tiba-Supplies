@@ -1,0 +1,9 @@
+BEGIN:VCARD
+VERSION:3.0
+N:سيناء;احمد الجندي مواسير;;;
+FN:احمد الجندي مواسير سيناء
+item1.TEL:+20 12 22885105
+item1.X-ABLabel:الجوّال
+item2.TEL;waid=201098991616:+20 10 98991616
+item2.X-ABLabel:الجوّال
+END:VCARD
