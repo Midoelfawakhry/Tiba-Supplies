@@ -31,7 +31,7 @@ export const Header: React.FC<HeaderProps> = ({
   const unreadCount = notifications.filter(n => !n.read && (!n.targetDriverId || n.targetDriverId === selectedDriver.driverId)).length;
 
   return (
-    <header className="sticky top-0 z-50 bg-zinc-900 border-b border-zinc-800 text-zinc-100 shadow-md">
+    <header className="sticky top-0 z-50 bg-[#07101c]/95 border-b border-blue-950/70 backdrop-blur-xl text-zinc-100 shadow-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
         
         {/* Zone 1: Single text element brand title */}
@@ -51,12 +51,12 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Zone 2: Navigation views */}
-        <nav className="flex items-center gap-1 sm:gap-2 bg-zinc-950/70 p-1 rounded-xl border border-zinc-800 text-xs sm:text-sm font-medium">
+        <nav className="flex items-center gap-1 sm:gap-2 bg-[#0b1728] p-1 rounded-xl border border-slate-700/70 text-xs sm:text-sm font-medium">
           <button
             onClick={() => setActiveTab('admin')}
             className={`px-3 py-2 rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap ${
               activeTab === 'admin'
-                ? 'bg-amber-500 text-zinc-950 font-bold shadow-sm'
+                ? 'bg-gradient-to-r from-orange-500 to-amber-400 text-slate-950 font-bold shadow-lg'
                 : 'text-zinc-300 hover:text-white hover:bg-zinc-800/60'
             }`}
           >
@@ -68,7 +68,7 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={() => setActiveTab('driver')}
             className={`px-3 py-2 rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap ${
               activeTab === 'driver'
-                ? 'bg-amber-500 text-zinc-950 font-bold shadow-sm'
+                ? 'bg-gradient-to-r from-orange-500 to-amber-400 text-slate-950 font-bold shadow-lg'
                 : 'text-zinc-300 hover:text-white hover:bg-zinc-800/60'
             }`}
           >
@@ -80,7 +80,7 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={() => setActiveTab('map')}
             className={`px-3 py-2 rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap ${
               activeTab === 'map'
-                ? 'bg-amber-500 text-zinc-950 font-bold shadow-sm'
+                ? 'bg-gradient-to-r from-orange-500 to-amber-400 text-slate-950 font-bold shadow-lg'
                 : 'text-zinc-300 hover:text-white hover:bg-zinc-800/60'
             }`}
           >
@@ -93,7 +93,7 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={() => setActiveTab('directory')}
             className={`hidden lg:flex px-3 py-2 rounded-lg transition-colors items-center gap-1.5 whitespace-nowrap ${
               activeTab === 'directory'
-                ? 'bg-amber-500 text-zinc-950 font-bold shadow-sm'
+                ? 'bg-gradient-to-r from-orange-500 to-amber-400 text-slate-950 font-bold shadow-lg'
                 : 'text-zinc-300 hover:text-white hover:bg-zinc-800/60'
             }`}
           >
@@ -112,7 +112,7 @@ export const Header: React.FC<HeaderProps> = ({
                 const found = trucks.find(t => t.id === e.target.value);
                 if (found) onSelectDriver(found);
               }}
-              className="bg-zinc-800 border border-zinc-700 text-xs rounded-lg px-2.5 py-1.5 text-zinc-200 focus:outline-none focus:border-amber-500"
+              className="bg-[#101c2d] border border-slate-700/70 text-xs rounded-lg px-2.5 py-1.5 text-zinc-200 focus:outline-none focus:border-amber-500"
             >
               {trucks.map(t => (
                 <option key={t.id} value={t.id}>
@@ -134,7 +134,7 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="relative">
             <button
               onClick={() => setShowNotifMenu(!showNotifMenu)}
-              className="relative p-2 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-white hover:bg-zinc-700 transition"
+              className="relative p-2 rounded-lg bg-[#101c2d] border border-slate-700/70 text-zinc-300 hover:text-white hover:bg-zinc-700 transition"
               title="الإشعارات والتنبيهات"
             >
               <Bell className="w-5 h-5" />
