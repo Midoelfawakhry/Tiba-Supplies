@@ -100,6 +100,18 @@ export interface DriverLiveLocation {
   statusText: string;
 }
 
+export interface DestinationChange {
+  id: string;
+  fromFactoryName: string;
+  fromFactoryCoords: GeoLocation;
+  toFactoryName: string;
+  toFactoryCoords: GeoLocation;
+  reason: 'quality_rejection' | 'factory_closed' | 'dispatch_instruction' | 'other';
+  notes?: string;
+  changedAt: string;
+  changedBy?: string;
+}
+
 export interface TripLoad {
   id: string;
   dailyOrderId: string;
@@ -123,6 +135,9 @@ export interface TripLoad {
   currentLocation: DriverLiveLocation;
   quarryCoords: GeoLocation;
   factoryCoords: GeoLocation;
+  originalFactoryName?: string;
+  originalFactoryCoords?: GeoLocation;
+  destinationChanges?: DestinationChange[];
   isTrackingActive: boolean;
 }
 
