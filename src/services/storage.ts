@@ -414,6 +414,15 @@ export const StorageService = {
 
     trips[index] = trip;
     this.saveTrips(trips);
+
+    this.addNotification({
+      targetDriverId: trip.driverId,
+      title: '🔄 تغيير وجهة النقلة',
+      message: `تم تحويل وجهة النقلة من ${fromFactoryName} إلى ${toFactoryName}. السبب: ${notes || reason}.`,
+      type: 'load_updated',
+      orderId: trip.dailyOrderId
+    });
+
     return trip;
   },
 
