@@ -151,6 +151,20 @@ export default function App() {
   };
 
   // Admin assigns driver to existing order
+  const handleChangeTripDestination = (
+    tripId: string,
+    factoryName: string,
+    factoryCoords: { lat: number; lng: number },
+    reason: 'quality_rejection' | 'factory_closed' | 'dispatch_instruction' | 'other',
+    notes?: string
+  ) => {
+    StorageService.changeTripDestination(tripId, factoryName, factoryCoords, reason, notes, 'HEAD_OFFICE');
+    setTrips(StorageService.getTrips());
+    setNotifications(StorageService.getNotifications());
+    playNotificationSound();
+  };
+
+  // Admin assigns driver to existing order
   const handleAssignDriver = (orderId: string, truckId: string) => {
     const truck = trucks.find(t => t.id === truckId);
     if (!truck) {
@@ -361,6 +375,7 @@ export default function App() {
             onAssignDriver={handleAssignDriver}
             onUpdateOrderNotes={handleUpdateOrderNotes}
             onDeleteOrder={handleDeleteOrder}
+            onChangeTripDestination={handleChangeTripDestination}
             onSendDriverAlert={(dId, title, msg) => {
               StorageService.addNotification({
                 targetDriverId: dId,
