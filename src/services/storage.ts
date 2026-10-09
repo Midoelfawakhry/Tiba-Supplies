@@ -5,7 +5,9 @@ import {
   FleetTruck,
   TripLoad,
   AppNotification,
-  TripStatus
+  TripStatus,
+  DestinationChange,
+  GeoLocation
 } from '../types/fleet';
 import {
   INITIAL_QUARRIES,
@@ -363,6 +365,53 @@ export const StorageService = {
     }
 
     trip.currentLocation.lastUpdated = now;
+    trips[index] = trip;
+    this.saveTrips(trips);
+    return trip;
+  },
+
+  changeTripDestination(
+    tripId: string,
+    toFactoryName: string,
+    toFactoryCoords: GeoLocation,
+    reason: DestinationChange['reason'],
+    notes?: string,
+    changedBy?: string
+  ): TripLoad | null {
+    const trips = this.getTrips();
+    const index = trips.findIndex(t => t.id === tripId);
+    if (index === -1) return null;
+
+    const trip = trips[index];
+    if (trip.status === 'delivered' || trip.status === 'cancelled') return null;
+
+    const now = new Date().toISOString();
+    const fromFactoryName = trip.factoryName;
+    const fromFactoryCoords = trip.factoryCoords;
+
+    if (!trip.originalFactoryName) {
+      trip.originalFactoryName = fromFactoryName;
+      trip.originalFactoryCoords = fromFactoryCoords;
+    }
+
+    const change: DestinationChange = {
+      id: `destination-change-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      fromFactoryName,
+      fromFactoryCoords,
+      toFactoryName,
+      toFactoryCoords,
+      reason,
+      notes,
+      changedAt: now,
+      changedBy
+    };
+
+    trip.destinationChanges = [...(trip.destinationChanges || []), change];
+    trip.factoryName = toFactoryName;
+    trip.factoryCoords = toFactoryCoords;
+    trip.currentLocation.statusText = `تم تحويل الوجهة إلى ${toFactoryName}`;
+    trip.currentLocation.lastUpdated = now;
+
     trips[index] = trip;
     this.saveTrips(trips);
     return trip;
