@@ -76,7 +76,29 @@ export const DriverApp: React.FC = () => {
 
     let lastSentAt = 0;
     let active = true;
-    const watchId = navigator.geolocation.watchPosition(
+    let watchId: number | undefined;
+    void (async () => {
+      try {
+        const permissions = await Geolocation.checkPermissions();
+        if (permissions.location !== 'granted' && permissions.coarseLocation !== 'granted') {
+          const requested = await Geolocation.requestPermissions();
+          if (requested.location !== 'granted' && requested.coarseLocation !== 'granted') {
+            if (active) {
+              setError('إذن الموقع غير ممنوح. افتح إعدادات الهاتف > التطبيقات > Tiba Supplies Driver > الأذونات > الموقع، واسمح بالموقع أثناء استخدام التطبيق.');
+              setTrackingEnabled(false);
+            }
+            return;
+          }
+        }
+      } catch (permissionError: any) {
+        if (active) {
+          setError(permissionError?.message || 'تعذر طلب إذن GPS من أندرويد. افتح إعدادات التطبيق واسمح بالموقع.');
+          setTrackingEnabled(false);
+        }
+        return;
+      }
+      if (!active) return;
+      watchId = navigator.geolocation.watchPosition(
       async ({ coords, timestamp }) => {
         if (!active) return;
         setPosition({
@@ -106,10 +128,11 @@ export const DriverApp: React.FC = () => {
         if (active) setError(locationError.message || 'تعذر قراءة GPS. تأكد من منح إذن الموقع.');
       },
       { enableHighAccuracy: true, timeout: 20000, maximumAge: 5000 },
-    );
+      );
+    })();
     return () => {
       active = false;
-      navigator.geolocation.clearWatch(watchId);
+      if (watchId !== undefined) navigator.geolocation.clearWatch(watchId);
     };
   }, [session, trackingEnabled]);
 
