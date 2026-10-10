@@ -54,9 +54,24 @@ jobs:
     env:
       VITE_APP_MODE: ${{ matrix.app_mode }}
       TIBA_APP_MODE: ${{ matrix.app_mode }}
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || secrets.SUPABASE_URL }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY || secrets.SUPABASE_PUBLISHABLE_KEY || secrets.SUPABASE_ANON_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Verify Supabase build configuration
+        shell: bash
+        run: |
+          if [ -z "$VITE_SUPABASE_URL" ]; then
+            echo "::error::Missing GitHub Actions secret: VITE_SUPABASE_URL (or SUPABASE_URL)"
+            exit 1
+          fi
+          if [ -z "$VITE_SUPABASE_PUBLISHABLE_KEY" ]; then
+            echo "::error::Missing GitHub Actions secret: VITE_SUPABASE_PUBLISHABLE_KEY (or SUPABASE_PUBLISHABLE_KEY / SUPABASE_ANON_KEY)"
+            exit 1
+          fi
+          echo "Supabase URL and publishable key are configured."
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -80,7 +95,7 @@ jobs:
 
       - name: Generate Capacitor config
         run: |
-          node -e 'const mode=process.env.TIBA_APP_MODE; const office=mode === "office"; const config={appId:office ? "com.tibasupplies.office" : "com.tibasupplies.driver",appName:office ? "Tiba Supplies Office" : "Tiba Supplies Driver",webDir:"dist",android:{allowMixedContent:false}}; require("fs").writeFileSync("capacitor.config.json", JSON.stringify(config,null,2)+"\n")'
+          node -e 'const mode=process.env.TIBA_APP_MODE; const office=mode === "office"; const config={appId:office ? "com.tibasupplies.office" : "com.tibasupplies.driver",appName:office ? "Tiba Supplies Office" : "Tiba Supplies Driver",webDir:"dist",android:{allowMixedContent:false}}; require("fs").writeFileSync("capacitor.config.json", JSON.stringify(config,null,2)+"\\n")'
 
       - name: Add Android platform
         run: npx cap add android
