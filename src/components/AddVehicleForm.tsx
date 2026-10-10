@@ -3,7 +3,6 @@ import { supabase } from '../lib/supabase';
 
 export const AddVehicleForm: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
   const [plate, setPlate] = useState('');
-  const [code, setCode] = useState('');
   const [owner, setOwner] = useState('');
   const [phone, setPhone] = useState('');
   const [saving, setSaving] = useState(false);
@@ -16,21 +15,19 @@ export const AddVehicleForm: React.FC<{ onSaved: () => void }> = ({ onSaved }) =
     try {
       const { data, error } = await supabase.rpc('create_operational_vehicle', {
         p_plate_number: plate.trim(),
-        p_vehicle_code: code.trim(),
         p_owner_name: owner.trim(),
         p_owner_phone: phone.trim() || null,
       });
       if (error) throw error;
       if (!data?.success) throw new Error('تعذر تأكيد الحفظ.');
       setMessage('تم حفظ العربية والمالك بنجاح.');
-      setPlate(''); setCode(''); setOwner(''); setPhone('');
+      setPlate(''); setOwner(''); setPhone('');
       onSaved();
     } catch (error: any) {
       const raw = String(error?.message || '');
       const messages: Record<string, string> = {
         VEHICLE_PLATE_EXISTS: 'رقم اللوحة مسجل بالفعل.',
-        VEHICLE_CODE_EXISTS: 'كود العربية مستخدم بالفعل.',
-        REQUIRED_FIELDS_MISSING: 'أكمل رقم اللوحة وكود العربية واسم المالك.',
+        REQUIRED_FIELDS_MISSING: 'أكمل رقم اللوحة واسم المالك.',
         AUTH_REQUIRED: 'سجّل دخولك أولًا.',
         INSUFFICIENT_ROLE: 'حسابك لا يملك صلاحية إضافة عربية.',
       };
@@ -44,9 +41,6 @@ export const AddVehicleForm: React.FC<{ onSaved: () => void }> = ({ onSaved }) =
   return <form onSubmit={submit} className="grid gap-3 sm:grid-cols-2">
     <label className="text-sm font-bold">رقم العربية / اللوحة *
       <input required value={plate} onChange={e => setPlate(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 p-3 font-normal" />
-    </label>
-    <label className="text-sm font-bold">كود العربية *
-      <input required value={code} onChange={e => setCode(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 p-3 font-normal" />
     </label>
     <label className="text-sm font-bold">اسم المالك *
       <input required value={owner} onChange={e => setOwner(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 p-3 font-normal" />
