@@ -23,7 +23,7 @@ export const LiveOperationsBoard: React.FC = () => {
   const [priority, setPriority] = useState('3');
   const [savingOrder, setSavingOrder] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-  const [activeScreen, setActiveScreen] = useState<'dashboard' | 'tracking' | 'directory' | 'direct' | 'drivers' | 'vehicles' | 'waiting'>('dashboard');
+  const [activeScreen, setActiveScreen] = useState<'dashboard' | 'tracking' | 'directory' | 'direct' | 'drivers' | 'vehicles' | 'waiting' | 'orders' | 'actual' | 'factories' | 'quarries'>('dashboard');
 
   const load = useCallback(async () => {
     setLoading(true);
