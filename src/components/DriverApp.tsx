@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { MapPin, Truck, Clock3, ShieldCheck, LogOut, Navigation, CircleAlert } from 'lucide-react';
+import { MapPin, Truck, Clock3, ShieldCheck, LogOut, Navigation, CircleAlert, FileText } from 'lucide-react';
 import { supabase, supabaseDiagnostics } from '../lib/supabase';
 
 type PositionState = {
@@ -18,6 +18,8 @@ export const DriverApp: React.FC = () => {
   const [position, setPosition] = useState<PositionState | null>(null);
   const [locating, setLocating] = useState(false);
   const [trackingEnabled, setTrackingEnabled] = useState(false);
+  const [portal, setPortal] = useState<any>(null);
+  const [portalLoading, setPortalLoading] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -50,6 +52,18 @@ export const DriverApp: React.FC = () => {
       subscription?.unsubscribe();
     };
   }, []);
+
+  async function refreshPortal() {
+    if (!session) return;
+    setPortalLoading(true);
+    const { data, error: portalError } = await supabase.rpc('get_driver_portal_snapshot');
+    if (portalError) {
+      setError(portalError.message || 'تعذر تحميل حالة التشغيل.');
+    } else {
+      setPortal(data);
+    }
+    setPortalLoading(false);
+  }
 
   useEffect(() => {
     if (!session || !trackingEnabled) return;
@@ -84,6 +98,7 @@ export const DriverApp: React.FC = () => {
           setError(locationError.message || 'تعذر حفظ الموقع. تأكد من ربط حساب السائق بالعربية وتطبيق إعدادات التتبع في Supabase.');
         } else if (active) {
           setError('');
+          void refreshPortal();
         }
       },
       (locationError) => {
@@ -118,17 +133,24 @@ export const DriverApp: React.FC = () => {
     }
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
-      ({ coords, timestamp }) => {
+      async ({ coords, timestamp }) => {
         setPosition({
           latitude: coords.latitude,
           longitude: coords.longitude,
           accuracy: coords.accuracy,
           capturedAt: new Date(timestamp).toLocaleString('ar-EG'),
         });
+        const { error: saveError } = await supabase.rpc('update_driver_live_location', {
+          p_latitude: coords.latitude, p_longitude: coords.longitude, p_accuracy_m: coords.accuracy,
+          p_heading: null, p_speed_kmh: null, p_captured_at: new Date(timestamp).toISOString(),
+        });
+        if (saveError) setError(saveError.message || 'تعذر حفظ الموقع. فعّل مشاركة الموقع وتأكد من ربط حسابك بالعربية.');
+        else { setError(''); await refreshPortal(); }
         setLocating(false);
       },
       (locationError) => {
-        setError(locationError.message || 'تعذر تحديد الموقع. راجع صلاحيات الموقع في الهاتف.');
+        const message = locationError.code === 1 ? 'تم رفض إذن الموقع. افتح إعدادات الهاتف > التطبيقات > Tiba Supplies > الأذونات > الموقع، واسمح بالموقع أثناء استخدام التطبيق، ثم جرّب مرة أخرى.' : locationError.code === 2 ? 'الهاتف لم يستطع تحديد موقعك. فعّل GPS وحاول في مكان مفتوح.' : 'انتهت مهلة تحديد الموقع. تأكد من تشغيل GPS وحاول مرة أخرى.';
+        setError(message);
         setLocating(false);
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
@@ -199,10 +221,34 @@ export const DriverApp: React.FC = () => {
           </div>}
           {error && <div role="alert" className="mt-4 flex gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"><CircleAlert className="shrink-0" size={18}/><span>{error}</span></div>}
         </section>
-        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center gap-2"><Clock3 className="text-blue-700" size={22}/><h2 className="font-black">حالة الدور</h2></div>
-          <p className="mt-2 text-sm leading-6 text-slate-500">سيظهر هنا ترتيبك في قائمة الانتظار وأوامر التحميل المرتبطة بحسابك بعد ربط شاشة السائق بإجراءات التشغيل الفعلية.</p>
-        </section>
+        {!portal?.inside_geofence ? (
+          <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center gap-2"><ShieldCheck className="text-blue-700" size={22}/><h2 className="font-black">الخدمات داخل نطاق المكتب</h2></div>
+            <p className="mt-2 text-sm leading-7 text-slate-600">لن تظهر الكمولات المتاحة أو ترتيب الانتظار أو سجل أوامرك إلا بعد أن يؤكد النظام وجودك داخل نطاق 10 كم من مكتب رأس سدر، مع موقع GPS حديث.</p>
+            {portal && <p className="mt-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{portal.location_updated_at ? 'آخر موقع محفوظ قد يكون خارج النطاق أو أقدم من 10 دقائق.' : 'لم يصل موقع GPS حديث للنظام حتى الآن.'}</p>}
+            <button onClick={() => { setTrackingEnabled(true); captureLocation(); }} className="mt-4 w-full rounded-xl bg-blue-600 p-3 font-black text-white">تفعيل GPS والتحقق من النطاق</button>
+            <button onClick={() => void refreshPortal()} className="mt-3 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold text-slate-700">{portalLoading ? 'جاري التحقق...' : 'إعادة التحقق من الموقع'}</button>
+          </section>
+        ) : (
+          <>
+            <section className="rounded-3xl border border-emerald-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center gap-2"><ShieldCheck className="text-emerald-700" size={22}/><h2 className="font-black">أنت داخل نطاق المكتب</h2></div>
+              <p className="mt-2 text-sm text-slate-600">المسافة التقريبية: {Math.round(Number(portal.distance_m || 0))} متر من مكتب {portal.office_name || 'رأس سدر'}.</p>
+            </section>
+            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center gap-2"><Clock3 className="text-blue-700" size={22}/><h2 className="font-black">رقمك في الانتظار</h2></div>
+              {portal.queue_status === 'WAITING' ? <p className="mt-3 text-2xl font-black text-blue-700">الدور رقم {portal.queue_position || '—'}</p> : <p className="mt-2 text-sm leading-7 text-slate-600">أنت داخل النطاق لكنك غير مسجل حاليًا في قائمة الانتظار. تسجيل الموقع وحده لا يضيفك تلقائيًا إلى القائمة.</p>}
+            </section>
+            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center gap-2"><Truck className="text-blue-700" size={22}/><h2 className="font-black">الحمولات المتاحة</h2></div>
+              {(portal.available_loads || []).length ? <div className="mt-4 space-y-3">{portal.available_loads.map((load: any) => <div key={load.load_order_id} className="rounded-2xl border border-slate-200 p-4"><div className="font-black">{load.factory_name || 'مصنع غير محدد'} <span className="text-slate-400">←</span> {load.quarry_name || 'محجر غير محدد'}</div><p className="mt-2 text-sm text-slate-600">المتبقي: {load.remaining_quantity} نقلة</p><p className="mt-1 text-xs text-slate-400">أمر: {String(load.load_order_id).slice(0, 8)}</p></div>)}</div> : <p className="mt-2 text-sm leading-7 text-slate-500">لا توجد حمولات متاحة حاليًا.</p>}
+            </section>
+            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center gap-2"><FileText className="text-blue-700" size={22}/><h2 className="font-black">أوامرك السابقة</h2></div>
+              {(portal.my_bookings || []).length ? <div className="mt-4 space-y-3">{portal.my_bookings.map((booking: any) => <div key={booking.booking_id} className="rounded-2xl border border-slate-200 p-4"><div className="font-bold">{booking.factory_name || 'مصنع غير محدد'} ← {booking.quarry_name || 'محجر غير محدد'}</div><p className="mt-2 text-sm text-slate-600">الحالة: {({BOOKED:'محجوزة',LOADING_STATEMENT:'بيان تحميل',IN_TRANSIT:'في الطريق',DELIVERED:'تم التسليم',COMPLETED:'مكتملة'} as Record<string,string>)[booking.status] || booking.status}</p><p className="mt-1 text-xs text-slate-400">{booking.booked_at ? new Date(booking.booked_at).toLocaleString('ar-EG') : ''}</p></div>)}</div> : <p className="mt-2 text-sm leading-7 text-slate-500">لا توجد أوامر سابقة مرتبطة بحسابك.</p>}
+            </section>
+          </>
+        )}
       </div>
     </main>
   );
