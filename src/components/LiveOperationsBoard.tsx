@@ -95,7 +95,7 @@ export const LiveOperationsBoard: React.FC = () => {
 
   return (
     <div dir="rtl" className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="border-b border-slate-200 bg-white/95 sticky top-0 z-20">
+      <header className="relative sm:sticky sm:top-0 z-20 border-b border-slate-200 bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-5 py-3 sm:py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="min-w-0 w-full sm:w-auto">
             <div className="text-[10px] leading-4 sm:text-xs font-black tracking-wide text-blue-700 whitespace-normal break-words">TIBA SUPPLIES · LIVE CORE</div>
