@@ -145,7 +145,7 @@ jobs:
       - name: Add Android platform
         run: npx cap add android
 
-      - name: Declare Android location permissions
+      - name: Declare and verify Android location permissions
         shell: bash
         run: |
           node <<'NODE'
@@ -156,14 +156,24 @@ jobs:
             'android.permission.ACCESS_COARSE_LOCATION',
             'android.permission.ACCESS_FINE_LOCATION'
           ];
-          for (const permission of permissions) {
-            const tag = '<uses-permission android:name="' + permission + '" />';
-            if (!xml.includes('android:name="' + permission + '"')) {
-              xml = xml.replace(/<manifest\\b[^>]*>/, match => match + '\\n    ' + tag);
-            }
+          const manifestOpen = xml.indexOf('>');
+          if (!xml.includes('<manifest') || manifestOpen < 0) {
+            throw new Error('AndroidManifest.xml manifest root tag was not found.');
+          }
+          const tags = permissions
+            .filter(permission => !xml.includes('android:name="' + permission + '"'))
+            .map(permission => '    <uses-permission android:name="' + permission + '" />');
+          if (tags.length) {
+            xml = xml.slice(0, manifestOpen + 1) + '\n' + tags.join('\n') + xml.slice(manifestOpen + 1);
           }
           fs.writeFileSync(file, xml);
-          console.log('Declared foreground location permissions in AndroidManifest.xml');
+          const verified = fs.readFileSync(file, 'utf8');
+          for (const permission of permissions) {
+            if (!verified.includes('android:name="' + permission + '"')) {
+              throw new Error('Required Android permission missing after insertion: ' + permission);
+            }
+          }
+          console.log('Verified both foreground location permissions in AndroidManifest.xml');
           NODE
 
       - name: Sync Android platform
