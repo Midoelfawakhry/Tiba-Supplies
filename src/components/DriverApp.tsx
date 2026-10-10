@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { MapPin, Truck, Clock3, ShieldCheck, LogOut, Navigation, CircleAlert, FileText } from 'lucide-react';
 import { supabase, supabaseDiagnostics } from '../lib/supabase';
+import { Geolocation } from '@capacitor/geolocation';
 
 type PositionState = {
   latitude: number;
@@ -132,7 +133,23 @@ export const DriverApp: React.FC = () => {
       return;
     }
     setLocating(true);
-    navigator.geolocation.getCurrentPosition(
+    void (async () => {
+      try {
+        const permissions = await Geolocation.checkPermissions();
+        if (permissions.location !== 'granted' && permissions.coarseLocation !== 'granted') {
+          const requested = await Geolocation.requestPermissions();
+          if (requested.location !== 'granted' && requested.coarseLocation !== 'granted') {
+            setError('إذن الموقع غير ممنوح. افتح إعدادات الهاتف > التطبيقات > Tiba Supplies Driver > الأذونات > الموقع، واسمح بالموقع أثناء استخدام التطبيق.');
+            setLocating(false);
+            return;
+          }
+        }
+      } catch (permissionError: any) {
+        setError(permissionError?.message || 'تعذر طلب إذن GPS من أندرويد. افتح إعدادات التطبيق واسمح بالموقع.');
+        setLocating(false);
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
       async ({ coords, timestamp }) => {
         setPosition({
           latitude: coords.latitude,
@@ -154,7 +171,8 @@ export const DriverApp: React.FC = () => {
         setLocating(false);
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
-    );
+      );
+    })();
   }
 
   if (loading) {
