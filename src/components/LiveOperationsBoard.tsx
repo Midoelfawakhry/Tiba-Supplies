@@ -130,30 +130,38 @@ export const LiveOperationsBoard: React.FC = () => {
 
         {successMessage && <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-700">{successMessage}</div>}
 
-        <nav aria-label="قوائم المكتب" className="grid grid-cols-2 gap-2 rounded-2xl border border-slate-200 bg-white p-2 sm:grid-cols-4 lg:grid-cols-7">
-          <button type="button" onClick={() => setActiveScreen('dashboard')} className={activeScreen === 'dashboard' ? 'rounded-xl bg-blue-600 px-3 py-3 text-sm font-black text-white' : 'rounded-xl px-3 py-3 text-sm font-bold text-slate-600'}>
-            <ClipboardList className="ml-1 inline h-4 w-4" /> مركز التشغيل
-          </button>
-          <button type="button" onClick={() => setActiveScreen('drivers')} className={activeScreen === 'drivers' ? 'rounded-xl bg-blue-600 px-3 py-3 text-sm font-black text-white' : 'rounded-xl px-3 py-3 text-sm font-bold text-slate-600'}>
-            <Users className="ml-1 inline h-4 w-4" /> قائمة السائقين
-          </button>
-          <button type="button" onClick={() => setActiveScreen('vehicles')} className={activeScreen === 'vehicles' ? 'rounded-xl bg-blue-600 px-3 py-3 text-sm font-black text-white' : 'rounded-xl px-3 py-3 text-sm font-bold text-slate-600'}>
-            <Truck className="ml-1 inline h-4 w-4" /> كل العربيات
-          </button>
-          <button type="button" onClick={() => setActiveScreen('waiting')} className={activeScreen === 'waiting' ? 'rounded-xl bg-blue-600 px-3 py-3 text-sm font-black text-white' : 'rounded-xl px-3 py-3 text-sm font-bold text-slate-600'}>
-            <Clock3 className="ml-1 inline h-4 w-4" /> قائمة الانتظار
-          </button>
-          <button type="button" onClick={() => setActiveScreen('tracking')} className={activeScreen === 'tracking' ? 'rounded-xl bg-blue-600 px-3 py-3 text-sm font-black text-white' : 'rounded-xl px-3 py-3 text-sm font-bold text-slate-600'}>
-            <MapPin className="ml-1 inline h-4 w-4" /> تتبع السيارات
-          </button>
-          <button type="button" onClick={() => setActiveScreen('directory')} className={activeScreen === 'directory' ? 'rounded-xl bg-blue-600 px-3 py-3 text-sm font-black text-white' : 'rounded-xl px-3 py-3 text-sm font-bold text-slate-600'}>
-            <Factory className="ml-1 inline h-4 w-4" /> دليل البيانات
-          </button>
-          <button type="button" onClick={() => setActiveScreen('direct')} className={activeScreen === 'direct' ? 'rounded-xl bg-emerald-600 px-3 py-3 text-sm font-black text-white' : 'rounded-xl px-3 py-3 text-sm font-bold text-slate-600'}>
-            <HandCoins className="ml-1 inline h-4 w-4" /> التحميل بالأمر المباشر
-          </button>
-        </nav>
-        {activeScreen === 'tracking' ? <VehicleTrackingScreen /> : activeScreen === 'drivers' ? <OfficeDirectoryScreen initialSection="drivers" showSectionTabs={false} /> : activeScreen === 'vehicles' ? <OfficeDirectoryScreen initialSection="vehicles" showSectionTabs={false} /> : activeScreen === 'waiting' ? <OfficeDirectoryScreen initialSection="waiting" showSectionTabs={false} /> : activeScreen === 'directory' ? <OfficeDirectoryScreen /> : activeScreen === 'direct' ? <DirectLoadAssignmentScreen /> : <>
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
+          <aside className="w-full shrink-0 rounded-3xl border border-slate-200 bg-white p-3 shadow-sm lg:sticky lg:top-28 lg:w-64" aria-label="القائمة الرئيسية للمكتب">
+            <div className="px-3 pb-3 pt-2">
+              <div className="text-[10px] font-black tracking-wider text-blue-700">TIBA SUPPLIES</div>
+              <h2 className="mt-1 text-base font-black">إدارة المكتب</h2>
+              <p className="mt-1 text-xs leading-5 text-slate-500">كل شاشات التشغيل في مكان واحد</p>
+            </div>
+            <nav className="grid grid-cols-2 gap-1 sm:grid-cols-3 lg:grid-cols-1" aria-label="التنقل بين شاشات المكتب">
+              {([
+                ['dashboard', 'مركز التشغيل', ClipboardList],
+                ['drivers', 'قائمة السائقين', Users],
+                ['vehicles', 'كل العربيات', Truck],
+                ['waiting', 'قائمة الانتظار', Clock3],
+                ['orders', 'أوامر التحميل', ClipboardList],
+                ['actual', 'التحميل الفعلي', CheckCircle2],
+                ['factories', 'المصانع والعملاء', Factory],
+                ['quarries', 'المحاجر والخامات', Mountain],
+                ['tracking', 'تتبع السيارات', MapPin],
+                ['directory', 'دليل البيانات الكامل', Users],
+                ['direct', 'التحميل بالأمر المباشر', HandCoins],
+              ] as const).map(([key, label, Icon]) => {
+                const selected = activeScreen === key;
+                return <button key={key} type="button" onClick={() => setActiveScreen(key as typeof activeScreen)} className={selected ? 'flex min-h-11 items-center gap-3 rounded-xl bg-blue-600 px-3 py-2.5 text-right text-sm font-black text-white shadow-sm' : 'flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-right text-sm font-bold text-slate-600 transition hover:bg-slate-50 hover:text-slate-900'}>
+                  <Icon className="h-[18px] w-[18px] shrink-0" />
+                  <span className="min-w-0 flex-1">{label}</span>
+                  {selected && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
+                </button>;
+              })}
+            </nav>
+          </aside>
+          <section className="min-w-0 flex-1 space-y-5">
+        {activeScreen === 'tracking' ? <VehicleTrackingScreen /> : activeScreen === 'drivers' ? <OfficeDirectoryScreen initialSection="drivers" showSectionTabs={false} /> : activeScreen === 'vehicles' ? <OfficeDirectoryScreen initialSection="vehicles" showSectionTabs={false} /> : activeScreen === 'waiting' ? <OfficeDirectoryScreen initialSection="waiting" showSectionTabs={false} /> : activeScreen === 'orders' ? <OfficeDirectoryScreen initialSection="loads" showSectionTabs={false} /> : activeScreen === 'actual' ? <OfficeDirectoryScreen initialSection="actual" showSectionTabs={false} /> : activeScreen === 'factories' ? <OfficeDirectoryScreen initialSection="factories" showSectionTabs={false} /> : activeScreen === 'quarries' ? <OfficeDirectoryScreen initialSection="quarries" showSectionTabs={false} /> : activeScreen === 'directory' ? <OfficeDirectoryScreen /> : activeScreen === 'direct' ? <DirectLoadAssignmentScreen /> : <>
         <section className="rounded-3xl border border-blue-200 bg-white p-5">
           <div className="mb-4">
             <h2 className="text-lg font-black">إنشاء أمر تحميل جديد</h2>
@@ -263,6 +271,8 @@ export const LiveOperationsBoard: React.FC = () => {
           </div>
         </section>
         </>}
+          </section>
+        </div>
       </main>
     </div>
   );
