@@ -1,14 +1,14 @@
 @import "tailwindcss";
 
 @layer base {
-  html,body,#root{min-height:100%;margin:0}
-  body{
-    font-family:'Cairo',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
-    background:#07101c;
-    color:#e5edf7;
-    direction:rtl;
+  html, body, #root { min-height: 100%; margin: 0; }
+  body {
+    font-family: 'Cairo', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #f8fafc;
+    color: #0f172a;
+    direction: rtl;
   }
-  button,select,textarea,input{font-family:inherit}
-  ::selection{background:#22d3ee;color:#06111f}
-  .font-mono,.tabular-nums{font-family:'JetBrains Mono',monospace}
+  button, select, textarea, input { font-family: inherit; }
+  ::selection { background: #2563eb; color: #ffffff; }
+  .font-mono, .tabular-nums { font-family: 'JetBrains Mono', monospace; }
 }
