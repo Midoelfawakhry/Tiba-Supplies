@@ -68,7 +68,6 @@ Deno.serve(async (req: Request) => {
     if (!driver || !driver.is_active) return json({ error: "DRIVER_NOT_FOUND_OR_INACTIVE" }, 404);
     if (driver.auth_user_id) return json({ error: "DRIVER_ACCOUNT_ALREADY_LINKED" }, 409);
 
-    // Invite is sent by Supabase Auth. The service-role key stays server-side only.
     const siteUrl = Deno.env.get("SITE_URL");
     const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
       data: { display_name: driver.name, account_type: "driver" },
@@ -80,15 +79,19 @@ Deno.serve(async (req: Request) => {
     }
     if (!invited.user) return json({ error: "INVITATION_FAILED" }, 500);
 
-    const { error: linkError } = await admin
+    // Return the updated row so a concurrent request cannot be reported as a successful link.
+    const { data: linkedDriver, error: linkError } = await admin
       .from("drivers")
       .update({ auth_user_id: invited.user.id })
       .eq("driver_id", driverId)
-      .is("auth_user_id", null);
-    if (linkError) {
-      // Avoid leaving an unlinked invited identity when the DB link fails.
+      .is("auth_user_id", null)
+      .select("driver_id")
+      .maybeSingle();
+
+    if (linkError || !linkedDriver) {
       await admin.auth.admin.deleteUser(invited.user.id);
-      throw linkError;
+      if (linkError) throw linkError;
+      return json({ error: "DRIVER_ACCOUNT_ALREADY_LINKED" }, 409);
     }
 
     return json({ success: true, driver_id: driverId, invited: true });
