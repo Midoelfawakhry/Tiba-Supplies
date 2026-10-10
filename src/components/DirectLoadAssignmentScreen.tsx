@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, HandCoins, RefreshCw, Truck } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { getLiveSnapshot, LiveSnapshot, liveName } from '../services/liveData';
@@ -19,7 +19,7 @@ export const DirectLoadAssignmentScreen: React.FC = () => {
     try {
       setSnapshot(await getLiveSnapshot());
     } catch (e: any) {
-      setError(e?.message || 'تعذر تحميل أوامر التحميل والسيارات.');
+      setError(e?.message || 'تعذر تحميل بيانات الإسناد والسيارات.');
     } finally {
       setLoading(false);
     }
@@ -29,32 +29,21 @@ export const DirectLoadAssignmentScreen: React.FC = () => {
 
   const factories = snapshot?.factories ?? [];
   const quarries = snapshot?.quarries ?? [];
-  const orders = useMemo(() => (snapshot?.load_orders ?? []).filter(order => {
-    const committedStatuses = ['BOOKED', 'LOADING_STATEMENT', 'IN_TRANSIT', 'DELIVERED', 'COMPLETED'];
-    const committed = (snapshot?.bookings ?? []).filter(b => b.load_order_id === order.load_order_id && committedStatuses.includes(String(b.status).toUpperCase())).length;
-    const status = String(order.status ?? '').toUpperCase();
-    return ['PUBLISHED', 'LOADING_STATEMENT'].includes(status) &&
-      (!factoryId || order.factory_id === factoryId) &&
-      (!quarryId || order.quarry_id === quarryId) &&
-      committed < Number(order.requested_quantity);
-  }), [snapshot, factoryId, quarryId]);
-
-  // The operator chooses factory + quarry; the app assigns the oldest eligible open order automatically.
-  const selectedOrder = [...orders].sort((a, b) => String(a.created_at ?? '').localeCompare(String(b.created_at ?? '')))[0];
-  const loadOrderId = selectedOrder?.load_order_id ?? '';
   const availableVehicles = snapshot?.vehicles ?? [];
 
+
   async function assign() {
-    if (!factoryId || !quarryId || !loadOrderId || !vehicleId) {
-      setError('اختار المصنع والمحجر والعربية، وتأكد من وجود أمر تحميل مفتوح.');
+    if (!factoryId || !quarryId || !vehicleId) {
+      setError('اختار المصنع والمحجر والعربية الأول.');
       return;
     }
     setSaving(true);
     setError('');
     setSuccess('');
     try {
-      const { data: result, error: rpcError } = await supabase.rpc('direct_assign_load', {
-        p_load_order_id: loadOrderId,
+      const { data: result, error: rpcError } = await supabase.rpc('direct_assign_standalone_load', {
+        p_factory_id: factoryId,
+        p_quarry_id: quarryId,
         p_vehicle_id: vehicleId,
       });
       if (rpcError) throw rpcError;
@@ -68,11 +57,9 @@ export const DirectLoadAssignmentScreen: React.FC = () => {
         VEHICLE_LOCATION_MISSING_OR_STALE: 'لا يمكن الإسناد: موقع العربية غير متاح أو أقدم من 10 دقائق.',
         VEHICLE_OUTSIDE_GEOFENCE: 'لا يمكن الإسناد: العربية خارج نطاق 10 كم من مكتب تسجيل الوصول.',
         NO_ACTIVE_DRIVER_FOR_VEHICLE: 'العربية غير مرتبطة بسائق نشط حاليًا.',
-        LOAD_CAPACITY_REACHED: 'الأمر وصل للكمية المطلوبة بالكامل.',
         DRIVER_HAS_ACTIVE_BOOKING: 'السائق لديه نقلة نشطة بالفعل.',
         VEHICLE_HAS_ACTIVE_BOOKING: 'العربية عليها نقلة نشطة بالفعل.',
         OFFICE_GEOFENCE_NOT_CONFIGURED: 'إحداثيات المكتب أو نطاقه غير مضبوط في قاعدة البيانات.',
-        LOAD_ORDER_NOT_DISPATCHABLE: 'حالة أمر التحميل لا تسمح بالإسناد المباشر.',
       };
       const key = Object.keys(messages).find(k => raw.includes(k));
       setError(key ? messages[key] : raw || 'تعذر تنفيذ الإسناد المباشر.');
@@ -88,7 +75,7 @@ export const DirectLoadAssignmentScreen: React.FC = () => {
           <div className="rounded-2xl bg-emerald-100 p-3 text-emerald-800"><HandCoins size={26}/></div>
           <div>
             <h2 className="text-xl font-black sm:text-2xl">التحميل بالأمر المباشر</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">قسم مستقل لإسناد أمر تحميل إلى عربية محددة، من غير المرور بترتيب قائمة الانتظار أو التوزيع التلقائي. التحقق من الموقع يتم داخل قاعدة البيانات قبل تثبيت الإسناد.</p>
+            <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">إسناد نقلة مستقلة مباشرة من المكتب إلى عربية محددة، من غير ارتباط بكميات مركز التشغيل أو أوامر التحميل المنشورة. التحقق من الموقع يتم قبل تثبيت الإسناد.</p>
           </div>
           <button type="button" onClick={() => void refresh()} disabled={loading} className="mr-auto inline-flex shrink-0 items-center gap-2 rounded-xl border border-slate-300 px-3 py-2 text-sm font-bold text-slate-700 disabled:opacity-60"><RefreshCw size={16} className={loading ? 'animate-spin' : ''}/><span className="hidden sm:inline">تحديث</span></button>
         </div>
@@ -100,7 +87,7 @@ export const DirectLoadAssignmentScreen: React.FC = () => {
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
         <section className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-6">
           <h3 className="text-lg font-black">بيانات الإسناد</h3>
-          <p className="mt-1 text-sm text-slate-500">اختار المصنع والمحجر والعربية فقط؛ التطبيق هيختار تلقائيًا أقدم أمر تحميل مفتوح مطابق وله كمية متبقية.</p>
+          <p className="mt-1 text-sm text-slate-500">اختار المصنع والمحجر والعربية. الإسناد المباشر نقلة مستقلة عن أوامر مركز التشغيل.</p>
           <label className="mt-5 block text-sm font-bold text-slate-700">المصنع</label>
           <select value={factoryId} onChange={e => { setFactoryId(e.target.value); setError(''); setSuccess(''); }} className="mt-2 w-full rounded-xl border border-slate-300 bg-slate-50 p-3 text-sm text-slate-900">
             <option value="">اختار المصنع</option>
@@ -121,7 +108,7 @@ export const DirectLoadAssignmentScreen: React.FC = () => {
           <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-900">
             <b>شروط التأكيد:</b> السائق مرتبط بالعربية، وموقع GPS حديث (آخر 10 دقائق)، والعربية داخل نطاق 10 كم من مكتب تسجيل الوصول. لا يمكن إسناد نقلة نشطة ثانية لنفس السائق أو العربية.
           </div>
-          <button type="button" disabled={saving || loading || !factoryId || !quarryId || !loadOrderId || !vehicleId} onClick={() => void assign()} className="mt-5 w-full rounded-xl bg-emerald-600 p-4 text-sm font-black text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50">{saving ? 'جاري التحقق وتثبيت الإسناد...' : 'تأكيد التحميل بالأمر المباشر'}</button>
+          <button type="button" disabled={saving || loading || !factoryId || !quarryId || !vehicleId} onClick={() => void assign()} className="mt-5 w-full rounded-xl bg-emerald-600 p-4 text-sm font-black text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50">{saving ? 'جاري التحقق وتثبيت الإسناد...' : 'تأكيد الإسناد المباشر'}</button>
         </section>
 
         <aside className="space-y-4">
