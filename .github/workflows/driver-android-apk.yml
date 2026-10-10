@@ -132,7 +132,7 @@ jobs:
             appId: office ? 'com.tibasupplies.office' : 'com.tibasupplies.driver',
             appName: office ? 'Tiba Supplies Office' : 'Tiba Supplies Driver',
             webDir: 'dist',
-            android: { allowMixedContent: false }
+            android: { allowMixedContent: false, useLegacyBridge: mode === 'driver' }
           };
           fs.writeFileSync('capacitor.config.json', JSON.stringify(config, null, 2) + String.fromCharCode(10));
           console.log('Generated Capacitor config for ' + mode);
@@ -154,7 +154,11 @@ jobs:
           let xml = fs.readFileSync(file, 'utf8');
           const permissions = [
             'android.permission.ACCESS_COARSE_LOCATION',
-            'android.permission.ACCESS_FINE_LOCATION'
+            'android.permission.ACCESS_FINE_LOCATION',
+            'android.permission.ACCESS_BACKGROUND_LOCATION',
+            'android.permission.FOREGROUND_SERVICE',
+            'android.permission.FOREGROUND_SERVICE_LOCATION',
+            'android.permission.POST_NOTIFICATIONS'
           ];
           const manifestTag = xml.match(/<manifest[^>]*>/);
           if (!manifestTag) {
