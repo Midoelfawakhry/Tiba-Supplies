@@ -122,7 +122,8 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     actual: snapshot?.actual_loading_records ?? [],
   };
   const rows = lists[active] ?? [];
-  const filteredAvailableVehicles = availableVehicles.filter((vehicle: Row) => [vehicle.plate_number, vehicle.vehicle_code, vehicle.owner_name].some(value => String(value ?? '').toLowerCase().includes(vehicleSearch.trim().toLowerCase())));
+  const filteredAvailableVehicles = availableVehicles.filter((vehicle: Row) => [vehicle.plate_number, vehicle.vehicle_code].some(value => String(value ?? '').toLowerCase().includes(vehicleSearch.trim().toLowerCase())));
+  const selectedVehicle = availableVehicles.find((vehicle: Row) => String(vehicle.vehicle_id) === selectedVehicleId);
   const ActiveIcon = tabs.find(tab => tab.key === active)?.icon ?? ClipboardList;
 
   return (
@@ -161,8 +162,12 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
             <label className="relative mt-1.5 block"><span className="sr-only">ابحث برقم العربية</span><input value={vehicleSearch} onChange={e => { setVehicleSearch(e.target.value); setSelectedVehicleId(''); }} className="w-full rounded-xl border border-slate-300 bg-white p-3 pr-10 font-normal" placeholder="ابحث برقم اللوحة أو كود العربية..."/><span className="absolute right-3 top-3 text-slate-400"><Truck size={18}/></span></label>
             <select required value={selectedVehicleId} onChange={e => setSelectedVehicleId(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal">
               <option value="">اختار عربية متاحة</option>
-              {filteredAvailableVehicles.map((vehicle: Row) => <option key={vehicle.vehicle_id} value={vehicle.vehicle_id}>{vehicle.plate_number}{vehicle.owner_name ? ` · المالك: ${vehicle.owner_name}` : ' · المالك غير محدد'}{vehicle.vehicle_code ? ` · ${vehicle.vehicle_code}` : ''} </option>)}
+              {filteredAvailableVehicles.map((vehicle: Row) => <option key={vehicle.vehicle_id} value={vehicle.vehicle_id}>{vehicle.plate_number}{vehicle.vehicle_code ? ` · ${vehicle.vehicle_code}` : ''}</option>)}
             </select>
+            <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3" aria-live="polite">
+              <span className="block text-xs font-semibold text-slate-500">مالك العربية المرتبط بها تلقائيًا</span>
+              <span className="mt-1 block font-bold text-slate-800">{selectedVehicle ? (selectedVehicle.owner_name || 'لا يوجد مالك مسجل لهذه العربية') : 'اختار العربية لعرض اسم المالك'}</span>
+            </div>
             <p className="mt-1 text-xs font-normal text-slate-500">{filteredAvailableVehicles.length} عربية متاحة للاختيار</p>
           </div>
           <label className="text-sm font-bold text-slate-700">كود السواق (اختياري)<input value={driverCode} onChange={e => setDriverCode(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal" placeholder="لو عنده كود بالفعل"/></label>
