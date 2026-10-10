@@ -45,7 +45,9 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
   const [driverName, setDriverName] = useState('');
   const [driverPhone, setDriverPhone] = useState('');
   const [driverCode, setDriverCode] = useState('');
-  const [vehiclePlate, setVehiclePlate] = useState('');
+  const [vehicleSearch, setVehicleSearch] = useState('');
+  const [selectedVehicleId, setSelectedVehicleId] = useState('');
+  const [availableVehicles, setAvailableVehicles] = useState<Row[]>([]);
   const [savingDriver, setSavingDriver] = useState(false);
 
   const load = useCallback(async () => {
@@ -57,6 +59,9 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
       const { data: waitingData, error: waitingError } = await supabase.rpc('get_office_waiting_list');
       if (waitingError) throw waitingError;
       setWaiting(Array.isArray(waitingData) ? waitingData : []);
+      const { data: vehiclesData, error: vehiclesError } = await supabase.rpc('get_available_vehicles');
+      if (vehiclesError) throw vehiclesError;
+      setAvailableVehicles(Array.isArray(vehiclesData) ? vehiclesData : []);
     } catch (e: any) {
       setError(e?.message || 'تعذر تحميل دليل بيانات المكتب.');
     } finally {
@@ -74,7 +79,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
       const { data: result, error: createError } = await supabase.rpc('create_operational_driver', {
         p_name: driverName.trim(),
         p_phone: driverPhone.trim(),
-        p_plate_number: vehiclePlate.trim(),
+        p_vehicle_id: selectedVehicleId,
         p_driver_code: driverCode.trim() || null,
       });
       if (createError) throw createError;
@@ -83,7 +88,8 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
       setDriverName('');
       setDriverPhone('');
       setDriverCode('');
-      setVehiclePlate('');
+      setVehicleSearch('');
+      setSelectedVehicleId('');
       setShowDriverForm(false);
       await load();
     } catch (e: any) {
@@ -91,6 +97,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
       const messages: Record<string, string> = {
         DRIVER_PHONE_EXISTS: 'رقم الموبايل مسجل لسواق بالفعل.',
         VEHICLE_PLATE_EXISTS: 'رقم العربية مسجل بالفعل.',
+        VEHICLE_NOT_AVAILABLE: 'العربية دي مش متاحة أو اتربطت بسواق آخر. حدّث القائمة واختار عربية تانية.',
         DRIVER_CODE_EXISTS: 'كود السواق مستخدم بالفعل.',
         REQUIRED_FIELDS_MISSING: 'اكتب اسم السواق ورقم الموبايل ورقم العربية.',
         INSUFFICIENT_ROLE: 'حسابك مش عنده صلاحية إضافة سواقين.',
@@ -113,6 +120,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     actual: snapshot?.actual_loading_records ?? [],
   };
   const rows = lists[active] ?? [];
+  const filteredAvailableVehicles = availableVehicles.filter((vehicle: Row) => String(vehicle.plate_number ?? '').toLowerCase().includes(vehicleSearch.trim().toLowerCase()));
   const ActiveIcon = tabs.find(tab => tab.key === active)?.icon ?? ClipboardList;
 
   return (
@@ -140,7 +148,14 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
         {showDriverForm && <form onSubmit={createDriver} className="mt-4 grid gap-3 sm:grid-cols-2">
           <label className="text-sm font-bold text-slate-700">اسم السواق بالكامل<input required value={driverName} onChange={e => setDriverName(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal" placeholder="اسم السواق"/></label>
           <label className="text-sm font-bold text-slate-700">رقم الموبايل<input required type="tel" value={driverPhone} onChange={e => setDriverPhone(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal" placeholder="رقم التواصل"/></label>
-          <label className="text-sm font-bold text-slate-700">رقم العربية / اللوحة<input required value={vehiclePlate} onChange={e => setVehiclePlate(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal" placeholder="رقم العربية"/></label>
+          <div className="text-sm font-bold text-slate-700">اختيار العربية
+            <label className="relative mt-1.5 block"><span className="sr-only">ابحث برقم العربية</span><input value={vehicleSearch} onChange={e => { setVehicleSearch(e.target.value); setSelectedVehicleId(''); }} className="w-full rounded-xl border border-slate-300 bg-white p-3 pr-10 font-normal" placeholder="ابحث برقم اللوحة..."/><span className="absolute right-3 top-3 text-slate-400"><Truck size={18}/></span></label>
+            <select required value={selectedVehicleId} onChange={e => setSelectedVehicleId(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal">
+              <option value="">اختار عربية متاحة</option>
+              {filteredAvailableVehicles.map((vehicle: Row) => <option key={vehicle.vehicle_id} value={vehicle.vehicle_id}>{vehicle.plate_number}</option>)}
+            </select>
+            <p className="mt-1 text-xs font-normal text-slate-500">{filteredAvailableVehicles.length} عربية متاحة للاختيار</p>
+          </div>
           <label className="text-sm font-bold text-slate-700">كود السواق (اختياري)<input value={driverCode} onChange={e => setDriverCode(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal" placeholder="لو عنده كود بالفعل"/></label>
           <div className="sm:col-span-2 flex flex-wrap items-center gap-3"><button disabled={savingDriver} type="submit" className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-black text-white disabled:opacity-60">{savingDriver ? 'جاري الحفظ...' : 'حفظ السواق في النظام'}</button><p className="text-xs leading-5 text-slate-500">قبل استخدام الحفظ، لازم تكون ترقية قاعدة البيانات الخاصة بإضافة السواق مطبّقة في Supabase.</p></div>
         </form>}
