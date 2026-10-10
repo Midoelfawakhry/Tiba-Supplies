@@ -1,13 +1,12 @@
--- Register an operational driver and vehicle from the office app.
--- This does NOT create a Supabase Auth account.
--- Schema checked against the live information_schema output shared by the project owner.
+-- Register an operational driver and link an existing vehicle.
+-- Driver login creation remains a separate workflow.
 ALTER TABLE public.drivers
   ADD COLUMN IF NOT EXISTS driver_code text;
 
 CREATE OR REPLACE FUNCTION public.create_operational_driver(
   p_name text,
   p_phone text,
-  p_plate_number text,
+  p_vehicle_id uuid,
   p_driver_code text DEFAULT NULL
 ) RETURNS jsonb
 LANGUAGE plpgsql
@@ -16,11 +15,10 @@ SET search_path = public
 AS $function$
 DECLARE
   v_driver_id uuid;
-  v_vehicle_id uuid;
+  v_vehicle_plate text;
   v_user_id uuid := auth.uid();
   v_name text := NULLIF(btrim(p_name), '');
   v_phone text := NULLIF(btrim(p_phone), '');
-  v_plate text := NULLIF(btrim(p_plate_number), '');
   v_code text := NULLIF(btrim(p_driver_code), '');
 BEGIN
   IF v_user_id IS NULL THEN RAISE EXCEPTION 'AUTH_REQUIRED'; END IF;
@@ -37,7 +35,7 @@ BEGIN
     RAISE EXCEPTION 'INSUFFICIENT_ROLE';
   END IF;
 
-  IF v_name IS NULL OR v_phone IS NULL OR v_plate IS NULL THEN
+  IF v_name IS NULL OR v_phone IS NULL OR p_vehicle_id IS NULL THEN
     RAISE EXCEPTION 'REQUIRED_FIELDS_MISSING';
   END IF;
 
@@ -50,13 +48,6 @@ BEGIN
     RAISE EXCEPTION 'DRIVER_PHONE_EXISTS';
   END IF;
 
-  IF EXISTS (
-    SELECT 1 FROM public.vehicles v
-    WHERE lower(btrim(v.plate_number)) = lower(v_plate)
-  ) THEN
-    RAISE EXCEPTION 'VEHICLE_PLATE_EXISTS';
-  END IF;
-
   IF v_code IS NOT NULL AND EXISTS (
     SELECT 1 FROM public.drivers d
     WHERE lower(btrim(d.driver_code)) = lower(v_code)
@@ -64,29 +55,43 @@ BEGIN
     RAISE EXCEPTION 'DRIVER_CODE_EXISTS';
   END IF;
 
+  -- Lock and validate the chosen vehicle; only unassigned active vehicles are selectable.
+  SELECT v.plate_number INTO v_vehicle_plate
+  FROM public.vehicles v
+  WHERE v.vehicle_id = p_vehicle_id
+    AND v.is_active = true
+    AND NOT EXISTS (
+      SELECT 1 FROM public.vehicle_driver_assignments vda
+      WHERE vda.vehicle_id = v.vehicle_id
+        AND vda.assigned_to IS NULL
+        AND vda.assigned_from <= now()
+    )
+  FOR UPDATE;
+
+  IF v_vehicle_plate IS NULL THEN
+    RAISE EXCEPTION 'VEHICLE_NOT_AVAILABLE';
+  END IF;
+
   INSERT INTO public.drivers (name, phone, driver_code, is_active, auth_user_id)
   VALUES (v_name, v_phone, v_code, true, NULL)
   RETURNING driver_id INTO v_driver_id;
 
-  INSERT INTO public.vehicles (plate_number, is_active)
-  VALUES (v_plate, true)
-  RETURNING vehicle_id INTO v_vehicle_id;
-
-  INSERT INTO public.vehicle_driver_assignments (driver_id, vehicle_id, assigned_from, assigned_to)
-  VALUES (v_driver_id, v_vehicle_id, now(), NULL);
+  INSERT INTO public.vehicle_driver_assignments
+    (driver_id, vehicle_id, assigned_from, assigned_to)
+  VALUES (v_driver_id, p_vehicle_id, now(), NULL);
 
   RETURN jsonb_build_object(
     'success', true,
     'driver_id', v_driver_id,
-    'vehicle_id', v_vehicle_id,
+    'vehicle_id', p_vehicle_id,
     'driver_name', v_name,
     'phone', v_phone,
-    'plate_number', v_plate,
+    'plate_number', v_vehicle_plate,
     'driver_code', v_code
   );
 END;
 $function$;
 
-REVOKE ALL ON FUNCTION public.create_operational_driver(text, text, text, text) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.create_operational_driver(text, text, text, text) TO authenticated;
+REVOKE ALL ON FUNCTION public.create_operational_driver(text, text, uuid, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.create_operational_driver(text, text, uuid, text) TO authenticated;
 NOTIFY pgrst, 'reload schema';
