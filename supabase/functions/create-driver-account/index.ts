@@ -6,7 +6,6 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// Driver-account invitation is deployed through the repository workflow after review.
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
@@ -33,10 +32,33 @@ Deno.serve(async (req: Request) => {
     const { data: callerData, error: callerError } = await callerClient.auth.getUser(token);
     if (callerError || !callerData.user) return json({ error: "AUTH_REQUIRED" }, 401);
     const callerId = callerData.user.id;
+    const body = await req.json();
+
+    if (body.action === "complete_password_setup") {
+      const { data: driver, error: driverError } = await admin
+        .from("drivers")
+        .select("driver_id")
+        .eq("auth_user_id", callerId)
+        .eq("is_active", true)
+        .maybeSingle();
+      if (driverError) throw driverError;
+      if (!driver) return json({ error: "DRIVER_NOT_FOUND_OR_INACTIVE" }, 403);
+
+      const { data: currentUser, error: currentUserError } = await admin.auth.admin.getUserById(callerId);
+      if (currentUserError) throw currentUserError;
+      const appMetadata = currentUser.user.app_metadata ?? {};
+      if (appMetadata.must_change_password !== true) return json({ success: true });
+
+      const { error: updateError } = await admin.auth.admin.updateUserById(callerId, {
+        app_metadata: { ...appMetadata, must_change_password: false },
+      });
+      if (updateError) throw updateError;
+      return json({ success: true });
+    }
 
     const { data: appUser, error: appUserError } = await admin
       .from("app_users")
-      .select("user_id,is_active")
+      .select("user_id")
       .eq("auth_user_id", callerId)
       .eq("is_active", true)
       .maybeSingle();
@@ -53,54 +75,72 @@ Deno.serve(async (req: Request) => {
     );
     if (!allowed) return json({ error: "INSUFFICIENT_ROLE" }, 403);
 
-    const body = await req.json();
     const driverId = String(body.driver_id ?? "").trim();
-    const email = String(body.email ?? "").trim().toLowerCase();
-    if (!driverId || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return json({ error: "DRIVER_ID_AND_VALID_EMAIL_REQUIRED" }, 400);
-    }
+    const temporaryPassword = String(body.temporary_password ?? "");
+    if (!driverId) return json({ error: "DRIVER_ID_REQUIRED" }, 400);
+    if (temporaryPassword.length < 8) return json({ error: "TEMPORARY_PASSWORD_TOO_SHORT" }, 400);
 
     const { data: driver, error: driverError } = await admin
       .from("drivers")
-      .select("driver_id,name,auth_user_id,is_active")
+      .select("driver_id,name,phone,auth_user_id,is_active")
       .eq("driver_id", driverId)
       .maybeSingle();
     if (driverError) throw driverError;
     if (!driver || !driver.is_active) return json({ error: "DRIVER_NOT_FOUND_OR_INACTIVE" }, 404);
     if (driver.auth_user_id) return json({ error: "DRIVER_ACCOUNT_ALREADY_LINKED" }, 409);
 
-    const siteUrl = Deno.env.get("SITE_URL");
-    const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
-      data: { display_name: driver.name, account_type: "driver" },
-      ...(siteUrl ? { redirectTo: siteUrl } : {}),
-    });
-    if (inviteError) {
-      const duplicate = /already|registered|exists/i.test(inviteError.message);
-      return json({ error: duplicate ? "EMAIL_ALREADY_REGISTERED" : "INVITATION_FAILED" }, duplicate ? 409 : 400);
-    }
-    if (!invited.user) return json({ error: "INVITATION_FAILED" }, 500);
+    const phone = normalizeEgyptianPhone(driver.phone);
+    if (!phone) return json({ error: "DRIVER_PHONE_INVALID" }, 400);
 
-    // Return the updated row so a concurrent request cannot be reported as a successful link.
+    // The office confirms the driver's identity in person; no email or SMS is sent.
+    const { data: created, error: createError } = await admin.auth.admin.createUser({
+      phone,
+      password: temporaryPassword,
+      phone_confirm: true,
+      user_metadata: { display_name: driver.name },
+      app_metadata: { must_change_password: true },
+    });
+    if (createError) {
+      const duplicate = /already|registered|exists/i.test(createError.message);
+      return json(
+        { error: duplicate ? "PHONE_ALREADY_REGISTERED" : "ACCOUNT_CREATION_FAILED" },
+        duplicate ? 409 : 400,
+      );
+    }
+    if (!created.user) return json({ error: "ACCOUNT_CREATION_FAILED" }, 500);
+
     const { data: linkedDriver, error: linkError } = await admin
       .from("drivers")
-      .update({ auth_user_id: invited.user.id })
+      .update({ auth_user_id: created.user.id })
       .eq("driver_id", driverId)
       .is("auth_user_id", null)
+      .eq("is_active", true)
       .select("driver_id")
       .maybeSingle();
 
     if (linkError || !linkedDriver) {
-      await admin.auth.admin.deleteUser(invited.user.id);
+      const { error: cleanupError } = await admin.auth.admin.deleteUser(created.user.id);
+      if (cleanupError) console.error("Unlinked driver auth cleanup failed", cleanupError);
       if (linkError) throw linkError;
       return json({ error: "DRIVER_ACCOUNT_ALREADY_LINKED" }, 409);
     }
 
-    return json({ success: true, driver_id: driverId, invited: true });
+    return json({ success: true, driver_id: driverId, phone_password_login: true });
   } catch (error) {
     console.error("create-driver-account failed", error);
     return json({ error: "INTERNAL_ERROR" }, 500);
   }
 });
+
+function normalizeEgyptianPhone(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  let phone = value.trim().replace(/[\\s()-]/g, "");
+  if (phone.startsWith("00")) phone = `+${phone.slice(2)}`;
+  if (/^01[0125]\\d{8}$/.test(phone)) phone = `+20${phone.slice(1)}`;
+  if (/^20(10|11|12|15)\\d{8}$/.test(phone)) phone = `+${phone}`;
+  if (/^\\+20(10|11|12|15)\\d{8}$/.test(phone)) return phone;
+  return null;
+}
 
 function json(body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), {
