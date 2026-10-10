@@ -94,8 +94,25 @@ jobs:
         run: npm run build
 
       - name: Generate Capacitor config
+        shell: bash
         run: |
-          node -e 'const mode=process.env.TIBA_APP_MODE; const office=mode === "office"; const config={appId:office ? "com.tibasupplies.office" : "com.tibasupplies.driver",appName:office ? "Tiba Supplies Office" : "Tiba Supplies Driver",webDir:"dist",android:{allowMixedContent:false}}; require("fs").writeFileSync("capacitor.config.json", JSON.stringify(config,null,2)+"\\n")'
+          node <<'NODE'
+          const fs = require('node:fs');
+          const mode = process.env.TIBA_APP_MODE;
+          const office = mode === 'office';
+          const config = {
+            appId: office ? 'com.tibasupplies.office' : 'com.tibasupplies.driver',
+            appName: office ? 'Tiba Supplies Office' : 'Tiba Supplies Driver',
+            webDir: 'dist',
+            android: { allowMixedContent: false }
+          };
+          fs.writeFileSync('capacitor.config.json', JSON.stringify(config, null, 2) + String.fromCharCode(10));
+          console.log('Generated Capacitor config for ' + mode);
+          console.log(fs.readFileSync('capacitor.config.json', 'utf8'));
+          NODE
+
+      - name: Validate Capacitor config
+        run: node -e "const c=require('./capacitor.config.json'); if(!c.appId || !c.appName || !c.webDir) process.exit(1); console.log('Capacitor config valid:', c.appId)"
 
       - name: Add Android platform
         run: npx cap add android
