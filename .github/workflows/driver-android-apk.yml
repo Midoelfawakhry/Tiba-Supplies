@@ -145,6 +145,27 @@ jobs:
       - name: Add Android platform
         run: npx cap add android
 
+      - name: Declare Android location permissions
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const file = 'android/app/src/main/AndroidManifest.xml';
+          let xml = fs.readFileSync(file, 'utf8');
+          const permissions = [
+            'android.permission.ACCESS_COARSE_LOCATION',
+            'android.permission.ACCESS_FINE_LOCATION'
+          ];
+          for (const permission of permissions) {
+            const tag = '<uses-permission android:name="' + permission + '" />';
+            if (!xml.includes('android:name="' + permission + '"')) {
+              xml = xml.replace(/<manifest\\b[^>]*>/, match => match + '\\n    ' + tag);
+            }
+          }
+          fs.writeFileSync(file, xml);
+          console.log('Declared foreground location permissions in AndroidManifest.xml');
+          NODE
+
       - name: Sync Android platform
         run: npx cap sync android
 
