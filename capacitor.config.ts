@@ -6,7 +6,6 @@ const config: CapacitorConfig = {
   appId: appMode === 'office' ? 'com.tibasupplies.office' : 'com.tibasupplies.driver',
   appName: appMode === 'office' ? 'Tiba Supplies Office' : 'Tiba Supplies Driver',
   webDir: 'dist',
-  bundledWebRuntime: false,
   android: {
     allowMixedContent: false,
   },
