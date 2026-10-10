@@ -228,7 +228,6 @@ export const LiveOperationsBoard: React.FC = () => {
                       <div className="rounded-xl bg-white p-2"><b>{Math.max(0, Number(order.requested_quantity) - booked)}</b><div className="text-[10px] text-slate-500">متبقي</div></div>
                     </div>
                     <div className="mt-3 text-[10px] text-slate-500">{order.load_order_id}</div>
-                    {['PUBLISHED', 'LOADING_STATEMENT'].includes(order.status) && booked < Number(order.requested_quantity) && <button type="button" onClick={() => { setDirectOrderId(order.load_order_id); setDirectVehicleId(''); setError(''); setSuccessMessage(''); }} className="mt-3 w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white">إسناد مباشر لعربية محددة</button>}
                   </article>
                 );
               })}
