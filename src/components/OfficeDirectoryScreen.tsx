@@ -71,6 +71,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
   const [driverEditCode, setDriverEditCode] = useState('');
   const [driverEditVehicleId, setDriverEditVehicleId] = useState('');
   const [driverEditVehicles, setDriverEditVehicles] = useState<Row[]>([]);
+  const [driverEditOptionsLoaded, setDriverEditOptionsLoaded] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Row | null>(null);
   const [vehicleEditPlate, setVehicleEditPlate] = useState('');
   const [vehicleEditCode, setVehicleEditCode] = useState('');
@@ -115,11 +116,13 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     setDriverEditCode(String(row.driver_code ?? ''));
     setDriverEditVehicleId('');
     setDriverEditVehicles([]);
+    setDriverEditOptionsLoaded(false);
     try {
       const { data, error: optionsError } = await supabase.rpc('get_driver_edit_options', { p_driver_id: row.driver_id });
       if (optionsError) throw optionsError;
       setDriverEditVehicles(Array.isArray(data?.vehicles) ? data.vehicles : []);
       setDriverEditVehicleId(String(data?.current_vehicle_id ?? ''));
+      setDriverEditOptionsLoaded(true);
     } catch (e: any) {
       setError(e?.message || 'تعذر تحميل العربيات المتاحة لتعديل السائق.');
     }
@@ -386,7 +389,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
           <label className="text-sm font-bold text-slate-700">رقم الموبايل<input required type="tel" disabled={Boolean(editingDriver.auth_user_id)} value={driverEditPhone} onChange={e => setDriverEditPhone(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal disabled:bg-slate-100"/>{editingDriver.auth_user_id && <span className="mt-1 block text-xs font-normal text-slate-500">هذا الرقم هو اسم دخول السائق، لذلك تعديله يحتاج إجراءً منفصلًا للحساب.</span>}</label>
           <label className="text-sm font-bold text-slate-700">كود السائق (اختياري)<input value={driverEditCode} onChange={e => setDriverEditCode(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal"/></label>
           <label className="text-sm font-bold text-slate-700">العربية المرتبطة<select value={driverEditVehicleId} onChange={e => setDriverEditVehicleId(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal"><option value="">بدون عربية مؤقتًا</option>{driverEditVehicles.map(vehicle => <option key={vehicle.vehicle_id} value={vehicle.vehicle_id}>{vehicle.plate_number}{vehicle.owner_name ? ` · المالك: ${vehicle.owner_name}` : ''}</option>)}</select></label>
-          <div className="sm:col-span-2 flex flex-wrap gap-3"><button disabled={savingEdit || driverEditVehicles.length === 0} type="submit" className="rounded-xl bg-red-600 px-5 py-3 text-sm font-black text-white transition hover:bg-red-700 disabled:opacity-60">{savingEdit ? 'جاري الحفظ...' : 'حفظ التعديل'}</button><button type="button" onClick={() => setEditingDriver(null)} className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-bold">إلغاء</button></div>
+          <div className="sm:col-span-2 flex flex-wrap gap-3"><button disabled={savingEdit || !driverEditOptionsLoaded} type="submit" className="rounded-xl bg-red-600 px-5 py-3 text-sm font-black text-white transition hover:bg-red-700 disabled:opacity-60">{savingEdit ? 'جاري الحفظ...' : 'حفظ التعديل'}</button><button type="button" onClick={() => setEditingDriver(null)} className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-bold">إلغاء</button></div>
         </form>
       </section>}
 
