@@ -162,20 +162,23 @@ BEGIN
 
   SELECT * INTO v_assignment
   FROM public.vehicle_driver_assignments a
-  WHERE a.driver_id = p_driver_id AND a.assigned_to IS NULL AND a.assigned_from <= now()
+  WHERE a.driver_id = p_driver_id AND a.vehicle_id = p_vehicle_id
+    AND a.assigned_to IS NULL AND a.assigned_from <= now()
   ORDER BY a.assigned_from DESC LIMIT 1 FOR UPDATE;
 
-  IF v_assignment.assignment_id IS NOT NULL
-     AND v_assignment.vehicle_id IS DISTINCT FROM p_vehicle_id THEN
+  IF p_vehicle_id IS NULL OR v_assignment.assignment_id IS NULL THEN
     UPDATE public.vehicle_driver_assignments
     SET assigned_to = now()
-    WHERE assignment_id = v_assignment.assignment_id;
-    v_assignment.assignment_id := NULL;
-  END IF;
-
-  IF p_vehicle_id IS NOT NULL AND v_assignment.assignment_id IS NULL THEN
-    INSERT INTO public.vehicle_driver_assignments(driver_id, vehicle_id, assigned_from)
-    VALUES (p_driver_id, p_vehicle_id, now());
+    WHERE driver_id = p_driver_id AND assigned_to IS NULL AND assigned_from <= now();
+    IF p_vehicle_id IS NOT NULL THEN
+      INSERT INTO public.vehicle_driver_assignments(driver_id, vehicle_id, assigned_from)
+      VALUES (p_driver_id, p_vehicle_id, now());
+    END IF;
+  ELSE
+    UPDATE public.vehicle_driver_assignments
+    SET assigned_to = now()
+    WHERE driver_id = p_driver_id AND assigned_to IS NULL AND assigned_from <= now()
+      AND assignment_id <> v_assignment.assignment_id;
   END IF;
 
   UPDATE public.drivers
