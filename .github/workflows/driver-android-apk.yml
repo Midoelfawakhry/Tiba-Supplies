@@ -15,6 +15,7 @@ on:
   push:
     branches:
       - phase2-driver-app-foundation
+      - feature/driver-phone-password-access
     paths:
       - 'src/**'
       - 'index.html'
