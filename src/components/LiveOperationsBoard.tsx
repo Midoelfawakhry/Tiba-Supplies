@@ -41,16 +41,24 @@ export const LiveOperationsBoard: React.FC = () => {
     return <div dir="rtl" className="min-h-screen bg-zinc-950 text-white grid place-items-center">جاري تحميل بيانات التشغيل الحقيقية...</div>;
   }
 
+  const operationalOffice = data?.operational_office ?? data?.office;
+  const checkInOffice = data?.check_in_office;
+  const checkInRadiusKm = Number(checkInOffice?.geofence_radius_m ?? 10000) / 1000;
+
   return (
     <div dir="rtl" className="min-h-screen bg-zinc-950 text-zinc-100">
       <header className="border-b border-slate-800 bg-slate-950/90 sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-5 py-4 flex items-center justify-between gap-4">
           <div>
             <div className="text-xs font-black text-cyan-300">TIBA SUPPLIES · LIVE CORE</div>
-            <h1 className="text-xl sm:text-2xl font-black">مركز تشغيل رأس سدر</h1>
+            <h1 className="text-xl sm:text-2xl font-black">مركز تشغيل طيبة للتوريدات</h1>
             <div className="text-xs text-slate-400 mt-1">
               <MapPin className="inline h-3 w-3 ml-1" />
-              {data?.office?.name ?? 'مكتب طيبة للتوريدات - رأس سدر'} · نطاق التشغيل {Number(data?.office?.geofence_radius_m ?? 10000) / 1000} كم
+              مكتب التشغيل: {operationalOffice?.name ?? 'طيبة للتوريدات - الإسماعيلية'}
+              {' · '}
+              تسجيل الوصول: {checkInOffice?.name ?? 'طيبة للتوريدات - رأس سدر'}
+              {' · '}
+              نطاق تسجيل الوصول {checkInRadiusKm} كم
             </div>
           </div>
           <div className="flex gap-2">
@@ -128,7 +136,7 @@ export const LiveOperationsBoard: React.FC = () => {
             <div className="rounded-3xl border border-emerald-500/20 bg-emerald-500/5 p-5">
               <div className="text-sm font-black text-emerald-300">قاعدة التشغيل الأساسية</div>
               <div className="mt-2 text-sm text-slate-300">
-                نقطة رأس سدر هي مركز التشغيل، ونطاق الأهلية 10 كم. أي تخصيص مباشر لاحقًا لن يتجاوز هذا القيد.
+                أوامر التحميل تصدر من مكتب الإسماعيلية، وتسجيل وصول السواقين يتم في مكتب رأس سدر. وجود السواق داخل نطاق {checkInRadiusKm} كم وحده لا يضيفه لقائمة الانتظار؛ لازم يسجل وصوله صراحةً.
               </div>
             </div>
           </div>
