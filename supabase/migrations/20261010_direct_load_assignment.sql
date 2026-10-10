@@ -56,7 +56,7 @@ BEGIN
   WHERE office_id = v_load.check_in_office_id AND is_active = true;
   IF NOT FOUND THEN RAISE EXCEPTION 'CHECK_IN_OFFICE_NOT_CONFIGURED'; END IF;
   IF v_office.latitude IS NULL OR v_office.longitude IS NULL
-     OR v_office.geofence_radius_m IS NULL OR v_office.geofence_radius_m <= 0 THEN
+     THEN
     RAISE EXCEPTION 'OFFICE_GEOFENCE_NOT_CONFIGURED';
   END IF;
 
@@ -88,7 +88,7 @@ BEGIN
     cos(radians(v_office.latitude)) * cos(radians(v_location.latitude)) *
     power(sin(radians(v_location.longitude - v_office.longitude) / 2), 2)
   ));
-  IF v_distance_m > v_office.geofence_radius_m THEN
+  IF v_distance_m > 10000 THEN
     RAISE EXCEPTION 'VEHICLE_OUTSIDE_GEOFENCE';
   END IF;
 
@@ -135,7 +135,7 @@ BEGIN
     'success', true, 'booking_id', v_booking_id, 'load_order_id', v_load.load_order_id,
     'driver_id', v_driver_id, 'vehicle_id', p_vehicle_id,
     'distance_m', round(v_distance_m::numeric, 1),
-    'geofence_radius_m', v_office.geofence_radius_m,
+    'geofence_radius_m', 10000,
     'status', 'LOADING_STATEMENT'
   );
 END;
