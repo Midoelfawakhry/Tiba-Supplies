@@ -1,0 +1,167 @@
+name: Build Tiba Supplies iOS Simulator Apps
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_mode:
+        description: Which iOS app to build
+        required: true
+        type: choice
+        options:
+          - driver
+          - office
+          - both
+        default: both
+  push:
+    branches:
+      - phase2-driver-app-foundation
+      - feature/driver-phone-password-access
+    paths:
+      - 'src/**'
+      - 'index.html'
+      - 'package.json'
+      - 'tsconfig.json'
+      - '.github/workflows/ios-build.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  select-builds:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - id: set-matrix
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            MODE="${{ inputs.app_mode }}"
+          else
+            MODE="both"
+          fi
+          if [ "$MODE" = "both" ]; then
+            echo 'matrix={"app_mode":["driver","office"]}' >> "$GITHUB_OUTPUT"
+          else
+            echo "matrix={\"app_mode\":[\"$MODE\"]}" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-ios-simulator:
+    needs: select-builds
+    runs-on: macos-15
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        app_mode: ${{ fromJson(needs.select-builds.outputs.matrix).app_mode }}
+    env:
+      VITE_APP_MODE: ${{ matrix.app_mode }}
+      TIBA_APP_MODE: ${{ matrix.app_mode }}
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || secrets.SUPABASE_URL }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY || secrets.SUPABASE_PUBLISHABLE_KEY || secrets.SUPABASE_ANON_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify Supabase configuration
+        shell: bash
+        run: |
+          if [ -z "$VITE_SUPABASE_URL" ]; then
+            echo "::error::Missing GitHub Actions secret: VITE_SUPABASE_URL (or SUPABASE_URL)"
+            exit 1
+          fi
+          if [ -z "$VITE_SUPABASE_PUBLISHABLE_KEY" ]; then
+            echo "::error::Missing GitHub Actions secret: VITE_SUPABASE_PUBLISHABLE_KEY (or SUPABASE_PUBLISHABLE_KEY / SUPABASE_ANON_KEY)"
+            exit 1
+          fi
+          NORMALIZED_URL="$(node -e 'const u = new URL(process.env.VITE_SUPABASE_URL); if (u.protocol !== "https:" || !u.hostname.endsWith(".supabase.co")) process.exit(2); process.stdout.write(u.origin)')" || {
+            echo "::error::Supabase URL is not a valid HTTPS project URL."
+            exit 1
+          }
+          echo "VITE_SUPABASE_URL=$NORMALIZED_URL" >> "$GITHUB_ENV"
+          echo "Supabase URL configured; publishable key is present (value not logged)."
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Type-check
+        run: npm run lint
+
+      - name: Build web bundle
+        run: npm run build
+
+      - name: Generate Capacitor config
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const mode = process.env.TIBA_APP_MODE;
+          const office = mode === 'office';
+          const config = {
+            appId: office ? 'com.tibasupplies.office' : 'com.tibasupplies.driver',
+            appName: office ? 'Tiba Supplies Office' : 'Tiba Supplies Driver',
+            webDir: 'dist',
+            ios: { contentInset: 'automatic' }
+          };
+          fs.writeFileSync('capacitor.config.json', JSON.stringify(config, null, 2) + String.fromCharCode(10));
+          console.log('Generated Capacitor config for ' + mode);
+          NODE
+
+      - name: Add iOS platform
+        run: npx cap add ios
+
+      - name: Configure driver background location permissions
+        if: matrix.app_mode == 'driver'
+        shell: bash
+        run: |
+          python3 <<'PY'
+          import plistlib
+          from pathlib import Path
+
+          plist_path = Path("ios/App/App/Info.plist")
+          with plist_path.open("rb") as stream:
+              info = plistlib.load(stream)
+
+          info["NSLocationWhenInUseUsageDescription"] = "يستخدم التطبيق موقعك أثناء العمل لعرض حالة الرحلة."
+          info["NSLocationAlwaysAndWhenInUseUsageDescription"] = "يشارك التطبيق موقع المركبة أثناء الرحلة حتى عند انتقال التطبيق إلى الخلفية."
+          modes = info.get("UIBackgroundModes", [])
+          if "location" not in modes:
+              modes.append("location")
+          info["UIBackgroundModes"] = modes
+
+          with plist_path.open("wb") as stream:
+              plistlib.dump(info, stream, sort_keys=False)
+          print("Configured iOS foreground and background location usage descriptions.")
+          PY
+
+      - name: Sync iOS plugins
+        run: npx cap sync ios
+
+      - name: Build iOS Simulator app
+        run: |
+          xcodebuild \
+            -workspace ios/App/App.xcworkspace \
+            -scheme App \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/tiba-ios-derived" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+          APP_PATH="$RUNNER_TEMP/tiba-ios-derived/Build/Products/Debug-iphonesimulator/App.app"
+          test -d "$APP_PATH"
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$RUNNER_TEMP/tiba-supplies-${{ matrix.app_mode }}-ios-simulator.zip"
+
+      - name: Upload simulator build
+        uses: actions/upload-artifact@v4
+        with:
+          name: tiba-supplies-${{ matrix.app_mode }}-ios-simulator
+          path: ${{ runner.temp }}/tiba-supplies-${{ matrix.app_mode }}-ios-simulator.zip
+          if-no-files-found: error
