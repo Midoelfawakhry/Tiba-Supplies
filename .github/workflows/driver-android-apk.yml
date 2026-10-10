@@ -37,7 +37,7 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             MODE="${{ inputs.app_mode }}"
           else
-            MODE="office"
+            MODE="driver"
           fi
           if [ "$MODE" = "both" ]; then
             echo 'matrix={"app_mode":["driver","office"]}' >> "$GITHUB_OUTPUT"
