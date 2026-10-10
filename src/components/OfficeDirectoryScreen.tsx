@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Building2, Mountain, Users, Truck, ClipboardCheck, ClipboardList, Clock3, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Building2, Mountain, Users, Truck, ClipboardCheck, ClipboardList, Clock3, RefreshCw, AlertTriangle, Pencil } from 'lucide-react';
 import { getLiveSnapshot, LiveSnapshot, liveName } from '../services/liveData';
 import { supabase } from '../lib/supabase';
 import { AddVehicleForm } from './AddVehicleForm';
@@ -38,7 +38,7 @@ function rowDetails(row: Row, key: ScreenKey) {
   if (key === 'factories') return [row.client_name, row.address, row.phone].filter(Boolean).join(' · ');
   if (key === 'quarries') return [row.region, row.materials_available?.join?.('، '), row.address].filter(Boolean).join(' · ');
   if (key === 'drivers') return [row.phone, row.driver_code, row.is_active === false ? 'غير نشط' : 'نشط'].filter(Boolean).join(' · ');
-  if (key === 'vehicles') return [row.truck_type ?? row.vehicle_type, row.capacity_tons ? row.capacity_tons + ' طن' : '', row.is_active === false ? 'غير نشطة' : 'نشطة'].filter(Boolean).join(' · ');
+  if (key === 'vehicles') return [row.owner_name ? 'المالك: ' + row.owner_name : '', row.truck_type ?? row.vehicle_type, row.capacity_tons ? row.capacity_tons + ' طن' : '', row.is_active === false ? 'غير نشطة' : 'نشطة'].filter(Boolean).join(' · ');
   if (key === 'waiting') return [row.driver_name, row.status, row.arrived_at ? new Date(row.arrived_at).toLocaleString('ar-EG') : ''].filter(Boolean).join(' · ');
   if (key === 'loads') return [row.status, row.requested_quantity ? 'المطلوب: ' + row.requested_quantity : '', row.created_at ? new Date(row.created_at).toLocaleString('ar-EG') : ''].filter(Boolean).join(' · ');
   return [row.load_date, row.driver_id ? 'معرّف السائق: ' + row.driver_id : '', row.vehicle_id ? 'معرّف العربية: ' + row.vehicle_id : '', row.created_at ? new Date(row.created_at).toLocaleString('ar-EG') : ''].filter(Boolean).join(' · ');
@@ -64,6 +64,21 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
   const [vehicleSearch, setVehicleSearch] = useState('');
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
   const [availableVehicles, setAvailableVehicles] = useState<Row[]>([]);
+  const [ownerDirectory, setOwnerDirectory] = useState<Row[]>([]);
+  const [editingDriver, setEditingDriver] = useState<Row | null>(null);
+  const [driverEditName, setDriverEditName] = useState('');
+  const [driverEditPhone, setDriverEditPhone] = useState('');
+  const [driverEditCode, setDriverEditCode] = useState('');
+  const [driverEditVehicleId, setDriverEditVehicleId] = useState('');
+  const [driverEditVehicles, setDriverEditVehicles] = useState<Row[]>([]);
+  const [editingVehicle, setEditingVehicle] = useState<Row | null>(null);
+  const [vehicleEditPlate, setVehicleEditPlate] = useState('');
+  const [vehicleEditCode, setVehicleEditCode] = useState('');
+  const [vehicleEditOwnerId, setVehicleEditOwnerId] = useState('');
+  const [vehicleOwnerMode, setVehicleOwnerMode] = useState<'existing' | 'new'>('existing');
+  const [newOwnerName, setNewOwnerName] = useState('');
+  const [newOwnerPhone, setNewOwnerPhone] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
   const [savingDriver, setSavingDriver] = useState(false);
 
   const load = useCallback(async () => {
@@ -71,13 +86,18 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     setError('');
     try {
       const data = await getLiveSnapshot();
+      const [waitingResult, vehiclesResult, ownersResult] = await Promise.all([
+        supabase.rpc('get_office_waiting_list'),
+        supabase.rpc('get_available_vehicles'),
+        supabase.rpc('get_vehicle_owner_directory'),
+      ]);
+      if (waitingResult.error) throw waitingResult.error;
+      if (vehiclesResult.error) throw vehiclesResult.error;
+      if (ownersResult.error) throw ownersResult.error;
       setSnapshot(data);
-      const { data: waitingData, error: waitingError } = await supabase.rpc('get_office_waiting_list');
-      if (waitingError) throw waitingError;
-      setWaiting(Array.isArray(waitingData) ? waitingData : []);
-      const { data: vehiclesData, error: vehiclesError } = await supabase.rpc('get_available_vehicles');
-      if (vehiclesError) throw vehiclesError;
-      setAvailableVehicles(Array.isArray(vehiclesData) ? vehiclesData : []);
+      setWaiting(Array.isArray(waitingResult.data) ? waitingResult.data : []);
+      setAvailableVehicles(Array.isArray(vehiclesResult.data) ? vehiclesResult.data : []);
+      setOwnerDirectory(Array.isArray(ownersResult.data) ? ownersResult.data : []);
     } catch (e: any) {
       setError(e?.message || 'تعذر تحميل دليل بيانات المكتب.');
     } finally {
@@ -85,6 +105,115 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     }
   }, []);
   useEffect(() => { void load(); }, [load]);
+
+  async function beginDriverEdit(row: Row) {
+    setError('');
+    setSuccess('');
+    setEditingDriver(row);
+    setDriverEditName(String(row.name ?? row.driver_name ?? ''));
+    setDriverEditPhone(String(row.phone ?? ''));
+    setDriverEditCode(String(row.driver_code ?? ''));
+    setDriverEditVehicleId('');
+    setDriverEditVehicles([]);
+    try {
+      const { data, error: optionsError } = await supabase.rpc('get_driver_edit_options', { p_driver_id: row.driver_id });
+      if (optionsError) throw optionsError;
+      setDriverEditVehicles(Array.isArray(data?.vehicles) ? data.vehicles : []);
+      setDriverEditVehicleId(String(data?.current_vehicle_id ?? ''));
+    } catch (e: any) {
+      setError(e?.message || 'تعذر تحميل العربيات المتاحة لتعديل السائق.');
+    }
+  }
+
+  function beginVehicleEdit(row: Row) {
+    setError('');
+    setSuccess('');
+    setEditingVehicle(row);
+    setVehicleEditPlate(String(row.plate_number ?? ''));
+    setVehicleEditCode(String(row.vehicle_code ?? ''));
+    setVehicleEditOwnerId(String(row.owner_id ?? ''));
+    setVehicleOwnerMode('existing');
+    setNewOwnerName('');
+    setNewOwnerPhone('');
+  }
+
+  async function saveDriverEdit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editingDriver) return;
+    setSavingEdit(true);
+    setError('');
+    setSuccess('');
+    try {
+      const { data, error: updateError } = await supabase.rpc('update_operational_driver', {
+        p_driver_id: editingDriver.driver_id,
+        p_name: driverEditName.trim(),
+        p_phone: driverEditPhone.trim(),
+        p_driver_code: driverEditCode.trim() || null,
+        p_vehicle_id: driverEditVehicleId || null,
+      });
+      if (updateError) throw updateError;
+      if (!data?.success) throw new Error('تعذر تأكيد تعديل السائق.');
+      setEditingDriver(null);
+      setSuccess('تم تحديث بيانات السائق وربط العربية. احتفظ النظام بسجل الربط السابق.');
+      await load();
+    } catch (e: any) {
+      const raw = String(e?.message || '');
+      const messages: Record<string, string> = {
+        AUTH_REQUIRED: 'انتهت جلسة المكتب. سجّل الدخول مرة أخرى.',
+        INSUFFICIENT_ROLE: 'حسابك لا يملك صلاحية تعديل السائقين.',
+        DRIVER_NOT_FOUND_OR_INACTIVE: 'السائق غير موجود أو غير نشط.',
+        DRIVER_PHONE_EXISTS: 'رقم الموبايل مستخدم لسائق آخر.',
+        DRIVER_PHONE_INVALID: 'أدخل رقم موبايل صحيحًا.',
+        DRIVER_CODE_EXISTS: 'كود السائق مستخدم بالفعل.',
+        VEHICLE_ALREADY_ASSIGNED: 'العربية مرتبطة بسائق آخر. اختر عربية متاحة.',
+        VEHICLE_NOT_AVAILABLE: 'العربية غير متاحة أو غير نشطة.',
+        DRIVER_LOGIN_PHONE_CHANGE_REQUIRES_ACCOUNT_UPDATE: 'رقم دخول السائق مرتبط بحسابه. لا يمكن تغييره من شاشة البيانات.',
+      };
+      const key = Object.keys(messages).find(code => raw.includes(code));
+      setError(key ? messages[key] : raw || 'تعذر تعديل بيانات السائق.');
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  async function saveVehicleEdit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editingVehicle) return;
+    setSavingEdit(true);
+    setError('');
+    setSuccess('');
+    try {
+      const { data, error: updateError } = await supabase.rpc('update_operational_vehicle', {
+        p_vehicle_id: editingVehicle.vehicle_id,
+        p_plate_number: vehicleEditPlate.trim(),
+        p_vehicle_code: vehicleEditCode.trim() || null,
+        p_owner_id: vehicleOwnerMode === 'existing' ? (vehicleEditOwnerId || null) : null,
+        p_new_owner_name: vehicleOwnerMode === 'new' ? newOwnerName.trim() : null,
+        p_new_owner_phone: vehicleOwnerMode === 'new' ? newOwnerPhone.trim() || null : null,
+      });
+      if (updateError) throw updateError;
+      if (!data?.success) throw new Error('تعذر تأكيد تعديل العربية.');
+      setEditingVehicle(null);
+      setSuccess('تم تحديث بيانات العربية وربطها بالمالك المحدد.');
+      await load();
+    } catch (e: any) {
+      const raw = String(e?.message || '');
+      const messages: Record<string, string> = {
+        AUTH_REQUIRED: 'انتهت جلسة المكتب. سجّل الدخول مرة أخرى.',
+        INSUFFICIENT_ROLE: 'حسابك لا يملك صلاحية تعديل العربيات.',
+        VEHICLE_NOT_FOUND_OR_INACTIVE: 'العربية غير موجودة أو غير نشطة.',
+        VEHICLE_PLATE_REQUIRED: 'اكتب رقم اللوحة.',
+        VEHICLE_PLATE_EXISTS: 'رقم اللوحة مستخدم لعربية أخرى.',
+        VEHICLE_CODE_EXISTS: 'كود العربية مستخدم بالفعل.',
+        OWNER_REQUIRED: 'اختر مالكًا موجودًا أو اكتب بيانات المالك الجديد.',
+        OWNER_NOT_FOUND_OR_INACTIVE: 'المالك غير موجود أو غير نشط. اختر مالكًا نشطًا.',
+      };
+      const key = Object.keys(messages).find(code => raw.includes(code));
+      setError(key ? messages[key] : raw || 'تعذر تعديل بيانات العربية.');
+    } finally {
+      setSavingEdit(false);
+    }
+  }
 
   async function createDriverAccount(driverId: string, temporaryPassword: string) {
     const { data, error: invokeError } = await supabase.functions.invoke('create-driver-account', {
@@ -250,11 +379,39 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
         </form>}
       </section>}
 
+      {editingDriver && active === 'drivers' && <section className="rounded-3xl border border-red-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="mb-4"><h3 className="font-black">تعديل بيانات السائق</h3><p className="mt-1 text-sm text-slate-500">غيّر بياناته أو انقله لعربية متاحة. يمكنك اختيار «بدون عربية» مؤقتًا.</p></div>
+        <form onSubmit={saveDriverEdit} className="grid gap-3 sm:grid-cols-2">
+          <label className="text-sm font-bold text-slate-700">اسم السائق<input required value={driverEditName} onChange={e => setDriverEditName(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal"/></label>
+          <label className="text-sm font-bold text-slate-700">رقم الموبايل<input required type="tel" disabled={Boolean(editingDriver.auth_user_id)} value={driverEditPhone} onChange={e => setDriverEditPhone(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal disabled:bg-slate-100"/>{editingDriver.auth_user_id && <span className="mt-1 block text-xs font-normal text-slate-500">هذا الرقم هو اسم دخول السائق، لذلك تعديله يحتاج إجراءً منفصلًا للحساب.</span>}</label>
+          <label className="text-sm font-bold text-slate-700">كود السائق (اختياري)<input value={driverEditCode} onChange={e => setDriverEditCode(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal"/></label>
+          <label className="text-sm font-bold text-slate-700">العربية المرتبطة<select value={driverEditVehicleId} onChange={e => setDriverEditVehicleId(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal"><option value="">بدون عربية مؤقتًا</option>{driverEditVehicles.map(vehicle => <option key={vehicle.vehicle_id} value={vehicle.vehicle_id}>{vehicle.plate_number}{vehicle.owner_name ? ` · المالك: ${vehicle.owner_name}` : ''}</option>)}</select></label>
+          <div className="sm:col-span-2 flex flex-wrap gap-3"><button disabled={savingEdit || driverEditVehicles.length === 0} type="submit" className="rounded-xl bg-red-600 px-5 py-3 text-sm font-black text-white transition hover:bg-red-700 disabled:opacity-60">{savingEdit ? 'جاري الحفظ...' : 'حفظ التعديل'}</button><button type="button" onClick={() => setEditingDriver(null)} className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-bold">إلغاء</button></div>
+        </form>
+      </section>}
+
+      {editingVehicle && active === 'vehicles' && <section className="rounded-3xl border border-blue-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="mb-4"><h3 className="font-black">تعديل بيانات العربية</h3><p className="mt-1 text-sm text-slate-500">عدّل اللوحة أو انقل الملكية لمالك موجود أو سجّل مالكًا جديدًا.</p></div>
+        <form onSubmit={saveVehicleEdit} className="grid gap-3 sm:grid-cols-2">
+          <label className="text-sm font-bold text-slate-700">رقم العربية / اللوحة<input required value={vehicleEditPlate} onChange={e => setVehicleEditPlate(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal"/></label>
+          <label className="text-sm font-bold text-slate-700">كود العربية<input value={vehicleEditCode} onChange={e => setVehicleEditCode(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal"/></label>
+          <div className="sm:col-span-2">
+            <div className="mb-2 text-sm font-bold text-slate-700">المالك</div>
+            <div className="mb-3 flex flex-wrap gap-2">
+              <button type="button" onClick={() => setVehicleOwnerMode('existing')} className={vehicleOwnerMode === 'existing' ? 'rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white' : 'rounded-xl border border-slate-300 px-4 py-2 text-sm font-bold'}>مالك موجود</button>
+              <button type="button" onClick={() => setVehicleOwnerMode('new')} className={vehicleOwnerMode === 'new' ? 'rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white' : 'rounded-xl border border-slate-300 px-4 py-2 text-sm font-bold'}>مالك جديد</button>
+            </div>
+            {vehicleOwnerMode === 'existing' ? <select required value={vehicleEditOwnerId} onChange={e => setVehicleEditOwnerId(e.target.value)} className="w-full rounded-xl border border-slate-300 bg-white p-3 font-normal"><option value="">اختر المالك</option>{ownerDirectory.map(owner => <option key={owner.owner_id} value={owner.owner_id} disabled={!owner.is_active}>{owner.name}{owner.phone ? ` · ${owner.phone}` : ''}{!owner.is_active ? ' · غير نشط' : ''}</option>)}</select> : <div className="grid gap-3 sm:grid-cols-2"><label className="text-sm font-bold text-slate-700">اسم المالك الجديد<input required value={newOwnerName} onChange={e => setNewOwnerName(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal"/></label><label className="text-sm font-bold text-slate-700">موبايل المالك (اختياري)<input type="tel" value={newOwnerPhone} onChange={e => setNewOwnerPhone(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal"/></label></div>}
+          </div>
+          <div className="sm:col-span-2 flex flex-wrap gap-3"><button disabled={savingEdit || (vehicleOwnerMode === 'existing' && ownerDirectory.length === 0)} type="submit" className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-black text-white transition hover:bg-blue-700 disabled:opacity-60">{savingEdit ? 'جاري الحفظ...' : 'حفظ التعديل'}</button><button type="button" onClick={() => setEditingVehicle(null)} className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-bold">إلغاء</button></div>
+        </form>
+      </section>}
+
       <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white">
         <div className="flex items-center gap-3 border-b border-slate-200 p-4 sm:p-5"><ActiveIcon className={sectionPalette[active].accent} size={23}/><div><h3 className="font-black">{tabs.find(tab => tab.key === active)?.label}</h3><p className="text-xs text-slate-500">{rows.length} سجل</p></div></div>
         <div className="divide-y divide-slate-100">
           {rows.map((row, index) => <article key={String(row.factory_id ?? row.quarry_id ?? row.driver_id ?? row.vehicle_id ?? row.entry_id ?? row.load_order_id ?? row.booking_id ?? row.actual_loading_record_id ?? index)} className={`border-r-4 p-4 transition-colors hover:bg-slate-50/70 sm:p-5 ${sectionPalette[active].row}`}>
-            <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h4 className="break-words font-black">{rowTitle(row, active)}</h4><p className="mt-1 break-words text-sm leading-6 text-slate-500">{rowDetails(row, active) || 'لا توجد تفاصيل إضافية في السجل الحالي.'}</p></div><span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-500">#{index + 1}</span></div>
+            <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h4 className="break-words font-black">{rowTitle(row, active)}</h4><p className="mt-1 break-words text-sm leading-6 text-slate-500">{rowDetails(active === 'vehicles' ? { ...row, owner_name: ownerDirectory.find(owner => String(owner.owner_id) === String(row.owner_id))?.name } : row, active) || 'لا توجد تفاصيل إضافية في السجل الحالي.'}</p></div><div className="flex shrink-0 items-center gap-2">{(active === 'drivers' || active === 'vehicles') && <button type="button" onClick={() => active === 'drivers' ? void beginDriverEdit(row) : beginVehicleEdit(row)} aria-label={active === 'drivers' ? 'تعديل بيانات السائق' : 'تعديل بيانات العربية'} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"><Pencil size={14}/> تعديل</button>}<span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-500">#{index + 1}</span></div></div>
           </article>)}
           {!loading && rows.length === 0 && <div className="p-10 text-center text-sm leading-6 text-slate-500">لا توجد سجلات في هذا القسم حاليًا. لن نعرض بيانات تجريبية بدل البيانات الحقيقية.</div>}
           {loading && <div className="p-8 text-center text-sm text-slate-500">جاري تحميل بيانات المكتب...</div>}
