@@ -168,7 +168,7 @@ BEGIN
       ),
     'quarries',
       COALESCE(
-        (SELECT jsonb_agg(to_jsonb(q) ORDER BY q.name)
+        (SELECT jsonb_agg(to_jsonb(q))
          FROM public.quarries q WHERE q.is_active = true),
         '[]'::jsonb
       ),
