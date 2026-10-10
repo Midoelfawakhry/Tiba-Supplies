@@ -20,6 +20,7 @@ on:
       - 'index.html'
       - 'package.json'
       - 'capacitor.config.json'
+      - 'tsconfig.json'
       - '.github/workflows/driver-android-apk.yml'
 
 permissions:
