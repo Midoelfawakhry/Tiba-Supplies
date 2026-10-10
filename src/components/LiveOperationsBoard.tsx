@@ -23,7 +23,7 @@ export const LiveOperationsBoard: React.FC = () => {
   const [priority, setPriority] = useState('3');
   const [savingOrder, setSavingOrder] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-  const [activeScreen, setActiveScreen] = useState<'dashboard' | 'tracking' | 'directory' | 'direct'>('dashboard');
+  const [activeScreen, setActiveScreen] = useState<'dashboard' | 'tracking' | 'directory' | 'direct' | 'drivers' | 'vehicles' | 'waiting'>('dashboard');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -130,21 +130,30 @@ export const LiveOperationsBoard: React.FC = () => {
 
         {successMessage && <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-700">{successMessage}</div>}
 
-        <nav aria-label="شاشات المكتب" className="grid grid-cols-2 gap-2 rounded-2xl border border-slate-200 bg-white p-2 sm:grid-cols-4">
+        <nav aria-label="قوائم المكتب" className="grid grid-cols-2 gap-2 rounded-2xl border border-slate-200 bg-white p-2 sm:grid-cols-4 lg:grid-cols-7">
           <button type="button" onClick={() => setActiveScreen('dashboard')} className={activeScreen === 'dashboard' ? 'rounded-xl bg-blue-600 px-3 py-3 text-sm font-black text-white' : 'rounded-xl px-3 py-3 text-sm font-bold text-slate-600'}>
             <ClipboardList className="ml-1 inline h-4 w-4" /> مركز التشغيل
+          </button>
+          <button type="button" onClick={() => setActiveScreen('drivers')} className={activeScreen === 'drivers' ? 'rounded-xl bg-blue-600 px-3 py-3 text-sm font-black text-white' : 'rounded-xl px-3 py-3 text-sm font-bold text-slate-600'}>
+            <Users className="ml-1 inline h-4 w-4" /> قائمة السائقين
+          </button>
+          <button type="button" onClick={() => setActiveScreen('vehicles')} className={activeScreen === 'vehicles' ? 'rounded-xl bg-blue-600 px-3 py-3 text-sm font-black text-white' : 'rounded-xl px-3 py-3 text-sm font-bold text-slate-600'}>
+            <Truck className="ml-1 inline h-4 w-4" /> كل العربيات
+          </button>
+          <button type="button" onClick={() => setActiveScreen('waiting')} className={activeScreen === 'waiting' ? 'rounded-xl bg-blue-600 px-3 py-3 text-sm font-black text-white' : 'rounded-xl px-3 py-3 text-sm font-bold text-slate-600'}>
+            <Clock3 className="ml-1 inline h-4 w-4" /> قائمة الانتظار
           </button>
           <button type="button" onClick={() => setActiveScreen('tracking')} className={activeScreen === 'tracking' ? 'rounded-xl bg-blue-600 px-3 py-3 text-sm font-black text-white' : 'rounded-xl px-3 py-3 text-sm font-bold text-slate-600'}>
             <MapPin className="ml-1 inline h-4 w-4" /> تتبع السيارات
           </button>
           <button type="button" onClick={() => setActiveScreen('directory')} className={activeScreen === 'directory' ? 'rounded-xl bg-blue-600 px-3 py-3 text-sm font-black text-white' : 'rounded-xl px-3 py-3 text-sm font-bold text-slate-600'}>
-            <Users className="ml-1 inline h-4 w-4" /> دليل البيانات
+            <Factory className="ml-1 inline h-4 w-4" /> دليل البيانات
           </button>
           <button type="button" onClick={() => setActiveScreen('direct')} className={activeScreen === 'direct' ? 'rounded-xl bg-emerald-600 px-3 py-3 text-sm font-black text-white' : 'rounded-xl px-3 py-3 text-sm font-bold text-slate-600'}>
             <HandCoins className="ml-1 inline h-4 w-4" /> التحميل بالأمر المباشر
           </button>
         </nav>
-        {activeScreen === 'tracking' ? <VehicleTrackingScreen /> : activeScreen === 'directory' ? <OfficeDirectoryScreen /> : activeScreen === 'direct' ? <DirectLoadAssignmentScreen /> : <>
+        {activeScreen === 'tracking' ? <VehicleTrackingScreen /> : activeScreen === 'drivers' ? <OfficeDirectoryScreen initialSection="drivers" showSectionTabs={false} /> : activeScreen === 'vehicles' ? <OfficeDirectoryScreen initialSection="vehicles" showSectionTabs={false} /> : activeScreen === 'waiting' ? <OfficeDirectoryScreen initialSection="waiting" showSectionTabs={false} /> : activeScreen === 'directory' ? <OfficeDirectoryScreen /> : activeScreen === 'direct' ? <DirectLoadAssignmentScreen /> : <>
         <section className="rounded-3xl border border-blue-200 bg-white p-5">
           <div className="mb-4">
             <h2 className="text-lg font-black">إنشاء أمر تحميل جديد</h2>
