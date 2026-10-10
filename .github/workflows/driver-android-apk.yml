@@ -50,7 +50,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.select-builds.outputs.matrix) }}
+      matrix:
+        app_mode: ${{ fromJson(needs.select-builds.outputs.matrix).app_mode }}
     env:
       VITE_APP_MODE: ${{ matrix.app_mode }}
       TIBA_APP_MODE: ${{ matrix.app_mode }}
@@ -60,7 +61,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Verify Supabase build configuration
+      - name: Verify and normalize Supabase configuration
         shell: bash
         run: |
           if [ -z "$VITE_SUPABASE_URL" ]; then
@@ -71,7 +72,15 @@ jobs:
             echo "::error::Missing GitHub Actions secret: VITE_SUPABASE_PUBLISHABLE_KEY (or SUPABASE_PUBLISHABLE_KEY / SUPABASE_ANON_KEY)"
             exit 1
           fi
-          echo "Supabase URL and publishable key are configured."
+
+          # Supabase createClient expects the project URL, not the REST endpoint path.
+          NORMALIZED_URL="$(node -e 'const u = new URL(process.env.VITE_SUPABASE_URL); if (u.protocol !== "https:" || !u.hostname.endsWith(".supabase.co")) process.exit(2); process.stdout.write(u.origin)')" || {
+            echo "::error::VITE_SUPABASE_URL is not a valid HTTPS Supabase project URL."
+            exit 1
+          }
+          echo "VITE_SUPABASE_URL=$NORMALIZED_URL" >> "$GITHUB_ENV"
+          echo "Supabase project URL is configured and normalized to the project origin."
+          echo "Publishable key is present (value intentionally not logged)."
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -92,6 +101,25 @@ jobs:
 
       - name: Build app bundle
         run: npm run build
+
+      - name: Verify Supabase configuration is embedded in app bundle
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const root = 'dist';
+          const expectedUrl = process.env.VITE_SUPABASE_URL;
+          const expectedKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+          const files = fs.readdirSync(path.join(root, 'assets'))
+            .filter(name => name.endsWith('.js'))
+            .map(name => fs.readFileSync(path.join(root, 'assets', name), 'utf8'));
+          const bundle = files.join('\n');
+          if (!files.length) throw new Error('No JavaScript bundles found in dist/assets.');
+          if (!bundle.includes(expectedUrl)) throw new Error('Built bundle does not contain the normalized Supabase project URL.');
+          if (!bundle.includes(expectedKey)) throw new Error('Built bundle does not contain the configured public Supabase key.');
+          console.log('Verified: normalized Supabase URL and configured public key are embedded in the built bundle. Key value not logged.');
+          NODE
 
       - name: Generate Capacitor config
         shell: bash
