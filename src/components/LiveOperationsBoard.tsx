@@ -14,6 +14,12 @@ export const LiveOperationsBoard: React.FC = () => {
   const [data, setData] = useState<LiveSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [factoryId, setFactoryId] = useState('');
+  const [quarryId, setQuarryId] = useState('');
+  const [quantity, setQuantity] = useState('1');
+  const [priority, setPriority] = useState('3');
+  const [savingOrder, setSavingOrder] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -28,6 +34,48 @@ export const LiveOperationsBoard: React.FC = () => {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  async function createLoadOrder(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError('');
+    setSuccessMessage('');
+
+    if (!factoryId || !quarryId) {
+      setError('اختار المصنع والمحجر الأول.');
+      return;
+    }
+
+    const requestedQuantity = Number(quantity);
+    const orderPriority = Number(priority);
+    if (!Number.isInteger(requestedQuantity) || requestedQuantity < 1) {
+      setError('الكمية المطلوبة لازم تكون عددًا صحيحًا أكبر من صفر.');
+      return;
+    }
+    if (!Number.isInteger(orderPriority) || orderPriority < 1 || orderPriority > 5) {
+      setError('الأولوية لازم تكون من 1 إلى 5.');
+      return;
+    }
+
+    setSavingOrder(true);
+    try {
+      const { data: result, error: rpcError } = await supabase.rpc('create_load_order', {
+        p_factory_id: factoryId,
+        p_quarry_id: quarryId,
+        p_requested_quantity: requestedQuantity,
+        p_priority: orderPriority,
+      });
+      if (rpcError) throw rpcError;
+      if (!result?.success) throw new Error('تعذر تأكيد إنشاء أمر التحميل.');
+
+      setSuccessMessage('تم إنشاء أمر التحميل ونشره بنجاح.');
+      setQuantity('1');
+      await load();
+    } catch (e: any) {
+      setError(e?.message || 'تعذر إنشاء أمر التحميل.');
+    } finally {
+      setSavingOrder(false);
+    }
+  }
 
   const counts = useMemo(() => {
     const orders = data?.load_orders ?? [];
@@ -74,6 +122,50 @@ export const LiveOperationsBoard: React.FC = () => {
 
       <main className="max-w-7xl mx-auto px-5 py-6 space-y-5">
         {error && <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">خطأ: {error}</div>}
+
+        {successMessage && <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-300">{successMessage}</div>}
+
+        <section className="rounded-3xl border border-cyan-500/20 bg-slate-900 p-5">
+          <div className="mb-4">
+            <h2 className="text-lg font-black">إنشاء أمر تحميل جديد</h2>
+            <p className="mt-1 text-xs text-slate-400">يُنشأ الأمر على مكتب الإسماعيلية ويُوجَّه تسجيل وصول السواقين إلى مكتب رأس سدر.</p>
+          </div>
+          <form onSubmit={createLoadOrder} className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <label className="text-xs text-slate-400">
+              المصنع
+              <select value={factoryId} onChange={e => setFactoryId(e.target.value)} required className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 p-3 text-sm text-white">
+                <option value="">اختار المصنع</option>
+                {(data?.factories ?? []).map(factory => <option key={factory.factory_id} value={factory.factory_id}>{liveName(factory)}</option>)}
+              </select>
+            </label>
+            <label className="text-xs text-slate-400">
+              المحجر
+              <select value={quarryId} onChange={e => setQuarryId(e.target.value)} required className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 p-3 text-sm text-white">
+                <option value="">اختار المحجر</option>
+                {(data?.quarries ?? []).map(quarry => <option key={quarry.quarry_id} value={quarry.quarry_id}>{liveName(quarry)}</option>)}
+              </select>
+            </label>
+            <label className="text-xs text-slate-400">
+              عدد النقلات المطلوبة
+              <input type="number" min="1" step="1" required value={quantity} onChange={e => setQuantity(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 p-3 text-sm text-white" />
+            </label>
+            <label className="text-xs text-slate-400">
+              الأولوية
+              <select value={priority} onChange={e => setPriority(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 p-3 text-sm text-white">
+                <option value="1">1 — عاجلة جدًا</option>
+                <option value="2">2 — عاجلة</option>
+                <option value="3">3 — عادية</option>
+                <option value="4">4 — منخفضة</option>
+                <option value="5">5 — الأقل</option>
+              </select>
+            </label>
+            <div className="flex items-end">
+              <button type="submit" disabled={savingOrder || !data?.factories.length || !data?.quarries.length} className="w-full rounded-xl bg-cyan-400 p-3 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-50">
+                {savingOrder ? 'جاري النشر...' : 'إنشاء ونشر الأمر'}
+              </button>
+            </div>
+          </form>
+        </section>
 
         <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
