@@ -5,7 +5,7 @@ CREATE OR REPLACE FUNCTION public.get_vehicle_owner_directory()
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = ''
 AS $function$
 DECLARE
   v_uid uuid := auth.uid();
@@ -39,7 +39,7 @@ CREATE OR REPLACE FUNCTION public.get_driver_edit_options(p_driver_id uuid)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = ''
 AS $function$
 DECLARE
   v_uid uuid := auth.uid();
@@ -100,7 +100,7 @@ CREATE OR REPLACE FUNCTION public.update_operational_driver(
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = ''
 AS $function$
 DECLARE
   v_uid uuid := auth.uid();
@@ -203,7 +203,7 @@ CREATE OR REPLACE FUNCTION public.update_operational_vehicle(
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = ''
 AS $function$
 DECLARE
   v_uid uuid := auth.uid();
