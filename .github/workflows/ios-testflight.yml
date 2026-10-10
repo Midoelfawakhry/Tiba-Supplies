@@ -1,0 +1,212 @@
+name: Build and upload Tiba Supplies iOS apps to TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_mode:
+        description: App to upload
+        required: true
+        type: choice
+        options:
+          - driver
+          - office
+          - both
+        default: both
+
+permissions:
+  contents: read
+
+jobs:
+  select-builds:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - id: set-matrix
+        shell: bash
+        run: |
+          MODE="${{ inputs.app_mode }}"
+          if [ "$MODE" = "both" ]; then
+            echo 'matrix={"app_mode":["driver","office"]}' >> "$GITHUB_OUTPUT"
+          else
+            echo "matrix={\"app_mode\":[\"$MODE\"]}" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-and-upload:
+    needs: select-builds
+    runs-on: macos-26
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        app_mode: ${{ fromJson(needs.select-builds.outputs.matrix).app_mode }}
+    env:
+      VITE_APP_MODE: ${{ matrix.app_mode }}
+      TIBA_APP_MODE: ${{ matrix.app_mode }}
+      VITE_SUPABASE_URL: https://tnlcvwtphbunteifoonc.supabase.co
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+      ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
+      ASC_API_PRIVATE_KEY: ${{ secrets.ASC_API_PRIVATE_KEY }}
+    steps:
+      - name: Check required Apple and Supabase settings
+        shell: bash
+        run: |
+          missing=0
+          for name in APPLE_TEAM_ID ASC_API_KEY_ID ASC_API_ISSUER_ID ASC_API_PRIVATE_KEY VITE_SUPABASE_PUBLISHABLE_KEY; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing GitHub Actions secret: $name"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+          echo "Required settings are present; secret values are not logged."
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare private App Store Connect key
+        shell: bash
+        run: |
+          KEY_DIR="$HOME/.appstoreconnect/private_keys"
+          mkdir -p "$KEY_DIR"
+          KEY_PATH="$KEY_DIR/AuthKey_${ASC_API_KEY_ID}.p8"
+          printf '%s' "$ASC_API_PRIVATE_KEY" > "$KEY_PATH"
+          chmod 600 "$KEY_PATH"
+          echo "APPLE_API_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check and build web app
+        run: |
+          npm run lint
+          npm run build
+
+      - name: Generate Capacitor config
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const mode = process.env.TIBA_APP_MODE;
+          const office = mode === 'office';
+          const config = {
+            appId: office ? 'com.tibasupplies.office' : 'com.tibasupplies.driver',
+            appName: office ? 'Tiba Supplies Office' : 'Tiba Supplies Driver',
+            webDir: 'dist',
+            ios: { contentInset: 'automatic' }
+          };
+          fs.writeFileSync('capacitor.config.json', JSON.stringify(config, null, 2) + String.fromCharCode(10));
+          console.log('Generated Capacitor config for ' + mode);
+          NODE
+
+      - name: Add iOS platform
+        run: npx cap add ios
+
+      - name: Configure driver background location permissions
+        if: matrix.app_mode == 'driver'
+        shell: bash
+        run: |
+          python3 <<'PY'
+          import plistlib
+          from pathlib import Path
+
+          plist_path = Path("ios/App/App/Info.plist")
+          with plist_path.open("rb") as stream:
+              info = plistlib.load(stream)
+
+          info["NSLocationWhenInUseUsageDescription"] = "يستخدم التطبيق موقعك أثناء العمل لعرض حالة الرحلة."
+          info["NSLocationAlwaysAndWhenInUseUsageDescription"] = "يشارك التطبيق موقع المركبة أثناء الرحلة حتى عند انتقال التطبيق إلى الخلفية."
+          modes = info.get("UIBackgroundModes", [])
+          if "location" not in modes:
+              modes.append("location")
+          info["UIBackgroundModes"] = modes
+
+          with plist_path.open("wb") as stream:
+              plistlib.dump(info, stream, sort_keys=False)
+          print("Configured iOS foreground and background location usage descriptions.")
+          PY
+
+      - name: Sync iOS plugins
+        run: npx cap sync ios
+
+      - name: Archive signed iOS app
+        shell: bash
+        run: |
+          xcodebuild \
+            -workspace ios/App/App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/tiba-${{ matrix.app_mode }}.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$APPLE_API_KEY_PATH" \
+            -authenticationKeyID "$ASC_API_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_API_ISSUER_ID" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CODE_SIGN_STYLE=Automatic \
+            CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
+            MARKETING_VERSION=1.0.0 \
+            archive
+
+      - name: Export App Store Connect package
+        shell: bash
+        run: |
+          python3 <<'PY'
+          import os
+          import plistlib
+          from pathlib import Path
+
+          options = {
+              "method": "app-store-connect",
+              "signingStyle": "automatic",
+              "teamID": os.environ["APPLE_TEAM_ID"],
+              "destination": "export",
+          }
+          with Path(os.environ["RUNNER_TEMP"], "ExportOptions.plist").open("wb") as stream:
+              plistlib.dump(options, stream)
+          PY
+          xcodebuild \
+            -exportArchive \
+            -archivePath "$RUNNER_TEMP/tiba-${{ matrix.app_mode }}.xcarchive" \
+            -exportPath "$RUNNER_TEMP/tiba-${{ matrix.app_mode }}-export" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$APPLE_API_KEY_PATH" \
+            -authenticationKeyID "$ASC_API_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_API_ISSUER_ID"
+          IPA_PATH="$(find "$RUNNER_TEMP/tiba-${{ matrix.app_mode }}-export" -maxdepth 1 -name '*.ipa' -print -quit)"
+          if [ -z "$IPA_PATH" ]; then
+            echo "::error::Xcode did not export an IPA."
+            exit 1
+          fi
+          echo "IPA_PATH=$IPA_PATH" >> "$GITHUB_ENV"
+
+      - name: Upload to TestFlight
+        shell: bash
+        run: |
+          xcrun altool --upload-app \
+            --type ios \
+            --file "$IPA_PATH" \
+            --apiKey "$ASC_API_KEY_ID" \
+            --apiIssuer "$ASC_API_ISSUER_ID"
+
+      - name: Keep uploaded IPA as a build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tiba-supplies-${{ matrix.app_mode }}-ios-ipa
+          path: ${{ env.IPA_PATH }}
+          if-no-files-found: error
+          retention-days: 7
