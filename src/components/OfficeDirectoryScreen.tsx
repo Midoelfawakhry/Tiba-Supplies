@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Building2, Mountain, Users, Truck, ClipboardCheck, ClipboardList, Clock3, RefreshCw, AlertTriangle } from 'lucide-react';
 import { getLiveSnapshot, LiveSnapshot, liveName } from '../services/liveData';
 import { supabase } from '../lib/supabase';
+import { AddVehicleForm } from './AddVehicleForm';
 
 type ScreenKey = 'factories' | 'quarries' | 'drivers' | 'vehicles' | 'waiting' | 'loads' | 'actual';
 type Row = Record<string, any>;
@@ -42,6 +43,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [showDriverForm, setShowDriverForm] = useState(false);
+  const [showVehicleForm, setShowVehicleForm] = useState(false);
   const [driverName, setDriverName] = useState('');
   const [driverPhone, setDriverPhone] = useState('');
   const [driverCode, setDriverCode] = useState('');
@@ -140,6 +142,13 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
       </div>}
       {success && <div role="status" className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{success}</div>}
       {error && <div role="alert" className="flex gap-2 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900"><AlertTriangle size={18} className="shrink-0"/><span>{error}</span></div>}
+      {active === 'vehicles' && <section className="rounded-3xl border border-blue-200 bg-white p-4 sm:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div><h3 className="font-black">إضافة عربية جديدة</h3><p className="mt-1 text-sm text-slate-500">تسجيل العربية ومالكها. ربط السواق خطوة منفصلة.</p></div>
+          <button type="button" onClick={() => setShowVehicleForm(v => !v)} className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-black text-white">{showVehicleForm ? 'إلغاء' : 'إضافة عربية'}</button>
+        </div>
+        {showVehicleForm && <div className="mt-4"><AddVehicleForm onSaved={() => { void load(); setSuccess('تمت إضافة العربية ومالكها.'); }} /></div>}
+      </section>}
       {active === 'drivers' && <section className="rounded-3xl border border-blue-200 bg-white p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div><h3 className="font-black">إضافة سائق جديد</h3><p className="mt-1 text-sm text-slate-500">تُحفظ البيانات التشغيلية في Supabase. إنشاء حساب الدخول خطوة منفصلة.</p></div>
