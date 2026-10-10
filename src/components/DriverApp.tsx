@@ -18,7 +18,6 @@ export const DriverApp: React.FC = () => {
   const [error, setError] = useState(supabaseDiagnostics.configurationError);
   const [position, setPosition] = useState<PositionState | null>(null);
   const [locating, setLocating] = useState(false);
-  const [trackingEnabled, setTrackingEnabled] = useState(false);
   const [portal, setPortal] = useState<any>(null);
   const [portalLoading, setPortalLoading] = useState(false);
 
@@ -67,7 +66,7 @@ export const DriverApp: React.FC = () => {
   }
 
   useEffect(() => {
-    if (!session || !trackingEnabled) return;
+    if (!session) return;
     if (!navigator.geolocation) {
       setError('الجهاز لا يدعم تحديد الموقع.');
       setTrackingEnabled(false);
@@ -85,7 +84,6 @@ export const DriverApp: React.FC = () => {
           if (requested.location !== 'granted' && requested.coarseLocation !== 'granted') {
             if (active) {
               setError('إذن الموقع غير ممنوح. افتح إعدادات الهاتف > التطبيقات > Tiba Supplies Driver > الأذونات > الموقع، واسمح بالموقع أثناء استخدام التطبيق.');
-              setTrackingEnabled(false);
             }
             return;
           }
@@ -93,7 +91,6 @@ export const DriverApp: React.FC = () => {
       } catch (permissionError: any) {
         if (active) {
           setError(permissionError?.message || 'تعذر طلب إذن GPS من أندرويد. افتح إعدادات التطبيق واسمح بالموقع.');
-          setTrackingEnabled(false);
         }
         return;
       }
@@ -134,7 +131,7 @@ export const DriverApp: React.FC = () => {
       active = false;
       if (watchId !== undefined) navigator.geolocation.clearWatch(watchId);
     };
-  }, [session, trackingEnabled]);
+  }, [session]);
 
   async function signIn(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -245,14 +242,11 @@ export const DriverApp: React.FC = () => {
         </section>
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center gap-2"><ShieldCheck className="text-blue-700" size={22}/><h2 className="font-black">تسجيل الوصول</h2></div>
-          <p className="mt-2 text-sm leading-6 text-slate-600">فعّل مشاركة الموقع المباشرة لإرسال إحداثيات GPS إلى خريطة المكتب. يحتاج ذلك إذن الموقع وربط حسابك بسجل السائق والعربية في النظام. مشاركة الموقع لا تعني تسجيل الوصول أو دخول قائمة الانتظار.</p>
-          <button onClick={() => setTrackingEnabled(value => !value)} className={trackingEnabled ? "mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-rose-600 p-3 font-black text-white" : "mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 p-3 font-black text-white"}>
-            <Navigation size={18}/>{trackingEnabled ? 'إيقاف مشاركة الموقع المباشرة' : 'تفعيل مشاركة الموقع المباشرة'}
+          <p className="mt-2 text-sm leading-6 text-slate-600">مشاركة الموقع تعمل تلقائيًا بعد تسجيل الدخول. اضغط الزر لفحص موقعك ومعرفة هل أنت داخل نطاق 10 كم من مكتب رأس سدر.</p>
+          <button onClick={captureLocation} disabled={locating} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 p-4 font-black text-white disabled:opacity-60">
+            <MapPin size={20}/>{locating ? 'جاري فحص الموقع...' : 'أنا وصلت — فحص الموقع'}
           </button>
-          <p className="mt-2 text-xs text-slate-500">{trackingEnabled ? 'التتبع مفعّل طالما التطبيق مفتوح وإذن الموقع متاح.' : 'لن يتم إرسال موقعك للخريطة قبل تفعيل المشاركة.'}</p>
-          <button onClick={captureLocation} disabled={locating} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white p-3 font-bold text-slate-800 disabled:opacity-60">
-            <MapPin size={18}/>{locating ? 'جاري تحديد الموقع...' : 'تحديد موقعي الحالي'}
-          </button>
+          {error && <div role="alert" className="mt-4 flex gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"><CircleAlert className="shrink-0" size={18}/><span>{error}</span></div>}
           {position && <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
             <p className="font-black">تم تحديد الموقع على الجهاز</p>
             <p className="mt-2">دقة GPS: {Math.round(position.accuracy)} متر</p>
@@ -267,8 +261,7 @@ export const DriverApp: React.FC = () => {
             <div className="flex items-center gap-2"><ShieldCheck className="text-blue-700" size={22}/><h2 className="font-black">الخدمات داخل نطاق المكتب</h2></div>
             <p className="mt-2 text-sm leading-7 text-slate-600">لن تظهر الكمولات المتاحة أو ترتيب الانتظار أو سجل أوامرك إلا بعد أن يؤكد النظام وجودك داخل نطاق 10 كم من مكتب رأس سدر، مع موقع GPS حديث.</p>
             {portal && <p className="mt-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{portal.location_updated_at ? 'آخر موقع محفوظ قد يكون خارج النطاق أو أقدم من 10 دقائق.' : 'لم يصل موقع GPS حديث للنظام حتى الآن.'}</p>}
-            <button onClick={() => { setTrackingEnabled(true); captureLocation(); }} className="mt-4 w-full rounded-xl bg-blue-600 p-3 font-black text-white">تفعيل GPS والتحقق من النطاق</button>
-            <button onClick={() => void refreshPortal()} className="mt-3 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold text-slate-700">{portalLoading ? 'جاري التحقق...' : 'إعادة التحقق من الموقع'}</button>
+            <p className="mt-3 text-sm font-bold text-slate-700">استخدم زر «أنا وصلت — فحص الموقع» أعلاه لتحديث موقعك والتحقق من النطاق.</p>
           </section>
         ) : (
           <>
