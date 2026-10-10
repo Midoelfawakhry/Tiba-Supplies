@@ -60,3 +60,27 @@ REVOKE ALL ON FUNCTION public.update_driver_live_location(double precision,doubl
 GRANT EXECUTE ON FUNCTION public.update_driver_live_location(double precision,double precision,double precision,double precision,double precision,timestamptz) TO authenticated;
 REVOKE ALL ON FUNCTION public.get_vehicle_live_locations() FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.get_vehicle_live_locations() TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.get_office_waiting_list()
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $function$
+DECLARE v_auth_user_id uuid := auth.uid(); v_office_id uuid;
+BEGIN
+  IF v_auth_user_id IS NULL THEN RAISE EXCEPTION 'AUTH_REQUIRED'; END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.app_users au JOIN public.user_roles ur ON ur.user_id=au.user_id JOIN public.roles r ON r.role_id=ur.role_id
+    WHERE au.auth_user_id=v_auth_user_id AND au.is_active=true AND r.name IN ('ADMIN','HEAD_OFFICE','BRANCH')
+  ) THEN RAISE EXCEPTION 'INSUFFICIENT_ROLE'; END IF;
+  SELECT office_id INTO v_office_id FROM public.offices WHERE is_active=true AND office_type='BRANCH' ORDER BY name LIMIT 1;
+  RETURN COALESCE((
+    SELECT jsonb_agg(jsonb_build_object(
+      'entry_id',w.entry_id,'driver_id',d.driver_id,'driver_name',d.name,
+      'vehicle_id',v.vehicle_id,'plate_number',v.plate_number,'status',w.status,'arrived_at',w.arrived_at
+    ) ORDER BY w.arrived_at)
+    FROM public.waiting_list_entries w
+    JOIN public.drivers d ON d.driver_id=w.driver_id
+    JOIN public.vehicles v ON v.vehicle_id=w.vehicle_id
+    WHERE w.office_id=v_office_id AND w.status='WAITING'
+  ),'[]'::jsonb);
+END; $function$;
+REVOKE ALL ON FUNCTION public.get_office_waiting_list() FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.get_office_waiting_list() TO authenticated;
