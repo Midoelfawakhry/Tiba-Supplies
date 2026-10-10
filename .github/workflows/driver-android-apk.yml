@@ -80,7 +80,7 @@ jobs:
 
       - name: Generate Capacitor config
         run: |
-          node -e 'const mode=process.env.TIBA_APP_MODE; const office=mode === "office"; const config={appId:office ? "com.tibasupplies.office" : "com.tibasupplies.driver",appName:office ? "Tiba Supplies Office" : "Tiba Supplies Driver",webDir:"dist",android:{allowMixedContent:false}}; require("fs").writeFileSync("capacitor.config.json", JSON.stringify(config,null,2)+"\\n")'
+          node -e 'const mode=process.env.TIBA_APP_MODE; const office=mode === "office"; const config={appId:office ? "com.tibasupplies.office" : "com.tibasupplies.driver",appName:office ? "Tiba Supplies Office" : "Tiba Supplies Driver",webDir:"dist",android:{allowMixedContent:false}}; require("fs").writeFileSync("capacitor.config.json", JSON.stringify(config,null,2)+"\n")'
 
       - name: Add Android platform
         run: npx cap add android
