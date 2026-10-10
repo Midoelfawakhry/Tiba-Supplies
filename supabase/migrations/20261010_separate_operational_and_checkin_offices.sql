@@ -53,7 +53,25 @@ SET check_in_office_id = CASE
 END
 WHERE lo.check_in_office_id IS NULL;
 
-DO $$
+-- Move operational ownership to the HEAD office only after preserving the old
+-- BRANCH office in check_in_office_id.
+UPDATE public.load_orders lo
+SET office_id = (
+  SELECT o.office_id
+  FROM public.offices o
+  WHERE o.office_type = 'HEAD' AND o.is_active = true
+  ORDER BY o.created_at, o.name
+  LIMIT 1
+)
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM public.offices current_office
+  WHERE current_office.office_id = lo.office_id
+    AND current_office.office_type = 'HEAD'
+    AND current_office.is_active = true
+);
+
+DO $
 BEGIN
   IF EXISTS (
     SELECT 1 FROM public.load_orders WHERE check_in_office_id IS NULL
