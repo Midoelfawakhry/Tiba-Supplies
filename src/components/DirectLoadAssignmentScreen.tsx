@@ -7,7 +7,6 @@ export const DirectLoadAssignmentScreen: React.FC = () => {
   const [snapshot, setSnapshot] = useState<LiveSnapshot | null>(null);
   const [factoryId, setFactoryId] = useState('');
   const [quarryId, setQuarryId] = useState('');
-  const [loadOrderId, setLoadOrderId] = useState('');
   const [vehicleId, setVehicleId] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -40,12 +39,14 @@ export const DirectLoadAssignmentScreen: React.FC = () => {
       committed < Number(order.requested_quantity);
   }), [snapshot, factoryId, quarryId]);
 
-  const selectedOrder = orders.find(order => order.load_order_id === loadOrderId);
+  // The operator chooses factory + quarry; the app assigns the oldest eligible open order automatically.
+  const selectedOrder = [...orders].sort((a, b) => String(a.created_at ?? '').localeCompare(String(b.created_at ?? '')))[0];
+  const loadOrderId = selectedOrder?.load_order_id ?? '';
   const availableVehicles = snapshot?.vehicles ?? [];
 
   async function assign() {
-    if (!loadOrderId || !vehicleId) {
-      setError('اختار أمر التحميل والعربية الأول.');
+    if (!factoryId || !quarryId || !loadOrderId || !vehicleId) {
+      setError('اختار المصنع والمحجر والعربية، وتأكد من وجود أمر تحميل مفتوح.');
       return;
     }
     setSaving(true);
@@ -59,7 +60,6 @@ export const DirectLoadAssignmentScreen: React.FC = () => {
       if (rpcError) throw rpcError;
       if (!result?.success) throw new Error('تعذر تأكيد الإسناد المباشر.');
       setSuccess(`تم الإسناد المباشر بنجاح. المسافة من المكتب: ${result.distance_m} متر.`);
-      setLoadOrderId('');
       setVehicleId('');
       await refresh();
     } catch (e: any) {
@@ -100,26 +100,18 @@ export const DirectLoadAssignmentScreen: React.FC = () => {
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
         <section className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-6">
           <h3 className="text-lg font-black">بيانات الإسناد</h3>
-          <p className="mt-1 text-sm text-slate-500">اختار أمرًا مفتوحًا، ثم حدّد العربية المطلوب تخصيصها.</p>
+          <p className="mt-1 text-sm text-slate-500">اختار المصنع والمحجر والعربية فقط؛ التطبيق هيختار تلقائيًا أقدم أمر تحميل مفتوح مطابق وله كمية متبقية.</p>
           <label className="mt-5 block text-sm font-bold text-slate-700">المصنع</label>
-          <select value={factoryId} onChange={e => { setFactoryId(e.target.value); setLoadOrderId(''); setError(''); setSuccess(''); }} className="mt-2 w-full rounded-xl border border-slate-300 bg-slate-50 p-3 text-sm text-slate-900">
+          <select value={factoryId} onChange={e => { setFactoryId(e.target.value); setError(''); setSuccess(''); }} className="mt-2 w-full rounded-xl border border-slate-300 bg-slate-50 p-3 text-sm text-slate-900">
             <option value="">اختار المصنع</option>
             {factories.map(factory => <option key={factory.factory_id} value={factory.factory_id}>{liveName(factory)}</option>)}
           </select>
           <label className="mt-5 block text-sm font-bold text-slate-700">المحجر</label>
-          <select value={quarryId} onChange={e => { setQuarryId(e.target.value); setLoadOrderId(''); setError(''); setSuccess(''); }} className="mt-2 w-full rounded-xl border border-slate-300 bg-slate-50 p-3 text-sm text-slate-900">
+          <select value={quarryId} onChange={e => { setQuarryId(e.target.value); setError(''); setSuccess(''); }} className="mt-2 w-full rounded-xl border border-slate-300 bg-slate-50 p-3 text-sm text-slate-900">
             <option value="">اختار المحجر</option>
             {quarries.map(quarry => <option key={quarry.quarry_id} value={quarry.quarry_id}>{liveName(quarry)}</option>)}
           </select>
-          <label className="mt-5 block text-sm font-bold text-slate-700">أمر التحميل</label>
-          <select value={loadOrderId} onChange={e => { setLoadOrderId(e.target.value); setError(''); setSuccess(''); }} disabled={!factoryId || !quarryId} className="mt-2 w-full rounded-xl border border-slate-300 bg-slate-50 p-3 text-sm text-slate-900 disabled:opacity-60">
-            <option value="">{!factoryId || !quarryId ? 'اختار المصنع والمحجر أولًا' : 'اختار أمر التحميل'}</option>
-            {orders.map(order => {
-              const booked = (snapshot?.bookings ?? []).filter(b => b.load_order_id === order.load_order_id && ['BOOKED', 'LOADING_STATEMENT', 'IN_TRANSIT', 'DELIVERED', 'COMPLETED'].includes(String(b.status).toUpperCase())).length;
-              return <option key={order.load_order_id} value={order.load_order_id}>أمر · {String(order.load_order_id).slice(0, 8)} · متبقي {Math.max(0, Number(order.requested_quantity) - booked)}</option>;
-            })}
-          </select>
-          {factoryId && quarryId && orders.length === 0 && <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900">مفيش أمر تحميل مفتوح للمصنع والمحجر المختارين. راجع «مركز التشغيل» وتأكد إن فيه أمر منشور وبكمية متبقية.</p>}
+          {factoryId && quarryId && (selectedOrder ? <p className="mt-3 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm leading-6 text-blue-900">هيتم اختيار أقدم أمر مفتوح تلقائيًا، والمتبقي فيه {Math.max(0, Number(selectedOrder.requested_quantity) - (snapshot?.bookings ?? []).filter(b => b.load_order_id === selectedOrder.load_order_id && ['BOOKED', 'LOADING_STATEMENT', 'IN_TRANSIT', 'DELIVERED', 'COMPLETED'].includes(String(b.status).toUpperCase())).length)} عربية.</p> : <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900">مفيش أمر تحميل مفتوح للمصنع والمحجر المختارين. راجع «مركز التشغيل» وتأكد إن فيه أمر منشور وبكمية متبقية.</p>)}
           {!loading && (factories.length === 0 || quarries.length === 0) && <p className="mt-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm leading-6 text-red-800">بيانات المصانع أو المحاجر لم تصل من قاعدة البيانات. راجع تحميل get_phase1_snapshot وصلاحياته؛ لم نضف بيانات تجريبية.</p>}
           <label className="mt-5 block text-sm font-bold text-slate-700">العربية</label>
           <select value={vehicleId} onChange={e => { setVehicleId(e.target.value); setError(''); setSuccess(''); }} className="mt-2 w-full rounded-xl border border-slate-300 bg-slate-50 p-3 text-sm text-slate-900">
