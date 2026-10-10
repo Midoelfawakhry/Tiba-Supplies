@@ -106,6 +106,7 @@ DECLARE
   v_uid uuid := auth.uid();
   v_driver public.drivers%ROWTYPE;
   v_assignment public.vehicle_driver_assignments%ROWTYPE;
+  v_target_vehicle public.vehicles%ROWTYPE;
   v_name text := NULLIF(btrim(p_name), '');
   v_phone text := NULLIF(btrim(p_phone), '');
   v_code text := NULLIF(btrim(p_driver_code), '');
@@ -145,9 +146,13 @@ BEGIN
     WHERE d.driver_id <> p_driver_id AND lower(btrim(d.driver_code)) = lower(v_code)
   ) THEN RAISE EXCEPTION 'DRIVER_CODE_EXISTS'; END IF;
 
-  IF p_vehicle_id IS NOT NULL AND NOT EXISTS (
-    SELECT 1 FROM public.vehicles v WHERE v.vehicle_id = p_vehicle_id AND v.is_active = true
-  ) THEN RAISE EXCEPTION 'VEHICLE_NOT_AVAILABLE'; END IF;
+  IF p_vehicle_id IS NOT NULL THEN
+    SELECT * INTO v_target_vehicle
+    FROM public.vehicles v
+    WHERE v.vehicle_id = p_vehicle_id AND v.is_active = true
+    FOR UPDATE;
+    IF NOT FOUND THEN RAISE EXCEPTION 'VEHICLE_NOT_AVAILABLE'; END IF;
+  END IF;
 
   IF p_vehicle_id IS NOT NULL AND EXISTS (
     SELECT 1 FROM public.vehicle_driver_assignments a
