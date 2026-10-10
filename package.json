@@ -25,7 +25,8 @@
     "@supabase/supabase-js": "^2.75.0",
     "@capacitor/core": "^7.4.3",
     "@capacitor/geolocation": "^7.1.5",
-    "@capacitor-community/background-geolocation": "^1.2.26"
+    "@capacitor-community/background-geolocation": "^1.2.26",
+    "@capacitor/ios": "^7.4.3"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
