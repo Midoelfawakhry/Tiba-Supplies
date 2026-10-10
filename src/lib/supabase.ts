@@ -51,8 +51,14 @@ export const supabase = {
       }
       return client.auth.onAuthStateChange(callback);
     },
-    signInWithPassword: (credentials: { email: string; password: string }) =>
+    signInWithPassword: (credentials: { phone: string; password: string }) =>
       getClient().auth.signInWithPassword(credentials),
+    signInWithOtp: (credentials: { phone: string; options?: { shouldCreateUser?: boolean } }) =>
+      getClient().auth.signInWithOtp(credentials),
+    verifyOtp: (credentials: { phone: string; token: string; type: "sms" }) =>
+      getClient().auth.verifyOtp(credentials),
+    updateUser: (attributes: { password?: string }) =>
+      getClient().auth.updateUser(attributes),
     signOut: () => getClient().auth.signOut(),
   },
   rpc: (functionName: string, args?: Record<string, unknown>) =>
