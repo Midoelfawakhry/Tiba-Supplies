@@ -1,8 +1,10 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
+const appMode = process.env.TIBA_APP_MODE === 'office' ? 'office' : 'driver';
+
 const config: CapacitorConfig = {
-  appId: 'com.tibasupplies.driver',
-  appName: 'Tiba Supplies Driver',
+  appId: appMode === 'office' ? 'com.tibasupplies.office' : 'com.tibasupplies.driver',
+  appName: appMode === 'office' ? 'Tiba Supplies Office' : 'Tiba Supplies Driver',
   webDir: 'dist',
   bundledWebRuntime: false,
   android: {
