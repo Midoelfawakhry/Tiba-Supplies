@@ -13,6 +13,21 @@ const statusLabel: Record<string, string> = {
   CANCELLED: 'ملغي',
 };
 
+type OfficeScreen = 'dashboard' | 'tracking' | 'directory' | 'direct' | 'drivers' | 'vehicles' | 'waiting' | 'orders' | 'actual' | 'factories' | 'quarries';
+const screenPalette: Record<OfficeScreen, { selected: string; wash: string }> = {
+  dashboard: { selected: 'bg-teal-600 hover:bg-teal-700', wash: 'bg-teal-50/40' },
+  drivers: { selected: 'bg-red-600 hover:bg-red-700', wash: 'bg-red-50/50' },
+  vehicles: { selected: 'bg-blue-600 hover:bg-blue-700', wash: 'bg-blue-50/50' },
+  waiting: { selected: 'bg-violet-600 hover:bg-violet-700', wash: 'bg-violet-50/50' },
+  orders: { selected: 'bg-orange-600 hover:bg-orange-700', wash: 'bg-orange-50/50' },
+  actual: { selected: 'bg-emerald-600 hover:bg-emerald-700', wash: 'bg-emerald-50/50' },
+  factories: { selected: 'bg-sky-600 hover:bg-sky-700', wash: 'bg-sky-50/50' },
+  quarries: { selected: 'bg-amber-600 hover:bg-amber-700', wash: 'bg-amber-50/50' },
+  tracking: { selected: 'bg-cyan-600 hover:bg-cyan-700', wash: 'bg-cyan-50/50' },
+  directory: { selected: 'bg-indigo-600 hover:bg-indigo-700', wash: 'bg-indigo-50/50' },
+  direct: { selected: 'bg-fuchsia-600 hover:bg-fuchsia-700', wash: 'bg-fuchsia-50/50' },
+};
+
 export const LiveOperationsBoard: React.FC = () => {
   const [data, setData] = useState<LiveSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
@@ -91,7 +106,7 @@ export const LiveOperationsBoard: React.FC = () => {
   }, [data]);
 
   if (loading && !data) {
-    return <div dir="rtl" className="min-h-screen bg-slate-50 text-slate-900 grid place-items-center">جاري تحميل بيانات التشغيل الحقيقية...</div>;
+    return <div dir="rtl" className="grid min-h-screen place-items-center bg-gradient-to-br from-teal-50 via-white to-orange-50 p-6 text-slate-800"><div className="rounded-3xl border border-teal-100 bg-white/90 px-8 py-9 text-center shadow-lg shadow-teal-900/5"><div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-2xl bg-teal-100 text-teal-700"><ClipboardList size={30}/></div><p className="text-xs font-black tracking-widest text-teal-700">TIBA SUPPLIES</p><p className="mt-2 text-lg font-black">جاري تجهيز مركز التشغيل</p><p className="mt-1 text-sm text-slate-500">بنحمّل بيانات التشغيل الحقيقية...</p><div className="mx-auto mt-5 h-1.5 w-40 overflow-hidden rounded-full bg-teal-100"><div className="h-full w-1/2 animate-pulse rounded-full bg-teal-600"/></div></div></div>;
   }
 
   const operationalOffice = data?.operational_office ?? data?.office;
@@ -152,7 +167,7 @@ export const LiveOperationsBoard: React.FC = () => {
                 ['direct', 'التحميل بالأمر المباشر', HandCoins],
               ] as const).map(([key, label, Icon]) => {
                 const selected = activeScreen === key;
-                return <button key={key} type="button" onClick={() => setActiveScreen(key as typeof activeScreen)} className={selected ? 'flex min-h-11 items-center gap-3 rounded-xl bg-blue-600 px-3 py-2.5 text-right text-sm font-black text-white shadow-sm' : 'flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-right text-sm font-bold text-slate-600 transition hover:bg-slate-50 hover:text-slate-900'}>
+                return <button key={key} type="button" onClick={() => setActiveScreen(key as typeof activeScreen)} className={selected ? `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-right text-sm font-black text-white shadow-sm transition ${screenPalette[key].selected}` : 'flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-right text-sm font-bold text-slate-600 transition hover:bg-slate-50 hover:text-slate-900'}>
                   <Icon className="h-[18px] w-[18px] shrink-0" />
                   <span className="min-w-0 flex-1">{label}</span>
                   {selected && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
@@ -160,9 +175,9 @@ export const LiveOperationsBoard: React.FC = () => {
               })}
             </nav>
           </aside>
-          <section className="min-w-0 flex-1 space-y-5">
+          <section className={`min-w-0 flex-1 space-y-5 rounded-[2rem] p-2 transition-colors sm:p-3 ${screenPalette[activeScreen].wash}`}>
         {activeScreen === 'tracking' ? <VehicleTrackingScreen /> : activeScreen === 'drivers' ? <OfficeDirectoryScreen initialSection="drivers" showSectionTabs={false} /> : activeScreen === 'vehicles' ? <OfficeDirectoryScreen initialSection="vehicles" showSectionTabs={false} /> : activeScreen === 'waiting' ? <OfficeDirectoryScreen initialSection="waiting" showSectionTabs={false} /> : activeScreen === 'orders' ? <OfficeDirectoryScreen initialSection="loads" showSectionTabs={false} /> : activeScreen === 'actual' ? <OfficeDirectoryScreen initialSection="actual" showSectionTabs={false} /> : activeScreen === 'factories' ? <OfficeDirectoryScreen initialSection="factories" showSectionTabs={false} /> : activeScreen === 'quarries' ? <OfficeDirectoryScreen initialSection="quarries" showSectionTabs={false} /> : activeScreen === 'directory' ? <OfficeDirectoryScreen /> : activeScreen === 'direct' ? <DirectLoadAssignmentScreen /> : <>
-        <section className="rounded-3xl border border-blue-200 bg-white p-5">
+        <section className="rounded-3xl border border-orange-200 bg-white p-5 shadow-sm">
           <div className="mb-4">
             <h2 className="text-lg font-black">إنشاء أمر تحميل جديد</h2>
             <p className="mt-1 text-xs text-slate-500">يُنشأ الأمر على مكتب الإسماعيلية ويُوجَّه تسجيل وصول السواقين إلى مكتب رأس سدر.</p>
@@ -197,7 +212,7 @@ export const LiveOperationsBoard: React.FC = () => {
               </select>
             </label>
             <div className="flex items-end">
-              <button type="submit" disabled={savingOrder || !data?.factories.length || !data?.quarries.length} className="w-full rounded-xl bg-blue-600 p-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-50">
+              <button type="submit" disabled={savingOrder || !data?.factories.length || !data?.quarries.length} className="w-full rounded-xl bg-orange-600 p-3 text-sm font-black text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50">
                 {savingOrder ? 'جاري النشر...' : 'إنشاء ونشر الأمر'}
               </button>
             </div>
