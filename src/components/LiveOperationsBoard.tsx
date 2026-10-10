@@ -23,6 +23,9 @@ export const LiveOperationsBoard: React.FC = () => {
   const [savingOrder, setSavingOrder] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [activeScreen, setActiveScreen] = useState<'dashboard' | 'tracking' | 'directory'>('dashboard');
+  const [directOrderId, setDirectOrderId] = useState('');
+  const [directVehicleId, setDirectVehicleId] = useState('');
+  const [savingDirectAssignment, setSavingDirectAssignment] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -77,6 +80,44 @@ export const LiveOperationsBoard: React.FC = () => {
       setError(e?.message || 'تعذر إنشاء أمر التحميل.');
     } finally {
       setSavingOrder(false);
+    }
+  }
+
+
+  async function assignDirectly() {
+    if (!directOrderId || !directVehicleId) {
+      setError('اختار أمر التحميل والعربية الأول.');
+      return;
+    }
+    setError('');
+    setSuccessMessage('');
+    setSavingDirectAssignment(true);
+    try {
+      const { data: result, error: rpcError } = await supabase.rpc('direct_assign_load', {
+        p_load_order_id: directOrderId,
+        p_vehicle_id: directVehicleId,
+      });
+      if (rpcError) throw rpcError;
+      if (!result?.success) throw new Error('تعذر تأكيد الإسناد المباشر.');
+      setSuccessMessage(`تم الإسناد المباشر بنجاح. المسافة من المكتب: ${result.distance_m} متر.`);
+      setDirectOrderId('');
+      setDirectVehicleId('');
+      await load();
+    } catch (e: any) {
+      const raw = String(e?.message || '');
+      const messages: Record<string, string> = {
+        VEHICLE_LOCATION_MISSING_OR_STALE: 'لا يمكن الإسناد: موقع العربية غير متاح أو أقدم من 10 دقائق.',
+        VEHICLE_OUTSIDE_GEOFENCE: 'لا يمكن الإسناد: العربية خارج نطاق 10 كم من مكتب تسجيل الوصول.',
+        NO_ACTIVE_DRIVER_FOR_VEHICLE: 'العربية غير مرتبطة بسائق نشط حاليًا.',
+        LOAD_CAPACITY_REACHED: 'الأمر وصل للكمية المطلوبة بالكامل.',
+        DRIVER_HAS_ACTIVE_BOOKING: 'السائق لديه نقلة نشطة بالفعل.',
+        VEHICLE_HAS_ACTIVE_BOOKING: 'العربية عليها نقلة نشطة بالفعل.',
+        OFFICE_GEOFENCE_NOT_CONFIGURED: 'إحداثيات أو نطاق المكتب غير مضبوط في قاعدة البيانات.',
+      };
+      const key = Object.keys(messages).find(k => raw.includes(k));
+      setError(key ? messages[key] : raw || 'تعذر تنفيذ الإسناد المباشر.');
+    } finally {
+      setSavingDirectAssignment(false);
     }
   }
 
@@ -223,6 +264,7 @@ export const LiveOperationsBoard: React.FC = () => {
                       <div className="rounded-xl bg-white p-2"><b>{Math.max(0, Number(order.requested_quantity) - booked)}</b><div className="text-[10px] text-slate-500">متبقي</div></div>
                     </div>
                     <div className="mt-3 text-[10px] text-slate-500">{order.load_order_id}</div>
+                    {['PUBLISHED', 'LOADING_STATEMENT'].includes(order.status) && booked < Number(order.requested_quantity) && <button type="button" onClick={() => { setDirectOrderId(order.load_order_id); setDirectVehicleId(''); setError(''); setSuccessMessage(''); }} className="mt-3 w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white">إسناد مباشر لعربية محددة</button>}
                   </article>
                 );
               })}
@@ -249,6 +291,21 @@ export const LiveOperationsBoard: React.FC = () => {
           </div>
         </section>
         </>}
+        {directOrderId && <div role="dialog" aria-modal="true" aria-labelledby="direct-assign-title" className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4">
+          <section className="w-full max-w-lg rounded-3xl bg-white p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <div><h2 id="direct-assign-title" className="text-xl font-black text-slate-900">إسناد مباشر لنقلة</h2><p className="mt-1 text-sm text-slate-500">تجاوز ترتيب قائمة الانتظار وقواعد التوزيع التلقائي. يظل شرط الموقع داخل نطاق المكتب 10 كم إلزاميًا.</p></div>
+              <button type="button" onClick={() => setDirectOrderId('')} className="rounded-lg border border-slate-200 px-3 py-2 text-slate-700">إغلاق</button>
+            </div>
+            <label className="mt-5 block text-sm font-bold text-slate-700">العربية</label>
+            <select value={directVehicleId} onChange={e => setDirectVehicleId(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900">
+              <option value="">اختار العربية</option>
+              {(data?.vehicles ?? []).map(vehicle => <option key={vehicle.vehicle_id} value={vehicle.vehicle_id}>{vehicle.plate_number ?? vehicle.vehicle_code ?? vehicle.vehicle_id}</option>)}
+            </select>
+            <div className="mt-3 rounded-xl bg-amber-50 p-3 text-xs leading-6 text-amber-900">سيتم التحقق من آخر موقع GPS محفوظ (لا يزيد عمره عن 10 دقائق) داخل قاعدة البيانات قبل تأكيد الإسناد. لو مفيش موقع حديث، الإسناد هيتوقف.</div>
+            <button type="button" disabled={savingDirectAssignment || !directVehicleId} onClick={() => void assignDirectly()} className="mt-4 w-full rounded-xl bg-emerald-600 p-3 font-black text-white disabled:opacity-50">{savingDirectAssignment ? 'جاري التحقق والإسناد...' : 'تأكيد الإسناد المباشر'}</button>
+          </section>
+        </div>}
       </main>
     </div>
   );
