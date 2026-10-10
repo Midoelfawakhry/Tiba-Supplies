@@ -98,8 +98,6 @@ export const DirectLoadAssignmentScreen: React.FC = () => {
             <option value="">اختار المحجر</option>
             {quarries.map(quarry => <option key={quarry.quarry_id} value={quarry.quarry_id}>{liveName(quarry)}</option>)}
           </select>
-          {factoryId && quarryId && (selectedOrder ? <p className="mt-3 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm leading-6 text-blue-900">هيتم اختيار أقدم أمر مفتوح تلقائيًا، والمتبقي فيه {Math.max(0, Number(selectedOrder.requested_quantity) - (snapshot?.bookings ?? []).filter(b => b.load_order_id === selectedOrder.load_order_id && ['BOOKED', 'LOADING_STATEMENT', 'IN_TRANSIT', 'DELIVERED', 'COMPLETED'].includes(String(b.status).toUpperCase())).length)} عربية.</p> : <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900">مفيش أمر تحميل مفتوح للمصنع والمحجر المختارين. راجع «مركز التشغيل» وتأكد إن فيه أمر منشور وبكمية متبقية.</p>)}
-          {!loading && (factories.length === 0 || quarries.length === 0) && <p className="mt-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm leading-6 text-red-800">بيانات المصانع أو المحاجر لم تصل من قاعدة البيانات. راجع تحميل get_phase1_snapshot وصلاحياته؛ لم نضف بيانات تجريبية.</p>}
           <label className="mt-5 block text-sm font-bold text-slate-700">العربية</label>
           <select value={vehicleId} onChange={e => { setVehicleId(e.target.value); setError(''); setSuccess(''); }} className="mt-2 w-full rounded-xl border border-slate-300 bg-slate-50 p-3 text-sm text-slate-900">
             <option value="">اختار العربية</option>
@@ -113,14 +111,14 @@ export const DirectLoadAssignmentScreen: React.FC = () => {
 
         <aside className="space-y-4">
           <section className="rounded-3xl border border-slate-200 bg-white p-5">
-            <div className="flex items-center gap-2"><Truck size={20} className="text-blue-700"/><h3 className="font-black">ملخص الاختيار</h3></div>
-            {selectedOrder ? <div className="mt-4 space-y-3 text-sm">
-              <div><span className="text-slate-500">المصنع</span><div className="mt-1 font-bold">{liveName(snapshot?.factories.find(f => f.factory_id === selectedOrder.factory_id))}</div></div>
-              <div><span className="text-slate-500">المحجر</span><div className="mt-1 font-bold">{liveName(snapshot?.quarries.find(q => q.quarry_id === selectedOrder.quarry_id))}</div></div>
-              <div className="grid grid-cols-2 gap-2"><div className="rounded-xl bg-slate-50 p-3"><div className="text-xs text-slate-500">المطلوب</div><div className="mt-1 text-xl font-black">{selectedOrder.requested_quantity}</div></div><div className="rounded-xl bg-slate-50 p-3"><div className="text-xs text-slate-500">المحجوز</div><div className="mt-1 text-xl font-black">{(snapshot?.bookings ?? []).filter(b => b.load_order_id === selectedOrder.load_order_id).length}</div></div></div>
-            </div> : <p className="mt-3 text-sm leading-6 text-slate-500">تفاصيل الأمر هتظهر هنا بعد الاختيار.</p>}
+            <div className="flex items-center gap-2"><Truck size={20} className="text-blue-700"/><h3 className="font-black">ملخص الإسناد المباشر</h3></div>
+            <div className="mt-4 space-y-3 text-sm">
+              <div><span className="text-slate-500">المصنع</span><div className="mt-1 font-bold">{liveName(factories.find(f => f.factory_id === factoryId))}</div></div>
+              <div><span className="text-slate-500">المحجر</span><div className="mt-1 font-bold">{liveName(quarries.find(q => q.quarry_id === quarryId))}</div></div>
+              <div><span className="text-slate-500">العربية</span><div className="mt-1 font-bold">{String(availableVehicles.find(v => v.vehicle_id === vehicleId)?.plate_number ?? availableVehicles.find(v => v.vehicle_id === vehicleId)?.vehicle_code ?? 'لم يتم الاختيار')}</div></div>
+            </div>
           </section>
-          <section className="rounded-3xl border border-slate-200 bg-slate-50 p-5"><h3 className="font-black">حالة البيانات</h3><div className="mt-3 text-sm leading-7 text-slate-600">{loading ? 'جاري تحميل البيانات...' : `مصانع: ${factories.length} · محاجر: ${quarries.length} · أوامر مطابقة: ${orders.length} · عربيات: ${availableVehicles.length}`}</div>{!loading && orders.length === 0 && <p className="mt-2 text-sm leading-6 text-slate-500">اختار المصنع والمحجر أولًا. لو القائمة فضلت فاضية، راجع حالة أوامر التحميل المنشورة والكمية المتبقية.</p>}</section>
+          <section className="rounded-3xl border border-slate-200 bg-slate-50 p-5"><h3 className="font-black">حالة البيانات</h3><div className="mt-3 text-sm leading-7 text-slate-600">{loading ? 'جاري تحميل البيانات...' : `مصانع: ${factories.length} · محاجر: ${quarries.length} · عربيات: ${availableVehicles.length}`}</div></section>
         </aside>
       </div>
     </section>
