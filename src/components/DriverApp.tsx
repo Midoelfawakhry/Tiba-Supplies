@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { MapPin, Truck, Clock3, ShieldCheck, LogOut, Navigation, CircleAlert, FileText } from 'lucide-react';
 import { supabase, supabaseDiagnostics } from '../lib/supabase';
-import { registerPlugin } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import type { BackgroundGeolocationPlugin } from '@capacitor-community/background-geolocation';
 import { Geolocation } from '@capacitor/geolocation';
 
@@ -220,6 +220,17 @@ export const DriverApp: React.FC = () => {
     }
   }
 
+  function locationPermissionInstructions() {
+    const platform = Capacitor.getPlatform();
+    if (platform === 'ios') {
+      return 'افتح إعدادات iPhone > الخصوصية والأمان > خدمات الموقع > Tiba Supplies Driver، واسمح بالموقع أثناء الاستخدام. للتتبع أثناء الرحلة في الخلفية اختر «دائمًا» إذا ظهر الخيار.';
+    }
+    if (platform === 'android') {
+      return 'افتح إعدادات الهاتف > التطبيقات > Tiba Supplies Driver > الأذونات > الموقع، واسمح بالموقع دائمًا، ثم فعّل الإشعارات.';
+    }
+    return 'اسمح للموقع من إعدادات المتصفح، واترك صفحة التطبيق مفتوحة أثناء الرحلة.';
+  }
+
   function captureLocation() {
     setError('');
     if (!navigator.geolocation) {
@@ -233,13 +244,13 @@ export const DriverApp: React.FC = () => {
         if (permissions.location !== 'granted' && permissions.coarseLocation !== 'granted') {
           const requested = await Geolocation.requestPermissions();
           if (requested.location !== 'granted' && requested.coarseLocation !== 'granted') {
-            setError('إذن الموقع غير ممنوح. افتح إعدادات الهاتف > التطبيقات > Tiba Supplies Driver > الأذونات > الموقع، واسمح بالموقع دائمًا (Allow all the time) من إعدادات أندرويد، وفعّل الإشعارات.');
+            setError('إذن الموقع غير ممنوح. ' + locationPermissionInstructions());
             setLocating(false);
             return;
           }
         }
       } catch (permissionError: any) {
-        setError(permissionError?.message || 'تعذر طلب إذن GPS من أندرويد. افتح إعدادات التطبيق واسمح بالموقع.');
+        setError((permissionError?.message || 'تعذر طلب إذن GPS.') + ' ' + locationPermissionInstructions());
         setLocating(false);
         return;
       }
@@ -260,7 +271,7 @@ export const DriverApp: React.FC = () => {
         setLocating(false);
       },
       (locationError) => {
-        const message = locationError.code === 1 ? 'تم رفض إذن الموقع. افتح إعدادات الهاتف > التطبيقات > Tiba Supplies > الأذونات > الموقع، واسمح بالموقع دائمًا (Allow all the time) من إعدادات أندرويد، وفعّل الإشعارات، ثم جرّب مرة أخرى.' : locationError.code === 2 ? 'الهاتف لم يستطع تحديد موقعك. فعّل GPS وحاول في مكان مفتوح.' : 'انتهت مهلة تحديد الموقع. تأكد من تشغيل GPS وحاول مرة أخرى.';
+        const message = locationError.code === 1 ? 'تم رفض إذن الموقع. ' + locationPermissionInstructions() + ' ثم جرّب مرة أخرى.' : locationError.code === 2 ? 'الهاتف لم يستطع تحديد موقعك. فعّل خدمات الموقع وحاول في مكان مفتوح.' : 'انتهت مهلة تحديد الموقع. تأكد من تشغيل خدمات الموقع وحاول مرة أخرى.';
         setError(message);
         setLocating(false);
       },
