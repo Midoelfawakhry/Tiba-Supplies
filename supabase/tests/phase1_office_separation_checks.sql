@@ -42,6 +42,11 @@ BEGIN
     RAISE EXCEPTION 'EXPECTED_10KM_CHECK_IN_RADIUS; found=%', v_checkin_radius;
   END IF;
 
+  IF ABS(v_checkin_lat - 29.5568640) > 0.0000001
+     OR ABS(v_checkin_lon - 32.7616990) > 0.0000001 THEN
+    RAISE EXCEPTION 'RAS_SEDR_COORDINATES_CHANGED_UNEXPECTEDLY';
+  END IF;
+
   IF NOT EXISTS (
     SELECT 1
     FROM information_schema.columns
