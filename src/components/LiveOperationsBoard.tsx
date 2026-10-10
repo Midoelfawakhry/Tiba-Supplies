@@ -47,10 +47,14 @@ export const LiveOperationsBoard: React.FC = () => {
         <div className="max-w-7xl mx-auto px-5 py-4 flex items-center justify-between gap-4">
           <div>
             <div className="text-xs font-black text-cyan-300">TIBA SUPPLIES · LIVE CORE</div>
-            <h1 className="text-xl sm:text-2xl font-black">مركز تشغيل رأس سدر</h1>
+            <h1 className="text-xl sm:text-2xl font-black">مركز تشغيل الإسماعيلية</h1>
             <div className="text-xs text-slate-400 mt-1">
               <MapPin className="inline h-3 w-3 ml-1" />
-              {data?.office?.name ?? 'مكتب طيبة للتوريدات - رأس سدر'} · نطاق التشغيل {Number(data?.office?.geofence_radius_m ?? 10000) / 1000} كم
+              مكتب إصدار التحميلات: {data?.operational_office?.name ?? data?.office?.name ?? 'مكتب طيبة للتوريدات - الإسماعيلية'}
+            </div>
+            <div className="text-xs text-emerald-300 mt-1">
+              <MapPin className="inline h-3 w-3 ml-1" />
+              موقع حضور السائقين: {data?.check_in_office?.name ?? 'مكتب طيبة للتوريدات - رأس سدر'} · نطاق الحضور {Number(data?.check_in_office?.geofence_radius_m ?? 10000) / 1000} كم
             </div>
           </div>
           <div className="flex gap-2">
@@ -128,7 +132,7 @@ export const LiveOperationsBoard: React.FC = () => {
             <div className="rounded-3xl border border-emerald-500/20 bg-emerald-500/5 p-5">
               <div className="text-sm font-black text-emerald-300">قاعدة التشغيل الأساسية</div>
               <div className="mt-2 text-sm text-slate-300">
-                نقطة رأس سدر هي مركز التشغيل، ونطاق الأهلية 10 كم. أي تخصيص مباشر لاحقًا لن يتجاوز هذا القيد.
+                مكتب الإسماعيلية هو مركز إصدار أوامر التحميل، ورأس سدر هو موقع حضور السائقين والتحقق من وجودهم داخل نطاق 10 كم. وجود السائق داخل النطاق وحده لا يضيفه لقائمة الانتظار؛ يلزم تأكيد الحضور من التطبيق.
               </div>
             </div>
           </div>
