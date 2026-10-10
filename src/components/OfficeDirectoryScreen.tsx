@@ -40,6 +40,13 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
   const [waiting, setWaiting] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [showDriverForm, setShowDriverForm] = useState(false);
+  const [driverName, setDriverName] = useState('');
+  const [driverPhone, setDriverPhone] = useState('');
+  const [driverCode, setDriverCode] = useState('');
+  const [vehiclePlate, setVehiclePlate] = useState('');
+  const [savingDriver, setSavingDriver] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -57,6 +64,44 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     }
   }, []);
   useEffect(() => { void load(); }, [load]);
+
+  async function createDriver(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError('');
+    setSuccess('');
+    setSavingDriver(true);
+    try {
+      const { data: result, error: createError } = await supabase.rpc('create_operational_driver', {
+        p_name: driverName.trim(),
+        p_phone: driverPhone.trim(),
+        p_plate_number: vehiclePlate.trim(),
+        p_driver_code: driverCode.trim() || null,
+      });
+      if (createError) throw createError;
+      if (!result?.success) throw new Error('تعذر تأكيد حفظ السواق في النظام.');
+      setSuccess('تم حفظ بيانات السواق والعربية في قاعدة البيانات. حساب الدخول لم يتم إنشاؤه في هذه الخطوة.');
+      setDriverName('');
+      setDriverPhone('');
+      setDriverCode('');
+      setVehiclePlate('');
+      setShowDriverForm(false);
+      await load();
+    } catch (e: any) {
+      const raw = String(e?.message || '');
+      const messages: Record<string, string> = {
+        DRIVER_PHONE_EXISTS: 'رقم الموبايل مسجل لسواق بالفعل.',
+        VEHICLE_PLATE_EXISTS: 'رقم العربية مسجل بالفعل.',
+        DRIVER_CODE_EXISTS: 'كود السواق مستخدم بالفعل.',
+        REQUIRED_FIELDS_MISSING: 'اكتب اسم السواق ورقم الموبايل ورقم العربية.',
+        INSUFFICIENT_ROLE: 'حسابك مش عنده صلاحية إضافة سواقين.',
+        AUTH_REQUIRED: 'سجّل دخولك بحساب المكتب الأول.',
+      };
+      const key = Object.keys(messages).find(k => raw.includes(k));
+      setError(key ? messages[key] : raw || 'تعذر حفظ بيانات السواق. تأكد من تطبيق تحديث قاعدة البيانات أولًا.');
+    } finally {
+      setSavingDriver(false);
+    }
+  }
 
   const lists: Record<ScreenKey, Row[]> = {
     factories: snapshot?.factories ?? [],
@@ -85,7 +130,22 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
           </button>;
         })}
       </div>}
+      {success && <div role="status" className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{success}</div>}
       {error && <div role="alert" className="flex gap-2 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900"><AlertTriangle size={18} className="shrink-0"/><span>{error}</span></div>}
+      {active === 'drivers' && <section className="rounded-3xl border border-blue-200 bg-white p-4 sm:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div><h3 className="font-black">إضافة سائق جديد</h3><p className="mt-1 text-sm text-slate-500">تُحفظ البيانات التشغيلية في Supabase. إنشاء حساب الدخول خطوة منفصلة.</p></div>
+          <button type="button" onClick={() => { setShowDriverForm(v => !v); setError(''); setSuccess(''); }} className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-black text-white">{showDriverForm ? 'إلغاء' : 'إضافة سائق'}</button>
+        </div>
+        {showDriverForm && <form onSubmit={createDriver} className="mt-4 grid gap-3 sm:grid-cols-2">
+          <label className="text-sm font-bold text-slate-700">اسم السواق بالكامل<input required value={driverName} onChange={e => setDriverName(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal" placeholder="اسم السواق"/></label>
+          <label className="text-sm font-bold text-slate-700">رقم الموبايل<input required type="tel" value={driverPhone} onChange={e => setDriverPhone(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal" placeholder="رقم التواصل"/></label>
+          <label className="text-sm font-bold text-slate-700">رقم العربية / اللوحة<input required value={vehiclePlate} onChange={e => setVehiclePlate(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal" placeholder="رقم العربية"/></label>
+          <label className="text-sm font-bold text-slate-700">كود السواق (اختياري)<input value={driverCode} onChange={e => setDriverCode(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal" placeholder="لو عنده كود بالفعل"/></label>
+          <div className="sm:col-span-2 flex flex-wrap items-center gap-3"><button disabled={savingDriver} type="submit" className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-black text-white disabled:opacity-60">{savingDriver ? 'جاري الحفظ...' : 'حفظ السواق في النظام'}</button><p className="text-xs leading-5 text-slate-500">قبل استخدام الحفظ، لازم تكون ترقية قاعدة البيانات الخاصة بإضافة السواق مطبّقة في Supabase.</p></div>
+        </form>}
+      </section>}
+
       <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white">
         <div className="flex items-center gap-3 border-b border-slate-200 p-4 sm:p-5"><ActiveIcon className="text-blue-700" size={23}/><div><h3 className="font-black">{tabs.find(tab => tab.key === active)?.label}</h3><p className="text-xs text-slate-500">{rows.length} سجل</p></div></div>
         <div className="divide-y divide-slate-100">
