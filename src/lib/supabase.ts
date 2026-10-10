@@ -51,7 +51,7 @@ export const supabase = {
       }
       return client.auth.onAuthStateChange(callback);
     },
-    signInWithPassword: (credentials: { email: string; password: string }) =>
+    signInWithPassword: (credentials: { phone: string; password: string }) =>
       getClient().auth.signInWithPassword(credentials),
     signOut: () => getClient().auth.signOut(),
   },
