@@ -29,6 +29,7 @@ BEGIN
   SELECT COALESCE(jsonb_agg(jsonb_build_object(
     'vehicle_id', v.vehicle_id,
     'plate_number', v.plate_number,
+    'vehicle_code', v.vehicle_code,
     'owner_id', v.owner_id
   ) ORDER BY v.plate_number), '[]'::jsonb)
   INTO v_result
