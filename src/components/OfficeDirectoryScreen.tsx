@@ -46,8 +46,9 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
   const [showVehicleForm, setShowVehicleForm] = useState(false);
   const [driverName, setDriverName] = useState('');
   const [driverPhone, setDriverPhone] = useState('');
-  const [driverEmail, setDriverEmail] = useState('');
-  const [pendingAccount, setPendingAccount] = useState<{ driverId: string; email: string; name: string } | null>(null);
+  const [driverTemporaryPassword, setDriverTemporaryPassword] = useState('');
+  const [driverTemporaryPasswordConfirmation, setDriverTemporaryPasswordConfirmation] = useState('');
+  const [pendingAccount, setPendingAccount] = useState<{ driverId: string; name: string } | null>(null);
   const [retryingInvite, setRetryingInvite] = useState(false);
   const [driverCode, setDriverCode] = useState('');
   const [vehicleSearch, setVehicleSearch] = useState('');
@@ -75,37 +76,41 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
   }, []);
   useEffect(() => { void load(); }, [load]);
 
-  async function inviteDriverAccount(driverId: string, email: string) {
+  async function createDriverAccount(driverId: string, temporaryPassword: string) {
     const { data, error: invokeError } = await supabase.functions.invoke('create-driver-account', {
-      body: { driver_id: driverId, email },
+      body: { driver_id: driverId, temporary_password: temporaryPassword },
     });
     if (invokeError) throw invokeError;
     if (!data?.success) {
-      const code = String(data?.error ?? 'INVITATION_FAILED');
+      const code = String(data?.error ?? 'ACCOUNT_CREATION_FAILED');
       const messages: Record<string, string> = {
         AUTH_REQUIRED: 'انتهت جلسة الدخول. سجّل دخول المكتب مرة تانية.',
         INSUFFICIENT_ROLE: 'حسابك مش عنده صلاحية إنشاء حسابات للسائقين.',
-        EMAIL_ALREADY_REGISTERED: 'الإيميل ده مسجل بالفعل في Supabase. استخدم إيميل غير مستخدم أو راجع ربط الحساب الموجود.',
+        PHONE_ALREADY_REGISTERED: 'رقم الموبايل مربوط بحساب موجود. راجع الحساب قبل إعادة المحاولة.',
         DRIVER_ACCOUNT_ALREADY_LINKED: 'السواق ده مربوط بحساب بالفعل.',
         DRIVER_NOT_FOUND_OR_INACTIVE: 'السواق غير موجود أو غير نشط.',
-        DRIVER_ID_AND_VALID_EMAIL_REQUIRED: 'اكتب إيميل صحيح للسواق.',
-        INVITATION_FAILED: 'تعذر إرسال دعوة التفعيل. راجع إعدادات البريد في Supabase.',
+        DRIVER_PHONE_INVALID: 'رقم موبايل السواق غير صالح. استخدم رقمًا مصريًا صحيحًا.',
+        DRIVER_ID_REQUIRED: 'معرّف السواق مطلوب لإنشاء الحساب.',
+        TEMPORARY_PASSWORD_TOO_SHORT: 'كلمة المرور المؤقتة يجب ألا تقل عن 8 أحرف.',
+        ACCOUNT_CREATION_FAILED: 'تعذر إنشاء حساب الدخول. تحقق من إعدادات Supabase Auth.',
         SERVER_CONFIGURATION_MISSING: 'وظيفة إنشاء الحساب محتاجة إعدادات Supabase على الخادم.',
       };
       throw new Error(messages[code] ?? 'تعذر إنشاء حساب الدخول للسواق.');
     }
   }
 
-  async function retryDriverInvite() {
+  async function retryDriverAccount() {
     if (!pendingAccount) return;
     setRetryingInvite(true);
     setError('');
     try {
-      await inviteDriverAccount(pendingAccount.driverId, pendingAccount.email);
-      setSuccess(`تم إرسال دعوة تفعيل الحساب إلى ${pendingAccount.email}. السواق هيحدد كلمة المرور بنفسه.`);
+      await createDriverAccount(pendingAccount.driverId, driverTemporaryPassword);
+      setSuccess('تم إنشاء الحساب. اسم الدخول رقم الموبايل، والسائق يغيّر كلمة المرور بعد أول دخول.');
       setPendingAccount(null);
+      setDriverTemporaryPassword('');
+      setDriverTemporaryPasswordConfirmation('');
     } catch (e: any) {
-      setError(e?.message || 'تعذر إرسال دعوة التفعيل.');
+      setError(e?.message || 'تعذر إنشاء حساب السائق.');
     } finally {
       setRetryingInvite(false);
     }
@@ -115,6 +120,14 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     event.preventDefault();
     setError('');
     setSuccess('');
+    if (driverTemporaryPassword.length < 8) {
+      setError('كلمة المرور المؤقتة يجب ألا تقل عن 8 أحرف.');
+      return;
+    }
+    if (driverTemporaryPassword !== driverTemporaryPasswordConfirmation) {
+      setError('تأكيد كلمة المرور غير مطابق.');
+      return;
+    }
     setSavingDriver(true);
     try {
       const { data: result, error: createError } = await supabase.rpc('create_operational_driver', {
@@ -125,21 +138,22 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
       });
       if (createError) throw createError;
       if (!result?.success || !result?.driver_id) throw new Error('تعذر تأكيد حفظ السواق في النظام.');
-      const savedDriver = { driverId: String(result.driver_id), email: driverEmail.trim().toLowerCase(), name: driverName.trim() };
+      const savedDriver = { driverId: String(result.driver_id), name: driverName.trim() };
       setDriverName('');
       setDriverPhone('');
-      setDriverEmail('');
       setDriverCode('');
       setVehicleSearch('');
       setSelectedVehicleId('');
       setShowDriverForm(false);
       setPendingAccount(savedDriver);
       try {
-        await inviteDriverAccount(savedDriver.driverId, savedDriver.email);
-        setSuccess(`تم حفظ السواق وربط العربية، وإرسال دعوة تفعيل الحساب إلى ${savedDriver.email}. السواق هيحدد كلمة المرور بنفسه.`);
+        await createDriverAccount(savedDriver.driverId, driverTemporaryPassword);
+        setSuccess('تم حفظ السواق وربط العربية وإنشاء الحساب. اسم الدخول رقم الموبايل، والسائق يغيّر كلمة المرور بعد أول دخول.');
         setPendingAccount(null);
+        setDriverTemporaryPassword('');
+        setDriverTemporaryPasswordConfirmation('');
       } catch (inviteError: any) {
-        setError(`تم حفظ بيانات السواق وربط العربية، لكن إنشاء حساب الدخول لم يكتمل: ${inviteError?.message || 'تعذر إرسال الدعوة'}`);
+        setError(`تم حفظ بيانات السواق وربط العربية، لكن إنشاء حساب الدخول لم يكتمل: ${inviteError?.message || 'تعذر إنشاء الحساب'}`);
       }
       await load();
     } catch (e: any) {
@@ -191,7 +205,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
       </div>}
       {success && <div role="status" className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{success}</div>}
       {error && <div role="alert" className="flex gap-2 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900"><AlertTriangle size={18} className="shrink-0"/><span>{error}</span></div>}
-      {pendingAccount && <div className="flex flex-col gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="text-sm text-amber-950"><p className="font-black">بيانات السواق اتحفظت، ولسه دعوة الحساب محتاجة إعادة محاولة</p><p className="mt-1">{pendingAccount.name} · {pendingAccount.email}</p><p className="mt-1 text-xs">رقم السجل: {pendingAccount.driverId}</p></div><button type="button" onClick={() => void retryDriverInvite()} disabled={retryingInvite} className="rounded-xl bg-amber-700 px-4 py-2.5 text-sm font-black text-white disabled:opacity-60">{retryingInvite ? 'جاري إعادة الإرسال...' : 'إعادة إرسال دعوة التفعيل'}</button></div>}
+      {pendingAccount && <div className="flex flex-col gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="text-sm text-amber-950"><p className="font-black">بيانات السواق اتحفظت، ولسه إنشاء الحساب محتاج إعادة محاولة</p><p className="mt-1">{pendingAccount.name}</p><p className="mt-1 text-xs">رقم السجل: {pendingAccount.driverId}</p></div><button type="button" onClick={() => void retryDriverAccount()} disabled={retryingInvite} className="rounded-xl bg-amber-700 px-4 py-2.5 text-sm font-black text-white disabled:opacity-60">{retryingInvite ? 'جاري إنشاء الحساب...' : 'إعادة محاولة إنشاء الحساب'}</button></div>}
       {active === 'vehicles' && <section className="rounded-3xl border border-blue-200 bg-white p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div><h3 className="font-black">إضافة عربية جديدة</h3><p className="mt-1 text-sm text-slate-500">تسجيل العربية ومالكها. ربط السواق خطوة منفصلة.</p></div>
@@ -201,13 +215,14 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
       </section>}
       {active === 'drivers' && <section className="rounded-3xl border border-blue-200 bg-white p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div><h3 className="font-black">إضافة سائق جديد</h3><p className="mt-1 text-sm text-slate-500">تُحفظ البيانات التشغيلية في Supabase. إنشاء حساب الدخول خطوة منفصلة.</p></div>
+          <div><h3 className="font-black">إضافة سائق جديد</h3><p className="mt-1 text-sm text-slate-500">يُحفظ السائق ويرتبط برقم الموبايل والعربية، ثم يدخل برقم الموبايل وكلمة المرور.</p></div>
           <button type="button" onClick={() => { setShowDriverForm(v => !v); setError(''); setSuccess(''); }} className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-black text-white">{showDriverForm ? 'إلغاء' : 'إضافة سائق'}</button>
         </div>
         {showDriverForm && <form onSubmit={createDriver} className="mt-4 grid gap-3 sm:grid-cols-2">
           <label className="text-sm font-bold text-slate-700">اسم السواق بالكامل<input required value={driverName} onChange={e => setDriverName(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal" placeholder="اسم السواق"/></label>
           <label className="text-sm font-bold text-slate-700">رقم الموبايل<input required type="tel" value={driverPhone} onChange={e => setDriverPhone(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal" placeholder="رقم التواصل"/></label>
-          <label className="text-sm font-bold text-slate-700">إيميل السواق لتفعيل الحساب<input required type="email" value={driverEmail} onChange={e => setDriverEmail(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal" placeholder="driver@example.com" dir="ltr"/><span className="mt-1 block text-xs font-normal text-slate-500">هنبعت له دعوة آمنة يحدد منها كلمة المرور بنفسه.</span></label>
+          <label className="text-sm font-bold text-slate-700">كلمة مرور مؤقتة للسائق<input required type="password" autoComplete="new-password" minLength={8} value={driverTemporaryPassword} onChange={e => setDriverTemporaryPassword(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal" /><span className="mt-1 block text-xs font-normal text-slate-500">اكتب كلمة مؤقتة من 8 أحرف على الأقل، وسلّمها للسائق مباشرة.</span></label>
+          <label className="text-sm font-bold text-slate-700">تأكيد كلمة المرور المؤقتة<input required type="password" autoComplete="new-password" minLength={8} value={driverTemporaryPasswordConfirmation} onChange={e => setDriverTemporaryPasswordConfirmation(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal" /></label>
           <div className="text-sm font-bold text-slate-700">اختيار العربية
             <label className="relative mt-1.5 block"><span className="sr-only">ابحث برقم العربية</span><input value={vehicleSearch} onChange={e => { setVehicleSearch(e.target.value); setSelectedVehicleId(''); }} className="w-full rounded-xl border border-slate-300 bg-white p-3 pr-10 font-normal" placeholder="ابحث برقم اللوحة أو كود العربية..."/><span className="absolute right-3 top-3 text-slate-400"><Truck size={18}/></span></label>
             <select required value={selectedVehicleId} onChange={e => setSelectedVehicleId(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal">
@@ -221,7 +236,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
             <p className="mt-1 text-xs font-normal text-slate-500">{filteredAvailableVehicles.length} عربية متاحة للاختيار</p>
           </div>
           <label className="text-sm font-bold text-slate-700">كود السواق (اختياري)<input value={driverCode} onChange={e => setDriverCode(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal" placeholder="لو عنده كود بالفعل"/></label>
-          <div className="sm:col-span-2 flex flex-wrap items-center gap-3"><button disabled={savingDriver} type="submit" className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-black text-white disabled:opacity-60">{savingDriver ? 'جاري حفظ البيانات وإرسال الدعوة...' : 'حفظ السواق وإرسال دعوة الحساب'}</button><p className="text-xs leading-5 text-slate-500">هيتم حفظ السواق وربط العربية، ثم إرسال دعوة التفعيل إلى الإيميل. كلمة المرور بيحددها السواق بنفسه.</p></div>
+          <div className="sm:col-span-2 flex flex-wrap items-center gap-3"><button disabled={savingDriver} type="submit" className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-black text-white disabled:opacity-60">{savingDriver ? 'جاري حفظ البيانات وإنشاء الحساب...' : 'حفظ السواق وإنشاء الحساب'}</button><p className="text-xs leading-5 text-slate-500">هيتم إنشاء الحساب باستخدام رقم الموبايل وكلمة المرور المؤقتة. السائق يغيّرها عند أول دخول؛ لا تُرسل رسائل أو إيميلات.</p></div>
         </form>}
       </section>}
 
