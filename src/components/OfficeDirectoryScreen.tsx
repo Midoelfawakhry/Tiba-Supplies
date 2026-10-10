@@ -16,6 +16,16 @@ const tabs: { key: ScreenKey; label: string; icon: React.ElementType }[] = [
   { key: 'actual', label: 'التحميل الفعلي', icon: ClipboardCheck },
 ];
 
+const sectionPalette: Record<ScreenKey, { selected: string; accent: string; border: string; action: string; row: string; wash: string }> = {
+  factories: { selected: 'border-sky-600 bg-sky-600', accent: 'text-sky-700', border: 'border-sky-200', action: 'bg-sky-600 hover:bg-sky-700', row: 'border-r-sky-400', wash: 'bg-sky-50/50' },
+  quarries: { selected: 'border-amber-600 bg-amber-600', accent: 'text-amber-700', border: 'border-amber-200', action: 'bg-amber-600 hover:bg-amber-700', row: 'border-r-amber-400', wash: 'bg-amber-50/50' },
+  drivers: { selected: 'border-red-600 bg-red-600', accent: 'text-red-700', border: 'border-red-200', action: 'bg-red-600 hover:bg-red-700', row: 'border-r-red-400', wash: 'bg-red-50/50' },
+  vehicles: { selected: 'border-blue-600 bg-blue-600', accent: 'text-blue-700', border: 'border-blue-200', action: 'bg-blue-600 hover:bg-blue-700', row: 'border-r-blue-400', wash: 'bg-blue-50/50' },
+  waiting: { selected: 'border-violet-600 bg-violet-600', accent: 'text-violet-700', border: 'border-violet-200', action: 'bg-violet-600 hover:bg-violet-700', row: 'border-r-violet-400', wash: 'bg-violet-50/50' },
+  loads: { selected: 'border-orange-600 bg-orange-600', accent: 'text-orange-700', border: 'border-orange-200', action: 'bg-orange-600 hover:bg-orange-700', row: 'border-r-orange-400', wash: 'bg-orange-50/50' },
+  actual: { selected: 'border-emerald-600 bg-emerald-600', accent: 'text-emerald-700', border: 'border-emerald-200', action: 'bg-emerald-600 hover:bg-emerald-700', row: 'border-r-emerald-400', wash: 'bg-emerald-50/50' },
+};
+
 function rowTitle(row: Row, key: ScreenKey) {
   if (key === 'factories' || key === 'quarries') return liveName(row);
   if (key === 'drivers') return row.name ?? row.driver_name ?? 'سائق بدون اسم';
@@ -189,7 +199,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
   const ActiveIcon = tabs.find(tab => tab.key === active)?.icon ?? ClipboardList;
 
   return (
-    <section className="space-y-4">
+    <section className={`space-y-4 rounded-[2rem] p-2 transition-colors sm:p-3 ${sectionPalette[active].wash}`}>
       <div className="flex flex-col gap-3 rounded-3xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
         <div><h2 className="text-xl font-black">شاشات إدارة المكتب</h2><p className="mt-1 text-sm leading-6 text-slate-500">دليل موحّد لبيانات التشغيل الحقيقية المحمّلة من Supabase.</p></div>
         <button onClick={() => void load()} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 py-2 font-bold disabled:opacity-60"><RefreshCw size={17} className={loading ? 'animate-spin' : ''}/> تحديث البيانات</button>
@@ -198,7 +208,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
         {tabs.map(tab => {
           const Icon = tab.icon;
           const selected = active === tab.key;
-          return <button key={tab.key} type="button" onClick={() => setActive(tab.key)} className={selected ? 'flex min-h-16 items-center gap-2 rounded-2xl border border-blue-600 bg-blue-600 p-3 text-right text-sm font-black text-white' : 'flex min-h-16 items-center gap-2 rounded-2xl border border-slate-200 bg-white p-3 text-right text-sm font-bold text-slate-700'}>
+          return <button key={tab.key} type="button" onClick={() => setActive(tab.key)} className={selected ? `flex min-h-16 items-center gap-2 rounded-2xl border p-3 text-right text-sm font-black text-white shadow-sm ${sectionPalette[tab.key].selected}` : 'flex min-h-16 items-center gap-2 rounded-2xl border border-slate-200 bg-white p-3 text-right text-sm font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50'}>
             <Icon size={19} className="shrink-0"/><span>{tab.label}</span><span className="mr-auto text-xs opacity-80">{lists[tab.key].length}</span>
           </button>;
         })}
@@ -206,10 +216,10 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
       {success && <div role="status" className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{success}</div>}
       {error && <div role="alert" className="flex gap-2 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900"><AlertTriangle size={18} className="shrink-0"/><span>{error}</span></div>}
       {pendingAccount && <div className="flex flex-col gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="text-sm text-amber-950"><p className="font-black">بيانات السواق اتحفظت، ولسه إنشاء الحساب محتاج إعادة محاولة</p><p className="mt-1">{pendingAccount.name}</p><p className="mt-1 text-xs">رقم السجل: {pendingAccount.driverId}</p></div><button type="button" onClick={() => void retryDriverAccount()} disabled={retryingInvite} className="rounded-xl bg-amber-700 px-4 py-2.5 text-sm font-black text-white disabled:opacity-60">{retryingInvite ? 'جاري إنشاء الحساب...' : 'إعادة محاولة إنشاء الحساب'}</button></div>}
-      {active === 'vehicles' && <section className="rounded-3xl border border-blue-200 bg-white p-4 sm:p-5">
+      {active === 'vehicles' && <section className={`rounded-3xl border bg-white p-4 shadow-sm sm:p-5 ${sectionPalette[active].border}`}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div><h3 className="font-black">إضافة عربية جديدة</h3><p className="mt-1 text-sm text-slate-500">تسجيل العربية ومالكها. ربط السواق خطوة منفصلة.</p></div>
-          <button type="button" onClick={() => setShowVehicleForm(v => !v)} className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-black text-white">{showVehicleForm ? 'إلغاء' : 'إضافة عربية'}</button>
+          <button type="button" onClick={() => setShowVehicleForm(v => !v)} className={`rounded-xl px-4 py-2.5 text-sm font-black text-white transition ${sectionPalette[active].action}`}>{showVehicleForm ? 'إلغاء' : 'إضافة عربية'}</button>
         </div>
         {showVehicleForm && <div className="mt-4"><AddVehicleForm onSaved={() => { void load(); setSuccess('تمت إضافة العربية ومالكها.'); }} /></div>}
       </section>}
@@ -241,9 +251,9 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
       </section>}
 
       <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white">
-        <div className="flex items-center gap-3 border-b border-slate-200 p-4 sm:p-5"><ActiveIcon className="text-blue-700" size={23}/><div><h3 className="font-black">{tabs.find(tab => tab.key === active)?.label}</h3><p className="text-xs text-slate-500">{rows.length} سجل</p></div></div>
+        <div className="flex items-center gap-3 border-b border-slate-200 p-4 sm:p-5"><ActiveIcon className={sectionPalette[active].accent} size={23}/><div><h3 className="font-black">{tabs.find(tab => tab.key === active)?.label}</h3><p className="text-xs text-slate-500">{rows.length} سجل</p></div></div>
         <div className="divide-y divide-slate-100">
-          {rows.map((row, index) => <article key={String(row.factory_id ?? row.quarry_id ?? row.driver_id ?? row.vehicle_id ?? row.entry_id ?? row.load_order_id ?? row.booking_id ?? row.actual_loading_record_id ?? index)} className="p-4 sm:p-5">
+          {rows.map((row, index) => <article key={String(row.factory_id ?? row.quarry_id ?? row.driver_id ?? row.vehicle_id ?? row.entry_id ?? row.load_order_id ?? row.booking_id ?? row.actual_loading_record_id ?? index)} className={`border-r-4 p-4 transition-colors hover:bg-slate-50/70 sm:p-5 ${sectionPalette[active].row}`}>
             <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h4 className="break-words font-black">{rowTitle(row, active)}</h4><p className="mt-1 break-words text-sm leading-6 text-slate-500">{rowDetails(row, active) || 'لا توجد تفاصيل إضافية في السجل الحالي.'}</p></div><span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-500">#{index + 1}</span></div>
           </article>)}
           {!loading && rows.length === 0 && <div className="p-10 text-center text-sm leading-6 text-slate-500">لا توجد سجلات في هذا القسم حاليًا. لن نعرض بيانات تجريبية بدل البيانات الحقيقية.</div>}
