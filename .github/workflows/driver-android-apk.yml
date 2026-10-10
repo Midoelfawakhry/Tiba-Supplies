@@ -156,10 +156,11 @@ jobs:
             'android.permission.ACCESS_COARSE_LOCATION',
             'android.permission.ACCESS_FINE_LOCATION'
           ];
-          const manifestOpen = xml.indexOf('>');
-          if (!xml.includes('<manifest') || manifestOpen < 0) {
+          const manifestTag = xml.match(/<manifest\\b[^>]*>/);
+          if (!manifestTag) {
             throw new Error('AndroidManifest.xml manifest root tag was not found.');
           }
+          const manifestOpen = manifestTag.index + manifestTag[0].length - 1;
           const tags = permissions
             .filter(permission => !xml.includes('android:name="' + permission + '"'))
             .map(permission => '    <uses-permission android:name="' + permission + '" />');
