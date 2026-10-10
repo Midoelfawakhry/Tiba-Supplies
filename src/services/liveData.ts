@@ -1,7 +1,11 @@
 import { supabase } from '../lib/supabase';
 
 export type LiveSnapshot = {
+  // The primary operational office that creates load orders.
   office: Record<string, any> | null;
+  operational_office: Record<string, any> | null;
+  // The office where drivers explicitly check in.
+  check_in_office: Record<string, any> | null;
   factories: Record<string, any>[];
   quarries: Record<string, any>[];
   load_orders: Record<string, any>[];
@@ -16,7 +20,9 @@ export async function getLiveSnapshot(): Promise<LiveSnapshot> {
   if (error) throw error;
 
   return {
-    office: data?.office ?? null,
+    office: data?.operational_office ?? data?.office ?? null,
+    operational_office: data?.operational_office ?? data?.office ?? null,
+    check_in_office: data?.check_in_office ?? null,
     factories: data?.factories ?? [],
     quarries: data?.quarries ?? [],
     load_orders: data?.load_orders ?? [],
