@@ -14,6 +14,7 @@ on:
         default: office
   push:
     branches:
+      - main
       - phase2-driver-app-foundation
       - feature/driver-phone-password-access
     paths:
@@ -57,8 +58,8 @@ jobs:
     env:
       VITE_APP_MODE: ${{ matrix.app_mode }}
       TIBA_APP_MODE: ${{ matrix.app_mode }}
-      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || secrets.SUPABASE_URL }}
-      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY || secrets.SUPABASE_PUBLISHABLE_KEY || secrets.SUPABASE_ANON_KEY }}
+      VITE_SUPABASE_URL: https://tnlcvwtphbunteifoonc.supabase.co
+      VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_69f6sJFpdfPMks3NS5WkFA_v_DqI7Ce
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -76,7 +77,7 @@ jobs:
           fi
 
           # Supabase createClient expects the project URL, not the REST endpoint path.
-          NORMALIZED_URL="$(node -e 'const u = new URL(process.env.VITE_SUPABASE_URL); if (u.protocol !== "https:" || !u.hostname.endsWith(".supabase.co")) process.exit(2); process.stdout.write(u.origin)')" || {
+          NORMALIZED_URL="$(node -e 'const u = new URL(process.env.VITE_SUPABASE_URL); if (u.protocol !== "https:" || u.origin !== "https://tnlcvwtphbunteifoonc.supabase.co") process.exit(2); process.stdout.write(u.origin)')" || {
             echo "::error::VITE_SUPABASE_URL is not a valid HTTPS Supabase project URL."
             exit 1
           }
