@@ -1,0 +1,64 @@
+name: Build Driver Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - phase2-driver-app-foundation
+    paths:
+      - 'src/**'
+      - 'index.html'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'capacitor.config.ts'
+      - '.github/workflows/driver-android-apk.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install web dependencies
+        run: npm install
+
+      - name: Install Capacitor Android tooling
+        run: npm install --no-save @capacitor/core @capacitor/cli @capacitor/android
+
+      - name: Type-check
+        run: npm run lint
+
+      - name: Build driver web bundle
+        run: npm run build
+        env:
+          VITE_APP_MODE: driver
+
+      - name: Create Android project
+        run: npx cap add android
+
+      - name: Sync Android project
+        run: npx cap sync android
+
+      - name: Build debug APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: tiba-supplies-driver-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
