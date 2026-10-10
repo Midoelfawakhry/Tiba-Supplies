@@ -17,6 +17,7 @@ export const DriverApp: React.FC = () => {
   const [error, setError] = useState(supabaseDiagnostics.configurationError);
   const [position, setPosition] = useState<PositionState | null>(null);
   const [locating, setLocating] = useState(false);
+  const [trackingEnabled, setTrackingEnabled] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -49,6 +50,52 @@ export const DriverApp: React.FC = () => {
       subscription?.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (!session || !trackingEnabled) return;
+    if (!navigator.geolocation) {
+      setError('الجهاز لا يدعم تحديد الموقع.');
+      setTrackingEnabled(false);
+      return;
+    }
+
+    let lastSentAt = 0;
+    let active = true;
+    const watchId = navigator.geolocation.watchPosition(
+      async ({ coords, timestamp }) => {
+        if (!active) return;
+        setPosition({
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          accuracy: coords.accuracy,
+          capturedAt: new Date(timestamp).toLocaleString('ar-EG'),
+        });
+        if (Date.now() - lastSentAt < 20000) return;
+        lastSentAt = Date.now();
+        const { error: locationError } = await supabase.rpc('update_driver_live_location', {
+          p_latitude: coords.latitude,
+          p_longitude: coords.longitude,
+          p_accuracy_m: coords.accuracy,
+          p_heading: coords.heading,
+          p_speed_kmh: coords.speed == null ? null : coords.speed * 3.6,
+          p_captured_at: new Date(timestamp).toISOString(),
+        });
+        if (active && locationError) {
+          setError(locationError.message || 'تعذر حفظ الموقع. تأكد من ربط حساب السائق بالعربية وتطبيق إعدادات التتبع في Supabase.');
+        } else if (active) {
+          setError('');
+        }
+      },
+      (locationError) => {
+        if (active) setError(locationError.message || 'تعذر قراءة GPS. تأكد من منح إذن الموقع.');
+      },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 5000 },
+    );
+    return () => {
+      active = false;
+      navigator.geolocation.clearWatch(watchId);
+    };
+  }, [session, trackingEnabled]);
 
   async function signIn(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -135,8 +182,12 @@ export const DriverApp: React.FC = () => {
         </section>
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center gap-2"><ShieldCheck className="text-blue-700" size={22}/><h2 className="font-black">تسجيل الوصول</h2></div>
-          <p className="mt-2 text-sm leading-6 text-slate-600">حدّد موقعك الحالي للتحقق من صلاحية الموقع ودقته. سيتم تفعيل تسجيل الوصول الفعلي وربطه بقائمة الانتظار في خطوة الربط مع إجراء قاعدة البيانات المعتمد.</p>
-          <button onClick={captureLocation} disabled={locating} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 p-3 font-black text-white disabled:opacity-60">
+          <p className="mt-2 text-sm leading-6 text-slate-600">فعّل مشاركة الموقع المباشرة لإرسال إحداثيات GPS إلى خريطة المكتب. يحتاج ذلك إذن الموقع وربط حسابك بسجل السائق والعربية في النظام. مشاركة الموقع لا تعني تسجيل الوصول أو دخول قائمة الانتظار.</p>
+          <button onClick={() => setTrackingEnabled(value => !value)} className={trackingEnabled ? "mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-rose-600 p-3 font-black text-white" : "mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 p-3 font-black text-white"}>
+            <Navigation size={18}/>{trackingEnabled ? 'إيقاف مشاركة الموقع المباشرة' : 'تفعيل مشاركة الموقع المباشرة'}
+          </button>
+          <p className="mt-2 text-xs text-slate-500">{trackingEnabled ? 'التتبع مفعّل طالما التطبيق مفتوح وإذن الموقع متاح.' : 'لن يتم إرسال موقعك للخريطة قبل تفعيل المشاركة.'}</p>
+          <button onClick={captureLocation} disabled={locating} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white p-3 font-bold text-slate-800 disabled:opacity-60">
             <MapPin size={18}/>{locating ? 'جاري تحديد الموقع...' : 'تحديد موقعي الحالي'}
           </button>
           {position && <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
@@ -144,7 +195,7 @@ export const DriverApp: React.FC = () => {
             <p className="mt-2">دقة GPS: {Math.round(position.accuracy)} متر</p>
             <p>وقت القراءة: {position.capturedAt}</p>
             <p className="mt-2 break-all font-mono text-xs">{position.latitude.toFixed(6)}, {position.longitude.toFixed(6)}</p>
-            <p className="mt-3 text-xs leading-5">ملاحظة: الموقع تم قراءته فقط ولم يتم تسجيل Check-in أو إضافتك لقائمة الانتظار.</p>
+            <p className="mt-3 text-xs leading-5">ملاحظة: قراءة الموقع لا تسجّل Check-in ولا تضيفك لقائمة الانتظار.</p>
           </div>}
           {error && <div role="alert" className="mt-4 flex gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"><CircleAlert className="shrink-0" size={18}/><span>{error}</span></div>}
         </section>
