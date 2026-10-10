@@ -1,7 +1,17 @@
-name: Build Driver Android APK
+name: Build Tiba Supplies Android APKs
 
 on:
   workflow_dispatch:
+    inputs:
+      app_mode:
+        description: Which Android app to build
+        required: true
+        type: choice
+        options:
+          - driver
+          - office
+          - both
+        default: both
   push:
     branches:
       - phase2-driver-app-foundation
@@ -16,8 +26,34 @@ permissions:
   contents: read
 
 jobs:
-  build-apk:
+  select-builds:
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - id: set-matrix
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            MODE="${{ inputs.app_mode }}"
+          else
+            MODE="both"
+          fi
+          if [ "$MODE" = "both" ]; then
+            echo 'matrix={"app_mode":["driver","office"]}' >> "$GITHUB_OUTPUT"
+          else
+            echo "matrix={\"app_mode\":[\"$MODE\"]}" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-apk:
+    needs: select-builds
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.select-builds.outputs.matrix) }}
+    env:
+      VITE_APP_MODE: ${{ matrix.app_mode }}
+      TIBA_APP_MODE: ${{ matrix.app_mode }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,24 +63,25 @@ jobs:
         with:
           node-version: 22
 
-      - name: Install web dependencies
-        run: npm install
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
 
-      - name: Install Capacitor Android tooling
-        run: npm install --no-save @capacitor/core @capacitor/cli @capacitor/android
+      - name: Install dependencies
+        run: npm install
 
       - name: Type-check
         run: npm run lint
 
-      - name: Build driver web bundle
+      - name: Build app bundle
         run: npm run build
-        env:
-          VITE_APP_MODE: driver
 
-      - name: Create Android project
+      - name: Add Android platform
         run: npx cap add android
 
-      - name: Sync Android project
+      - name: Sync Android platform
         run: npx cap sync android
 
       - name: Build debug APK
@@ -53,9 +90,9 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug
 
-      - name: Upload debug APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: tiba-supplies-driver-debug-apk
+          name: tiba-supplies-${{ matrix.app_mode }}-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
