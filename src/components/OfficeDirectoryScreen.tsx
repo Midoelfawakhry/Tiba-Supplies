@@ -223,10 +223,10 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
         </div>
         {showVehicleForm && <div className="mt-4"><AddVehicleForm onSaved={() => { void load(); setSuccess('تمت إضافة العربية ومالكها.'); }} /></div>}
       </section>}
-      {active === 'drivers' && <section className="rounded-3xl border border-blue-200 bg-white p-4 sm:p-5">
+      {active === 'drivers' && <section className={`rounded-3xl border bg-white p-4 shadow-sm sm:p-5 ${sectionPalette[active].border}`}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div><h3 className="font-black">إضافة سائق جديد</h3><p className="mt-1 text-sm text-slate-500">يُحفظ السائق ويرتبط برقم الموبايل والعربية، ثم يدخل برقم الموبايل وكلمة المرور.</p></div>
-          <button type="button" onClick={() => { setShowDriverForm(v => !v); setError(''); setSuccess(''); }} className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-black text-white">{showDriverForm ? 'إلغاء' : 'إضافة سائق'}</button>
+          <button type="button" onClick={() => { setShowDriverForm(v => !v); setError(''); setSuccess(''); }} className={`rounded-xl px-4 py-2.5 text-sm font-black text-white transition ${sectionPalette[active].action}`}>{showDriverForm ? 'إلغاء' : 'إضافة سائق'}</button>
         </div>
         {showDriverForm && <form onSubmit={createDriver} className="mt-4 grid gap-3 sm:grid-cols-2">
           <label className="text-sm font-bold text-slate-700">اسم السواق بالكامل<input required value={driverName} onChange={e => setDriverName(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal" placeholder="اسم السواق"/></label>
@@ -246,7 +246,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
             <p className="mt-1 text-xs font-normal text-slate-500">{filteredAvailableVehicles.length} عربية متاحة للاختيار</p>
           </div>
           <label className="text-sm font-bold text-slate-700">كود السواق (اختياري)<input value={driverCode} onChange={e => setDriverCode(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal" placeholder="لو عنده كود بالفعل"/></label>
-          <div className="sm:col-span-2 flex flex-wrap items-center gap-3"><button disabled={savingDriver} type="submit" className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-black text-white disabled:opacity-60">{savingDriver ? 'جاري حفظ البيانات وإنشاء الحساب...' : 'حفظ السواق وإنشاء الحساب'}</button><p className="text-xs leading-5 text-slate-500">هيتم إنشاء الحساب باستخدام رقم الموبايل وكلمة المرور المؤقتة. السائق يغيّرها عند أول دخول؛ لا تُرسل رسائل أو إيميلات.</p></div>
+          <div className="sm:col-span-2 flex flex-wrap items-center gap-3"><button disabled={savingDriver} type="submit" className={`rounded-xl px-5 py-3 text-sm font-black text-white transition disabled:opacity-60 ${sectionPalette[active].action}`}>{savingDriver ? 'جاري حفظ البيانات وإنشاء الحساب...' : 'حفظ السواق وإنشاء الحساب'}</button><p className="text-xs leading-5 text-slate-500">هيتم إنشاء الحساب باستخدام رقم الموبايل وكلمة المرور المؤقتة. السائق يغيّرها عند أول دخول؛ لا تُرسل رسائل أو إيميلات.</p></div>
         </form>}
       </section>}
 
