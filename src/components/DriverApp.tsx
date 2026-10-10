@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { MapPin, Truck, Clock3, ShieldCheck, LogOut, Navigation, CircleAlert, FileText } from 'lucide-react';
 import { supabase, supabaseDiagnostics } from '../lib/supabase';
-import { Geolocation } from '@capacitor/geolocation';
+import { registerPlugin } from '@capacitor/core';
+import type { BackgroundGeolocationPlugin } from '@capacitor-community/background-geolocation';
+
+const BackgroundGeolocation = registerPlugin<BackgroundGeolocationPlugin>('BackgroundGeolocation');
 
 type PositionState = {
   latitude: number;
@@ -67,68 +70,63 @@ export const DriverApp: React.FC = () => {
 
   useEffect(() => {
     if (!session) return;
-    if (!navigator.geolocation) {
-      setError('الجهاز لا يدعم تحديد الموقع.');
-      return;
-    }
-
-    let lastSentAt = 0;
     let active = true;
-    let watchId: number | undefined;
+    let watcherId: string | undefined;
+    let lastSentAt = 0;
+
     void (async () => {
       try {
-        const permissions = await Geolocation.checkPermissions();
-        if (permissions.location !== 'granted' && permissions.coarseLocation !== 'granted') {
-          const requested = await Geolocation.requestPermissions();
-          if (requested.location !== 'granted' && requested.coarseLocation !== 'granted') {
-            if (active) {
-              setError('إذن الموقع غير ممنوح. افتح إعدادات الهاتف > التطبيقات > Tiba Supplies Driver > الأذونات > الموقع، واسمح بالموقع أثناء استخدام التطبيق.');
+        watcherId = await BackgroundGeolocation.addWatcher(
+          {
+            backgroundMessage: 'مشاركة موقعك مع طيبة مفعّلة أثناء العمل. أوقف التتبع بتسجيل الخروج.',
+            backgroundTitle: 'Tiba Supplies — تتبع موقع السائق',
+            requestPermissions: true,
+            stale: false,
+            distanceFilter: 10,
+          },
+          async (location, watcherError) => {
+            if (!active) return;
+            if (watcherError) {
+              setError(watcherError.message || 'تعذر تشغيل تتبع الموقع في الخلفية.');
+              return;
             }
-            return;
-          }
-        }
-      } catch (permissionError: any) {
-        if (active) {
-          setError(permissionError?.message || 'تعذر طلب إذن GPS من أندرويد. افتح إعدادات التطبيق واسمح بالموقع.');
-        }
-        return;
+            if (!location) return;
+
+            const capturedAt = new Date(location.time).toISOString();
+            setPosition({
+              latitude: location.latitude,
+              longitude: location.longitude,
+              accuracy: location.accuracy,
+              capturedAt: new Date(location.time).toLocaleString('ar-EG'),
+            });
+
+            if (Date.now() - lastSentAt < 20000) return;
+            lastSentAt = Date.now();
+            const { error: locationError } = await supabase.rpc('update_driver_live_location', {
+              p_latitude: location.latitude,
+              p_longitude: location.longitude,
+              p_accuracy_m: location.accuracy,
+              p_heading: location.bearing ?? null,
+              p_speed_kmh: location.speed == null ? null : location.speed * 3.6,
+              p_captured_at: capturedAt,
+            });
+            if (!active) return;
+            if (locationError) {
+              setError(locationError.message || 'تعذر حفظ الموقع. تأكد من إعدادات السائق في النظام.');
+            } else {
+              setError('');
+              void refreshPortal();
+            }
+          },
+        );
+      } catch (trackingError: any) {
+        if (active) setError(trackingError?.message || 'تعذر تشغيل خدمة تتبع الموقع. راجع أذونات الموقع والإشعارات.');
       }
-      if (!active) return;
-      watchId = navigator.geolocation.watchPosition(
-      async ({ coords, timestamp }) => {
-        if (!active) return;
-        setPosition({
-          latitude: coords.latitude,
-          longitude: coords.longitude,
-          accuracy: coords.accuracy,
-          capturedAt: new Date(timestamp).toLocaleString('ar-EG'),
-        });
-        if (Date.now() - lastSentAt < 20000) return;
-        lastSentAt = Date.now();
-        const { error: locationError } = await supabase.rpc('update_driver_live_location', {
-          p_latitude: coords.latitude,
-          p_longitude: coords.longitude,
-          p_accuracy_m: coords.accuracy,
-          p_heading: coords.heading,
-          p_speed_kmh: coords.speed == null ? null : coords.speed * 3.6,
-          p_captured_at: new Date(timestamp).toISOString(),
-        });
-        if (active && locationError) {
-          setError(locationError.message || 'تعذر حفظ الموقع. تأكد من ربط حساب السائق بالعربية وتطبيق إعدادات التتبع في Supabase.');
-        } else if (active) {
-          setError('');
-          void refreshPortal();
-        }
-      },
-      (locationError) => {
-        if (active) setError(locationError.message || 'تعذر قراءة GPS. تأكد من منح إذن الموقع.');
-      },
-      { enableHighAccuracy: true, timeout: 20000, maximumAge: 5000 },
-      );
     })();
+
     return () => {
       active = false;
-      if (watchId !== undefined) navigator.geolocation.clearWatch(watchId);
+      if (watcherId) void BackgroundGeolocation.removeWatcher({ id: watcherId });
     };
   }, [session]);
 
@@ -158,7 +156,7 @@ export const DriverApp: React.FC = () => {
         if (permissions.location !== 'granted' && permissions.coarseLocation !== 'granted') {
           const requested = await Geolocation.requestPermissions();
           if (requested.location !== 'granted' && requested.coarseLocation !== 'granted') {
-            setError('إذن الموقع غير ممنوح. افتح إعدادات الهاتف > التطبيقات > Tiba Supplies Driver > الأذونات > الموقع، واسمح بالموقع أثناء استخدام التطبيق.');
+            setError('إذن الموقع غير ممنوح. افتح إعدادات الهاتف > التطبيقات > Tiba Supplies Driver > الأذونات > الموقع، واسمح بالموقع دائمًا (Allow all the time) من إعدادات أندرويد، وفعّل الإشعارات.');
             setLocating(false);
             return;
           }
@@ -185,7 +183,7 @@ export const DriverApp: React.FC = () => {
         setLocating(false);
       },
       (locationError) => {
-        const message = locationError.code === 1 ? 'تم رفض إذن الموقع. افتح إعدادات الهاتف > التطبيقات > Tiba Supplies > الأذونات > الموقع، واسمح بالموقع أثناء استخدام التطبيق، ثم جرّب مرة أخرى.' : locationError.code === 2 ? 'الهاتف لم يستطع تحديد موقعك. فعّل GPS وحاول في مكان مفتوح.' : 'انتهت مهلة تحديد الموقع. تأكد من تشغيل GPS وحاول مرة أخرى.';
+        const message = locationError.code === 1 ? 'تم رفض إذن الموقع. افتح إعدادات الهاتف > التطبيقات > Tiba Supplies > الأذونات > الموقع، واسمح بالموقع دائمًا (Allow all the time) من إعدادات أندرويد، وفعّل الإشعارات، ثم جرّب مرة أخرى.' : locationError.code === 2 ? 'الهاتف لم يستطع تحديد موقعك. فعّل GPS وحاول في مكان مفتوح.' : 'انتهت مهلة تحديد الموقع. تأكد من تشغيل GPS وحاول مرة أخرى.';
         setError(message);
         setLocating(false);
       },
