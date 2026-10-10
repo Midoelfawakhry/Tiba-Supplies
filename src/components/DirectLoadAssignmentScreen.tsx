@@ -5,6 +5,8 @@ import { getLiveSnapshot, LiveSnapshot, liveName } from '../services/liveData';
 
 export const DirectLoadAssignmentScreen: React.FC = () => {
   const [snapshot, setSnapshot] = useState<LiveSnapshot | null>(null);
+  const [factoryId, setFactoryId] = useState('');
+  const [quarryId, setQuarryId] = useState('');
   const [loadOrderId, setLoadOrderId] = useState('');
   const [vehicleId, setVehicleId] = useState('');
   const [loading, setLoading] = useState(true);
@@ -26,10 +28,17 @@ export const DirectLoadAssignmentScreen: React.FC = () => {
 
   useEffect(() => { void refresh(); }, [refresh]);
 
-  const orders = useMemo(() => (snapshot?.load_orders ?? []).filter(order =>
-    ['PUBLISHED', 'LOADING_STATEMENT'].includes(order.status) &&
-    (snapshot?.bookings ?? []).filter(b => b.load_order_id === order.load_order_id).length < Number(order.requested_quantity)
-  ), [snapshot]);
+  const factories = snapshot?.factories ?? [];
+  const quarries = snapshot?.quarries ?? [];
+  const orders = useMemo(() => (snapshot?.load_orders ?? []).filter(order => {
+    const committedStatuses = ['BOOKED', 'LOADING_STATEMENT', 'IN_TRANSIT', 'DELIVERED', 'COMPLETED'];
+    const committed = (snapshot?.bookings ?? []).filter(b => b.load_order_id === order.load_order_id && committedStatuses.includes(String(b.status).toUpperCase())).length;
+    const status = String(order.status ?? '').toUpperCase();
+    return ['PUBLISHED', 'LOADING_STATEMENT'].includes(status) &&
+      (!factoryId || order.factory_id === factoryId) &&
+      (!quarryId || order.quarry_id === quarryId) &&
+      committed < Number(order.requested_quantity);
+  }), [snapshot, factoryId, quarryId]);
 
   const selectedOrder = orders.find(order => order.load_order_id === loadOrderId);
   const availableVehicles = snapshot?.vehicles ?? [];
@@ -92,16 +101,26 @@ export const DirectLoadAssignmentScreen: React.FC = () => {
         <section className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-6">
           <h3 className="text-lg font-black">بيانات الإسناد</h3>
           <p className="mt-1 text-sm text-slate-500">اختار أمرًا مفتوحًا، ثم حدّد العربية المطلوب تخصيصها.</p>
+          <label className="mt-5 block text-sm font-bold text-slate-700">المصنع</label>
+          <select value={factoryId} onChange={e => { setFactoryId(e.target.value); setLoadOrderId(''); setError(''); setSuccess(''); }} className="mt-2 w-full rounded-xl border border-slate-300 bg-slate-50 p-3 text-sm text-slate-900">
+            <option value="">اختار المصنع</option>
+            {factories.map(factory => <option key={factory.factory_id} value={factory.factory_id}>{liveName(factory)}</option>)}
+          </select>
+          <label className="mt-5 block text-sm font-bold text-slate-700">المحجر</label>
+          <select value={quarryId} onChange={e => { setQuarryId(e.target.value); setLoadOrderId(''); setError(''); setSuccess(''); }} className="mt-2 w-full rounded-xl border border-slate-300 bg-slate-50 p-3 text-sm text-slate-900">
+            <option value="">اختار المحجر</option>
+            {quarries.map(quarry => <option key={quarry.quarry_id} value={quarry.quarry_id}>{liveName(quarry)}</option>)}
+          </select>
           <label className="mt-5 block text-sm font-bold text-slate-700">أمر التحميل</label>
-          <select value={loadOrderId} onChange={e => { setLoadOrderId(e.target.value); setError(''); setSuccess(''); }} className="mt-2 w-full rounded-xl border border-slate-300 bg-slate-50 p-3 text-sm text-slate-900">
-            <option value="">اختار أمر التحميل</option>
+          <select value={loadOrderId} onChange={e => { setLoadOrderId(e.target.value); setError(''); setSuccess(''); }} disabled={!factoryId || !quarryId} className="mt-2 w-full rounded-xl border border-slate-300 bg-slate-50 p-3 text-sm text-slate-900 disabled:opacity-60">
+            <option value="">{!factoryId || !quarryId ? 'اختار المصنع والمحجر أولًا' : 'اختار أمر التحميل'}</option>
             {orders.map(order => {
-              const factory = snapshot?.factories.find(f => f.factory_id === order.factory_id);
-              const quarry = snapshot?.quarries.find(q => q.quarry_id === order.quarry_id);
-              const booked = (snapshot?.bookings ?? []).filter(b => b.load_order_id === order.load_order_id).length;
-              return <option key={order.load_order_id} value={order.load_order_id}>{liveName(factory)} · {liveName(quarry)} · متبقي {Math.max(0, Number(order.requested_quantity) - booked)}</option>;
+              const booked = (snapshot?.bookings ?? []).filter(b => b.load_order_id === order.load_order_id && ['BOOKED', 'LOADING_STATEMENT', 'IN_TRANSIT', 'DELIVERED', 'COMPLETED'].includes(String(b.status).toUpperCase())).length;
+              return <option key={order.load_order_id} value={order.load_order_id}>أمر · {String(order.load_order_id).slice(0, 8)} · متبقي {Math.max(0, Number(order.requested_quantity) - booked)}</option>;
             })}
           </select>
+          {factoryId && quarryId && orders.length === 0 && <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900">مفيش أمر تحميل مفتوح للمصنع والمحجر المختارين. راجع «مركز التشغيل» وتأكد إن فيه أمر منشور وبكمية متبقية.</p>}
+          {!loading && (factories.length === 0 || quarries.length === 0) && <p className="mt-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm leading-6 text-red-800">بيانات المصانع أو المحاجر لم تصل من قاعدة البيانات. راجع تحميل get_phase1_snapshot وصلاحياته؛ لم نضف بيانات تجريبية.</p>}
           <label className="mt-5 block text-sm font-bold text-slate-700">العربية</label>
           <select value={vehicleId} onChange={e => { setVehicleId(e.target.value); setError(''); setSuccess(''); }} className="mt-2 w-full rounded-xl border border-slate-300 bg-slate-50 p-3 text-sm text-slate-900">
             <option value="">اختار العربية</option>
@@ -110,7 +129,7 @@ export const DirectLoadAssignmentScreen: React.FC = () => {
           <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-900">
             <b>شروط التأكيد:</b> السائق مرتبط بالعربية، وموقع GPS حديث (آخر 10 دقائق)، والعربية داخل نطاق 10 كم من مكتب تسجيل الوصول. لا يمكن إسناد نقلة نشطة ثانية لنفس السائق أو العربية.
           </div>
-          <button type="button" disabled={saving || loading || !loadOrderId || !vehicleId} onClick={() => void assign()} className="mt-5 w-full rounded-xl bg-emerald-600 p-4 text-sm font-black text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50">{saving ? 'جاري التحقق وتثبيت الإسناد...' : 'تأكيد التحميل بالأمر المباشر'}</button>
+          <button type="button" disabled={saving || loading || !factoryId || !quarryId || !loadOrderId || !vehicleId} onClick={() => void assign()} className="mt-5 w-full rounded-xl bg-emerald-600 p-4 text-sm font-black text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50">{saving ? 'جاري التحقق وتثبيت الإسناد...' : 'تأكيد التحميل بالأمر المباشر'}</button>
         </section>
 
         <aside className="space-y-4">
@@ -122,7 +141,7 @@ export const DirectLoadAssignmentScreen: React.FC = () => {
               <div className="grid grid-cols-2 gap-2"><div className="rounded-xl bg-slate-50 p-3"><div className="text-xs text-slate-500">المطلوب</div><div className="mt-1 text-xl font-black">{selectedOrder.requested_quantity}</div></div><div className="rounded-xl bg-slate-50 p-3"><div className="text-xs text-slate-500">المحجوز</div><div className="mt-1 text-xl font-black">{(snapshot?.bookings ?? []).filter(b => b.load_order_id === selectedOrder.load_order_id).length}</div></div></div>
             </div> : <p className="mt-3 text-sm leading-6 text-slate-500">تفاصيل الأمر هتظهر هنا بعد الاختيار.</p>}
           </section>
-          <section className="rounded-3xl border border-slate-200 bg-slate-50 p-5"><h3 className="font-black">حالة البيانات</h3><div className="mt-3 text-sm leading-7 text-slate-600">{loading ? 'جاري تحميل البيانات...' : `أوامر قابلة للإسناد: ${orders.length} · عربيات نشطة: ${availableVehicles.length}`}</div>{!loading && orders.length === 0 && <p className="mt-2 text-sm leading-6 text-slate-500">لا توجد أوامر متاحة للإسناد حاليًا. أنشئ أمر تحميل أو حدّث البيانات.</p>}</section>
+          <section className="rounded-3xl border border-slate-200 bg-slate-50 p-5"><h3 className="font-black">حالة البيانات</h3><div className="mt-3 text-sm leading-7 text-slate-600">{loading ? 'جاري تحميل البيانات...' : `مصانع: ${factories.length} · محاجر: ${quarries.length} · أوامر مطابقة: ${orders.length} · عربيات: ${availableVehicles.length}`}</div>{!loading && orders.length === 0 && <p className="mt-2 text-sm leading-6 text-slate-500">اختار المصنع والمحجر أولًا. لو القائمة فضلت فاضية، راجع حالة أوامر التحميل المنشورة والكمية المتبقية.</p>}</section>
         </aside>
       </div>
     </section>
