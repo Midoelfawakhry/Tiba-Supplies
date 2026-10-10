@@ -71,7 +71,7 @@ WHERE NOT EXISTS (
     AND current_office.is_active = true
 );
 
-DO $
+DO $$
 BEGIN
   IF EXISTS (
     SELECT 1 FROM public.load_orders WHERE check_in_office_id IS NULL
