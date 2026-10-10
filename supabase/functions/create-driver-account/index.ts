@@ -134,11 +134,11 @@ Deno.serve(async (req: Request) => {
 
 function normalizeEgyptianPhone(value: unknown): string | null {
   if (typeof value !== "string") return null;
-  let phone = value.trim().replace(/[\\s()-]/g, "");
+  let phone = value.trim().replace(/[\s()-]/g, "");
   if (phone.startsWith("00")) phone = `+${phone.slice(2)}`;
-  if (/^01[0125]\\d{8}$/.test(phone)) phone = `+20${phone.slice(1)}`;
-  if (/^20(10|11|12|15)\\d{8}$/.test(phone)) phone = `+${phone}`;
-  if (/^\\+20(10|11|12|15)\\d{8}$/.test(phone)) return phone;
+  if (/^01[0125]\d{8}$/.test(phone)) phone = `+20${phone.slice(1)}`;
+  if (/^20(10|11|12|15)\d{8}$/.test(phone)) phone = `+${phone}`;
+  if (/^\+20(10|11|12|15)\d{8}$/.test(phone)) return phone;
   return null;
 }
 
