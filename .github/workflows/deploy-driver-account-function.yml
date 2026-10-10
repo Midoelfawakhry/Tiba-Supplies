@@ -2,18 +2,21 @@ name: Deploy driver account Edge Function
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - feature/driver-account-invite
-    paths:
-      - "supabase/functions/create-driver-account/**"
-      - ".github/workflows/deploy-driver-account-function.yml"
+    inputs:
+      confirm_live_deploy:
+        description: Select DEPLOY only after this change has been reviewed and is ready for the live Supabase project.
+        required: true
+        type: choice
+        options:
+          - "NO"
+          - "DEPLOY"
 
 permissions:
   contents: read
 
 jobs:
   deploy:
+    if: ${{ inputs.confirm_live_deploy == 'DEPLOY' }}
     name: Deploy create-driver-account
     runs-on: ubuntu-latest
     steps:
