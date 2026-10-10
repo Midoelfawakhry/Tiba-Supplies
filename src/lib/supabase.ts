@@ -57,6 +57,10 @@ export const supabase = {
   },
   rpc: (functionName: string, args?: Record<string, unknown>) =>
     getClient().rpc(functionName, args),
+  functions: {
+    invoke: (functionName: string, options?: { body?: Record<string, unknown> }) =>
+      getClient().functions.invoke(functionName, options),
+  },
 };
 
 export const supabaseDiagnostics = {
