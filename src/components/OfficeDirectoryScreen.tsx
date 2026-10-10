@@ -33,8 +33,9 @@ function rowDetails(row: Row, key: ScreenKey) {
   return [row.load_date, row.driver_id ? 'معرّف السائق: ' + row.driver_id : '', row.vehicle_id ? 'معرّف العربية: ' + row.vehicle_id : '', row.created_at ? new Date(row.created_at).toLocaleString('ar-EG') : ''].filter(Boolean).join(' · ');
 }
 
-export const OfficeDirectoryScreen: React.FC = () => {
-  const [active, setActive] = useState<ScreenKey>('factories');
+export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showSectionTabs?: boolean }> = ({ initialSection = 'factories', showSectionTabs = true }) => {
+  const [active, setActive] = useState<ScreenKey>(initialSection);
+  useEffect(() => { setActive(initialSection); }, [initialSection]);
   const [snapshot, setSnapshot] = useState<LiveSnapshot | null>(null);
   const [waiting, setWaiting] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,7 +76,7 @@ export const OfficeDirectoryScreen: React.FC = () => {
         <div><h2 className="text-xl font-black">شاشات إدارة المكتب</h2><p className="mt-1 text-sm leading-6 text-slate-500">دليل موحّد لبيانات التشغيل الحقيقية المحمّلة من Supabase.</p></div>
         <button onClick={() => void load()} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 py-2 font-bold disabled:opacity-60"><RefreshCw size={17} className={loading ? 'animate-spin' : ''}/> تحديث البيانات</button>
       </div>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+      {showSectionTabs && <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
         {tabs.map(tab => {
           const Icon = tab.icon;
           const selected = active === tab.key;
@@ -83,7 +84,7 @@ export const OfficeDirectoryScreen: React.FC = () => {
             <Icon size={19} className="shrink-0"/><span>{tab.label}</span><span className="mr-auto text-xs opacity-80">{lists[tab.key].length}</span>
           </button>;
         })}
-      </div>
+      </div>}
       {error && <div role="alert" className="flex gap-2 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900"><AlertTriangle size={18} className="shrink-0"/><span>{error}</span></div>}
       <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white">
         <div className="flex items-center gap-3 border-b border-slate-200 p-4 sm:p-5"><ActiveIcon className="text-blue-700" size={23}/><div><h3 className="font-black">{tabs.find(tab => tab.key === active)?.label}</h3><p className="text-xs text-slate-500">{rows.length} سجل</p></div></div>
