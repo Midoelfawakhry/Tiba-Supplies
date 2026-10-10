@@ -11,7 +11,7 @@ on:
           - driver
           - office
           - both
-        default: both
+        default: office
   push:
     branches:
       - phase2-driver-app-foundation
@@ -37,7 +37,7 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             MODE="${{ inputs.app_mode }}"
           else
-            MODE="both"
+            MODE="office"
           fi
           if [ "$MODE" = "both" ]; then
             echo 'matrix={"app_mode":["driver","office"]}' >> "$GITHUB_OUTPUT"
