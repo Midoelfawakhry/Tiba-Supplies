@@ -122,7 +122,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     actual: snapshot?.actual_loading_records ?? [],
   };
   const rows = lists[active] ?? [];
-  const filteredAvailableVehicles = availableVehicles.filter((vehicle: Row) => String(vehicle.plate_number ?? '').toLowerCase().includes(vehicleSearch.trim().toLowerCase()));
+  const filteredAvailableVehicles = availableVehicles.filter((vehicle: Row) => [vehicle.plate_number, vehicle.vehicle_code].some(value => String(value ?? '').toLowerCase().includes(vehicleSearch.trim().toLowerCase())));
   const ActiveIcon = tabs.find(tab => tab.key === active)?.icon ?? ClipboardList;
 
   return (
@@ -158,10 +158,10 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
           <label className="text-sm font-bold text-slate-700">اسم السواق بالكامل<input required value={driverName} onChange={e => setDriverName(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal" placeholder="اسم السواق"/></label>
           <label className="text-sm font-bold text-slate-700">رقم الموبايل<input required type="tel" value={driverPhone} onChange={e => setDriverPhone(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal" placeholder="رقم التواصل"/></label>
           <div className="text-sm font-bold text-slate-700">اختيار العربية
-            <label className="relative mt-1.5 block"><span className="sr-only">ابحث برقم العربية</span><input value={vehicleSearch} onChange={e => { setVehicleSearch(e.target.value); setSelectedVehicleId(''); }} className="w-full rounded-xl border border-slate-300 bg-white p-3 pr-10 font-normal" placeholder="ابحث برقم اللوحة..."/><span className="absolute right-3 top-3 text-slate-400"><Truck size={18}/></span></label>
+            <label className="relative mt-1.5 block"><span className="sr-only">ابحث برقم العربية</span><input value={vehicleSearch} onChange={e => { setVehicleSearch(e.target.value); setSelectedVehicleId(''); }} className="w-full rounded-xl border border-slate-300 bg-white p-3 pr-10 font-normal" placeholder="ابحث برقم اللوحة أو كود العربية..."/><span className="absolute right-3 top-3 text-slate-400"><Truck size={18}/></span></label>
             <select required value={selectedVehicleId} onChange={e => setSelectedVehicleId(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal">
               <option value="">اختار عربية متاحة</option>
-              {filteredAvailableVehicles.map((vehicle: Row) => <option key={vehicle.vehicle_id} value={vehicle.vehicle_id}>{vehicle.plate_number}</option>)}
+              {filteredAvailableVehicles.map((vehicle: Row) => <option key={vehicle.vehicle_id} value={vehicle.vehicle_id}>{vehicle.plate_number}{vehicle.vehicle_code ? ` · ${vehicle.vehicle_code}` : ''} </option>)}
             </select>
             <p className="mt-1 text-xs font-normal text-slate-500">{filteredAvailableVehicles.length} عربية متاحة للاختيار</p>
           </div>
