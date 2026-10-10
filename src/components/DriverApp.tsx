@@ -69,7 +69,6 @@ export const DriverApp: React.FC = () => {
     if (!session) return;
     if (!navigator.geolocation) {
       setError('الجهاز لا يدعم تحديد الموقع.');
-      setTrackingEnabled(false);
       return;
     }
 
