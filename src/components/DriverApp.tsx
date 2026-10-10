@@ -3,6 +3,7 @@ import { MapPin, Truck, Clock3, ShieldCheck, LogOut, Navigation, CircleAlert, Fi
 import { supabase, supabaseDiagnostics } from '../lib/supabase';
 import { registerPlugin } from '@capacitor/core';
 import type { BackgroundGeolocationPlugin } from '@capacitor-community/background-geolocation';
+import { Geolocation } from '@capacitor/geolocation';
 
 const BackgroundGeolocation = registerPlugin<BackgroundGeolocationPlugin>('BackgroundGeolocation');
 
@@ -92,12 +93,13 @@ export const DriverApp: React.FC = () => {
             }
             if (!location) return;
 
-            const capturedAt = new Date(location.time).toISOString();
+            const locationTimestamp = location.time ?? Date.now();
+            const capturedAt = new Date(locationTimestamp).toISOString();
             setPosition({
               latitude: location.latitude,
               longitude: location.longitude,
               accuracy: location.accuracy,
-              capturedAt: new Date(location.time).toLocaleString('ar-EG'),
+              capturedAt: new Date(locationTimestamp).toLocaleString('ar-EG'),
             });
 
             if (Date.now() - lastSentAt < 20000) return;
