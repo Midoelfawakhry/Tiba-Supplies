@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { RefreshCw, LogOut, MapPin, Factory, Mountain, Truck, ClipboardList, CheckCircle2, Clock3, Users, HandCoins } from 'lucide-react';
+import { RefreshCw, LogOut, MapPin, Factory, Mountain, Truck, ClipboardList, CheckCircle2, Clock3, Users } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { VehicleTrackingScreen } from './VehicleTrackingScreen';
 import { OfficeDirectoryScreen } from './OfficeDirectoryScreen';
 import { DirectLoadAssignmentScreen } from './DirectLoadAssignmentScreen';
 import { VehicleOwnerReportsScreen } from './VehicleOwnerReportsScreen';
 import { AccountStatementsScreen } from './AccountStatementsScreen';
+import { BranchEmployeeManagementScreen } from './BranchEmployeeManagementScreen';
 import { getLiveSnapshot, LiveSnapshot, liveName } from '../services/liveData';
 
 const statusLabel: Record<string, string> = {
@@ -15,7 +16,7 @@ const statusLabel: Record<string, string> = {
   CANCELLED: 'ملغي',
 };
 
-type OfficeScreen = 'dashboard' | 'tracking' | 'directory' | 'direct' | 'drivers' | 'vehicles' | 'waiting' | 'orders' | 'actual' | 'factories' | 'quarries' | 'vehicleReports' | 'factoryStatement' | 'quarryStatement';
+type OfficeScreen = 'dashboard' | 'tracking' | 'directory' | 'direct' | 'drivers' | 'vehicles' | 'waiting' | 'orders' | 'actual' | 'factories' | 'quarries' | 'vehicleReports' | 'factoryStatement' | 'quarryStatement' | 'employees';
 const screenPalette: Record<OfficeScreen, { selected: string; wash: string }> = {
   dashboard: { selected: 'bg-teal-600 hover:bg-teal-700', wash: 'bg-teal-50/40' },
   drivers: { selected: 'bg-red-600 hover:bg-red-700', wash: 'bg-red-50/50' },
@@ -31,6 +32,7 @@ const screenPalette: Record<OfficeScreen, { selected: string; wash: string }> = 
   tracking: { selected: 'bg-cyan-600 hover:bg-cyan-700', wash: 'bg-cyan-50/50' },
   directory: { selected: 'bg-indigo-600 hover:bg-indigo-700', wash: 'bg-indigo-50/50' },
   direct: { selected: 'bg-fuchsia-600 hover:bg-fuchsia-700', wash: 'bg-fuchsia-50/50' },
+  employees: { selected: 'bg-indigo-600 hover:bg-indigo-700', wash: 'bg-indigo-50/50' },
 };
 
 export const LiveOperationsBoard: React.FC = () => {
@@ -58,6 +60,10 @@ export const LiveOperationsBoard: React.FC = () => {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const localNow = new Date();
+  const todayKey = `${localNow.getFullYear()}-${String(localNow.getMonth() + 1).padStart(2, '0')}-${String(localNow.getDate()).padStart(2, '0')}`;
+  const todaysActualCount = (data?.actual_loading_records ?? []).filter((row: Record<string, any>) => String(row.loading_sequence_date ?? row.load_date ?? '').slice(0, 10) === todayKey).length;
 
   async function createLoadOrder(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -162,8 +168,8 @@ export const LiveOperationsBoard: React.FC = () => {
                 ['dashboard', 'مركز التشغيل', ClipboardList],
                 ['drivers', 'قائمة السائقين', Users],
                 ['vehicleReports', 'حسابات العربيات والملاك', Users],
-                ['factoryStatement', 'كشف حساب المصنع', Factory],
-                ['quarryStatement', 'كشف حساب المحجر', Mountain],
+                ['factoryStatement', 'كشف تحميل المصنع', Factory],
+                ['quarryStatement', 'كشف تحميل المحجر', Mountain],
                 ['waiting', 'قائمة الانتظار', Clock3],
                 ['orders', 'أوامر التحميل', ClipboardList],
                 ['actual', 'التحميل الفعلي', CheckCircle2],
@@ -171,7 +177,8 @@ export const LiveOperationsBoard: React.FC = () => {
                 ['quarries', 'المحاجر والخامات', Mountain],
                 ['tracking', 'تتبع السيارات', MapPin],
                 ['directory', 'دليل البيانات الكامل', Users],
-                ['direct', 'التحميل بالأمر المباشر', HandCoins],
+                ['direct', 'إسناد نقلة مباشرة', ClipboardList],
+                ['employees', 'موظفو مكتب رأس سدر', Users],
               ] as const).map(([key, label, Icon]) => {
                 const selected = activeScreen === key;
                 return <button key={key} type="button" onClick={() => setActiveScreen(key as typeof activeScreen)} className={selected ? `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-right text-sm font-black text-white shadow-sm transition ${screenPalette[key].selected}` : 'flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-right text-sm font-bold text-slate-600 transition hover:bg-slate-50 hover:text-slate-900'}>
@@ -183,7 +190,7 @@ export const LiveOperationsBoard: React.FC = () => {
             </nav>
           </aside>
           <section className={`min-w-0 flex-1 space-y-5 rounded-[2rem] p-2 transition-colors sm:p-3 ${screenPalette[activeScreen].wash}`}>
-        {activeScreen === 'factoryStatement' ? <AccountStatementsScreen kind="factory" /> : activeScreen === 'quarryStatement' ? <AccountStatementsScreen kind="quarry" /> : activeScreen === 'vehicleReports' ? <VehicleOwnerReportsScreen /> : activeScreen === 'tracking' ? <VehicleTrackingScreen /> : activeScreen === 'drivers' ? <OfficeDirectoryScreen initialSection="drivers" showSectionTabs={false} /> : activeScreen === 'vehicles' ? <OfficeDirectoryScreen initialSection="vehicles" showSectionTabs={false} /> : activeScreen === 'waiting' ? <OfficeDirectoryScreen initialSection="waiting" showSectionTabs={false} /> : activeScreen === 'orders' ? <OfficeDirectoryScreen initialSection="loads" showSectionTabs={false} /> : activeScreen === 'actual' ? <OfficeDirectoryScreen initialSection="actual" showSectionTabs={false} /> : activeScreen === 'factories' ? <OfficeDirectoryScreen initialSection="factories" showSectionTabs={false} /> : activeScreen === 'quarries' ? <OfficeDirectoryScreen initialSection="quarries" showSectionTabs={false} /> : activeScreen === 'directory' ? <OfficeDirectoryScreen /> : activeScreen === 'direct' ? <DirectLoadAssignmentScreen /> : <>
+        {activeScreen === 'employees' ? <BranchEmployeeManagementScreen /> : activeScreen === 'factoryStatement' ? <AccountStatementsScreen kind="factory" /> : activeScreen === 'quarryStatement' ? <AccountStatementsScreen kind="quarry" /> : activeScreen === 'vehicleReports' ? <VehicleOwnerReportsScreen /> : activeScreen === 'tracking' ? <VehicleTrackingScreen /> : activeScreen === 'drivers' ? <OfficeDirectoryScreen initialSection="drivers" showSectionTabs={false} /> : activeScreen === 'vehicles' ? <OfficeDirectoryScreen initialSection="vehicles" showSectionTabs={false} /> : activeScreen === 'waiting' ? <OfficeDirectoryScreen initialSection="waiting" showSectionTabs={false} /> : activeScreen === 'orders' ? <OfficeDirectoryScreen initialSection="loads" showSectionTabs={false} /> : activeScreen === 'actual' ? <OfficeDirectoryScreen initialSection="actual" showSectionTabs={false} /> : activeScreen === 'factories' ? <OfficeDirectoryScreen initialSection="factories" showSectionTabs={false} /> : activeScreen === 'quarries' ? <OfficeDirectoryScreen initialSection="quarries" showSectionTabs={false} /> : activeScreen === 'directory' ? <OfficeDirectoryScreen /> : activeScreen === 'direct' ? <DirectLoadAssignmentScreen /> : <>
         <section className="rounded-3xl border border-orange-200/80 bg-gradient-to-br from-white via-white to-orange-50/70 p-5 shadow-sm shadow-orange-900/5">
           <div className="mb-4">
             <h2 className="text-lg font-black">إنشاء أمر تحميل جديد</h2>
@@ -281,7 +288,8 @@ export const LiveOperationsBoard: React.FC = () => {
               <div className="grid grid-cols-2 gap-3 mt-4">
                 <div className="rounded-2xl bg-slate-50 p-4"><Factory className="h-5 w-5 text-blue-700" /><b className="block mt-2 text-xl">{data?.factories.length ?? 0}</b><span className="text-xs text-slate-500">مصنع نشط</span></div>
                 <div className="rounded-2xl bg-slate-50 p-4"><Mountain className="h-5 w-5 text-orange-600" /><b className="block mt-2 text-xl">{data?.quarries.length ?? 0}</b><span className="text-xs text-slate-500">محجر نشط</span></div>
-                <div className="rounded-2xl bg-slate-50 p-4"><Clock3 className="h-5 w-5 text-violet-600" /><b className="block mt-2 text-xl">{data?.actual_loading_records.length ?? 0}</b><span className="text-xs text-slate-500">سجل تحميل فعلي</span></div>
+                <div className="rounded-2xl bg-slate-50 p-4"><Clock3 className="h-5 w-5 text-violet-600" /><b className="block mt-2 text-xl">{data?.actual_loading_records.length ?? 0}</b><span className="text-xs text-slate-500">إجمالي سجلات التحميل</span></div>
+                <div className="rounded-2xl bg-emerald-50 p-4"><Truck className="h-5 w-5 text-emerald-700" /><b className="block mt-2 text-xl">{todaysActualCount}</b><span className="text-xs text-slate-500">تحميلات اليوم</span></div>
               </div>
             </div>
             <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5">

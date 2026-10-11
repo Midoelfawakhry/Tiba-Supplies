@@ -46,8 +46,8 @@ Status: **NOT APPROVED FOR PRODUCTION** until all gates below pass.
 5. A driver’s own pending direct assignment remains visible outside the geofence; available loads and queue state do not.
 6. Missing, stale, future-dated, and outside-radius GPS points are rejected consistently by every eligibility path.
 7. Cancelling an eligible pre-delivery booking requires a reason, preserves audit history, and returns the driver to the end of the queue once; out-of-service vehicles are not re-queued.
-8. Cancellation is rejected after transit/delivery or after weight/delivery evidence is recorded.
-9. Redirect changes the current destination on the same actual-loading row, requires a reason, and does not persist the previous destination in audit payloads.
+8. Cancellation is allowed while IN_TRANSIT only if actual weight and delivery confirmation are both absent; it is rejected after actual weight or delivery evidence, and the reason/queue change are audited.
+9. Redirect is allowed for active trips and as a corrective action after weight/delivery; it changes only the destination on the same actual-loading row, preserves weight/scale/delivery evidence and booking status, and audits old/new destination plus reason.
 10. Delivery requires positive actual weight and a scale-ticket image; duplicate delivery confirmation is rejected.
 11. Only delivered trips with confirmed weight contribute to reports.
 12. No duplicate active booking, duplicate queue entry, or duplicate actual-loading record can be produced by retries/concurrent requests.
@@ -71,3 +71,21 @@ Status: **NOT APPROVED FOR PRODUCTION** until all gates below pass.
 
 ## Known caveat
 A successful frontend build does not prove database migration correctness. Production data and schema must remain untouched until the SQL and staging gates above pass.
+
+
+## Latest cancellation / redirect rule correction (review branch only)
+
+- Cancellation no longer treats `IN_TRANSIT` by itself as a blocker. The database RPC still rejects delivered/completed booking statuses and any actual-weight or delivery-confirmation evidence.
+- Redirect remains available after weight or delivery confirmation as a documented correction. It preserves the actual-load row identity, weight, scale image, delivery timestamp/coordinates, and booking status; the audit entry records old/new destination, reason, and whether the correction followed delivery.
+- UI and SQL static assertions were updated on branch `fix/phase1-cancel-redirect-rules`. They have not been applied to production and the SQL regression script has not yet been run in isolated staging.
+
+
+## Ras Sedr branch app and employee access (review candidate)
+
+- Main-office UI now includes a **موظفو مكتب رأس سدر** screen for creating and activating/deactivating branch employee accounts.
+- Employee authentication uses a unique username plus password; the username is mapped to an internal reserved `.invalid` Auth identifier. Passwords are stored only in Supabase Auth, never in `app_users`.
+- A server-side Edge Function creates the Auth user, app profile, BRANCH role and office assignment; only ADMIN/HEAD_OFFICE callers may create accounts.
+- The dedicated `get_branch_office_snapshot()` RPC returns a read-only branch data model: branch-directed load orders, related allocations/actual loading, waiting-list entries and a driver/vehicle-owner contact directory.
+- `get_phase1_snapshot()` is restricted to ADMIN/HEAD_OFFICE so BRANCH accounts cannot call the full main-office snapshot.
+- Android workflow now supports a separate `branch` build with application ID `com.tibasupplies.branch`; web preview also supports `/branch`.
+- This is still a candidate implementation. Verify the SQL migration in isolated staging, deploy the `create-branch-employee` Edge Function, and build/test the branch APK before issuing accounts. No production migration or APK release has been performed here.

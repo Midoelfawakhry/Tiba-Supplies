@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 
 type ReportVehicle = { vehicle_id: string; plate_number: string; vehicle_code?: string | null; owner_id?: string | null; owner_name?: string | null; owner_phone?: string | null; is_active: boolean };
 type ReportOwner = { owner_id: string; name: string; phone?: string | null; vehicle_count: number; is_active: boolean };
-type Trip = { actual_load_id: string; booking_id?: string | null; load_date?: string | null; created_at: string; vehicle_id?: string | null; plate_number?: string | null; owner_id?: string | null; owner_name?: string | null; driver_name?: string | null; quarry_name?: string | null; factory_name?: string | null; ticket_number?: string | null; actual_weight?: number | string | null; delivery_confirmed_at?: string | null; is_completed: boolean };
+type Trip = { actual_load_id: string; trip_code?: string | null; daily_load_number?: number | null; loading_sequence_date?: string | null; booking_id?: string | null; load_date?: string | null; created_at: string; vehicle_id?: string | null; plate_number?: string | null; owner_id?: string | null; owner_name?: string | null; driver_name?: string | null; quarry_name?: string | null; factory_name?: string | null; ticket_number?: string | null; actual_weight?: number | string | null; delivery_confirmed_at?: string | null; is_completed: boolean };
 type Snapshot = { vehicles: ReportVehicle[]; owners: ReportOwner[]; trips: Trip[] };
 
 const dateValue = (d: Date) => {
@@ -41,7 +41,7 @@ export const VehicleOwnerReportsScreen: React.FC = () => {
         trips: Array.isArray(data?.trips) ? data.trips : [],
       });
     } catch (e: any) {
-      setError(e?.message || 'تعذر تحميل حسابات العربيات والملاك.');
+      setError(e?.message || 'تعذر تحميل تقارير أوزان العربيات والملاك.');
     } finally { setLoading(false); }
   }
 
@@ -57,7 +57,7 @@ export const VehicleOwnerReportsScreen: React.FC = () => {
 
   function TripTable({ trips }: { trips: Trip[] }) {
     if (!trips.length) return <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">مفيش نقلات مكتملة بوزن فعلي في الفترة دي.</p>;
-    return <div className="overflow-x-auto rounded-2xl border border-slate-200"><table className="w-full min-w-[760px] text-right text-sm"><thead className="bg-slate-50 text-xs text-slate-500"><tr><th className="p-3">التاريخ</th><th className="p-3">العربية</th><th className="p-3">السواق</th><th className="p-3">المحجر</th><th className="p-3">المصنع النهائي</th><th className="p-3">رقم التذكرة</th><th className="p-3">الوزن الفعلي (طن)</th></tr></thead><tbody>{trips.map(t => <tr key={t.actual_load_id} className="border-t border-slate-100"><td className="p-3">{displayDate(t.load_date ?? t.created_at)}</td><td className="p-3 font-bold">{t.plate_number ?? '—'}</td><td className="p-3">{t.driver_name ?? '—'}</td><td className="p-3">{t.quarry_name ?? '—'}</td><td className="p-3">{t.factory_name ?? '—'}</td><td className="p-3">{t.ticket_number ?? '—'}</td><td className="p-3 font-black tabular-nums">{weight(t.actual_weight).toLocaleString('en-US', { maximumFractionDigits: 3 })}</td></tr>)}</tbody></table></div>;
+    return <div className="overflow-x-auto rounded-2xl border border-slate-200"><table className="w-full min-w-[920px] text-right text-sm"><thead className="bg-slate-50 text-xs text-slate-500"><tr><th className="p-3">التاريخ</th><th className="p-3">كود النقلة</th><th className="p-3">تحميل اليوم</th><th className="p-3">العربية</th><th className="p-3">السواق</th><th className="p-3">المحجر</th><th className="p-3">المصنع النهائي</th><th className="p-3">رقم التذكرة</th><th className="p-3">الوزن الفعلي (طن)</th></tr></thead><tbody>{trips.map(t => <tr key={t.actual_load_id} className="border-t border-slate-100"><td className="p-3">{displayDate(t.loading_sequence_date ?? t.load_date ?? t.created_at)}</td><td className="p-3 font-black">{t.trip_code ?? '—'}</td><td className="p-3">{t.daily_load_number ?? '—'}</td><td className="p-3 font-bold">{t.plate_number ?? '—'}</td><td className="p-3">{t.driver_name ?? '—'}</td><td className="p-3">{t.quarry_name ?? '—'}</td><td className="p-3">{t.factory_name ?? '—'}</td><td className="p-3">{t.ticket_number ?? '—'}</td><td className="p-3 font-black tabular-nums">{weight(t.actual_weight).toLocaleString('en-US', { maximumFractionDigits: 3 })}</td></tr>)}</tbody></table></div>;
   }
 
   return <section className="space-y-4">
