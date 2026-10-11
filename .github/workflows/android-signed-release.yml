@@ -10,6 +10,7 @@ on:
         options:
           - driver
           - office
+          - branch
           - both
         default: both
 
@@ -108,9 +109,10 @@ jobs:
           const fs = require('node:fs');
           const mode = process.env.TIBA_APP_MODE;
           const office = mode === 'office';
+          const branch = mode === 'branch';
           const config = {
-            appId: office ? 'com.tibasupplies.office' : 'com.tibasupplies.driver',
-            appName: office ? 'Tiba Supplies Office' : 'Tiba Supplies Driver',
+            appId: office ? 'com.tibasupplies.office' : branch ? 'com.tibasupplies.branch' : 'com.tibasupplies.driver',
+            appName: office ? 'Tiba Supplies Office' : branch ? 'Tiba Supplies Ras Sedr' : 'Tiba Supplies Driver',
             webDir: 'dist',
             android: { allowMixedContent: false, useLegacyBridge: mode === 'driver' }
           };
@@ -213,6 +215,8 @@ jobs:
         run: |
           if [ "$TIBA_APP_MODE" = "office" ]; then
             EXPECTED="com.tibasupplies.office"
+          elif [ "$TIBA_APP_MODE" = "branch" ]; then
+            EXPECTED="com.tibasupplies.branch"
           else
             EXPECTED="com.tibasupplies.driver"
           fi
