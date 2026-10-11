@@ -62,7 +62,7 @@
 
 @media print {
   body { background: #fff !important; font-size: 12px !important; }
-  #root button, .print\\:hidden { display: none !important; }
+  #root button { display: none !important; }
   #root main, #root section { box-shadow: none !important; }
 }
 
