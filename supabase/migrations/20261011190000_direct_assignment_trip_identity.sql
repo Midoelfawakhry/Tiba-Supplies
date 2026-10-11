@@ -140,6 +140,7 @@ BEGIN
       SELECT jsonb_agg(jsonb_build_object(
         'booking_id', b.booking_id, 'trip_code', b.trip_code, 'assignment_daily_number', b.assignment_daily_number, 'status', b.status, 'booked_at', b.booked_at,
         'load_order_id', b.load_order_id,
+        'daily_load_number', alr.daily_load_number,
         'factory_name', COALESCE(f.name, 'مصنع غير محدد'),
         'quarry_name', COALESCE(q.name, 'محجر غير محدد'),
         'requested_quantity', lo.requested_quantity,
@@ -149,6 +150,7 @@ BEGIN
       FROM public.bookings b
       LEFT JOIN public.load_orders lo ON lo.load_order_id = b.load_order_id
       LEFT JOIN public.standalone_direct_load_audit a ON a.booking_id = b.booking_id
+      LEFT JOIN public.actual_loading_records alr ON alr.booking_id = b.booking_id
       LEFT JOIN public.factories f ON f.factory_id = COALESCE(lo.factory_id, a.factory_id)
       LEFT JOIN public.quarries q ON q.quarry_id = COALESCE(lo.quarry_id, a.quarry_id)
       WHERE b.driver_id = v_driver_id
