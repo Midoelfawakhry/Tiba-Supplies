@@ -12,14 +12,14 @@ The version prefix is the authoritative key used by Supabase migration tracking.
 
 | Production version | Current repository file | Disposition |
 | --- | --- | --- |
-| 20261010182259 | supabase/migrations/20261010181742_office_edit_driver_vehicle.sql | Candidate for filename alignment; confirm content matches this history row first. |
-| 20261011001729 | supabase/migrations/20261011_vehicle_owner_reports.sql | Candidate for filename alignment; confirm content matches this history row first. |
-| 20261011001852 | supabase/migrations/20261011_office_cancel_redirect_booking.sql | Candidate for filename alignment; confirm content matches this history row first. |
-| 20261011001910 | supabase/migrations/20261011_prevent_cancel_loaded_trip.sql | Candidate for filename alignment; current cancellation behavior was superseded by a later head-office-owned implementation. Preserve the file as historical evidence. |
-| 20261011002050 | supabase/migrations/20261011_booking_destination_history.sql | Historical migration; its table was intentionally removed by a later migration. Do not reapply. |
-| 20261011002215 | supabase/migrations/20261011_simplify_redirect_storage.sql | Historical migration; later storage design superseded prior destination-history storage. Preserve history. |
-| 20261011002708 | supabase/migrations/20261011_phase1_cancel_queue_duplicate_guard.sql | Candidate for filename alignment after confirming content. Duplicate queue guard remains in the current cancellation path. |
-| 20261011003338 | supabase/migrations/20261011003500_prevent_duplicate_delivery_confirmation.sql | Candidate for filename alignment; the filename's timestamp is later than the actual history version, so confirm dependencies/order before renaming. |
+| 20261010182259 | supabase/migrations/20261010182259_office_edit_driver_vehicle.sql | Filename aligned in this PR to the recorded production version; SQL content preserved unchanged. |
+| 20261011001729 | supabase/migrations/20261011001729_vehicle_owner_reports.sql | Filename aligned in this PR to the recorded production version; SQL content preserved unchanged. |
+| 20261011001852 | supabase/migrations/20261011001852_office_cancel_redirect_booking.sql | Filename aligned in this PR to the recorded production version; SQL content preserved unchanged. |
+| 20261011001910 | supabase/migrations/20261011001910_prevent_cancel_loaded_trip.sql | Filename aligned in this PR; current cancellation behavior was superseded by a later head-office-owned implementation. SQL content preserved unchanged. |
+| 20261011002050 | supabase/migrations/20261011002050_booking_destination_history.sql | Filename aligned in this PR. Its table was intentionally removed by a later migration; keep this historical step for clean bootstrap order. |
+| 20261011002215 | supabase/migrations/20261011002215_simplify_redirect_storage.sql | Filename aligned in this PR. Later storage design superseded prior destination-history storage; keep this historical step for clean bootstrap order. |
+| 20261011002708 | supabase/migrations/20261011002708_phase1_cancel_queue_duplicate_guard.sql | Filename aligned in this PR to the recorded production version; SQL content preserved unchanged. Duplicate queue guard remains in the current cancellation path. |
+| 20261011003338 | supabase/migrations/20261011003338_prevent_duplicate_delivery_confirmation.sql | Filename aligned in this PR to the recorded production version; SQL content preserved unchanged. Ordering follows the production history. |
 | 20261011003819 | supabase/migrations/20261011003819_driver_geofence_status_helper.sql | Version aligned. |
 | 20261011004304 | supabase/migrations/20261011004304_validate_captured_driver_location_time.sql | Version aligned. |
 | 20261011105953 | supabase/migrations/20261011105953_account_statement_records_head_only.sql | Version aligned. |
@@ -57,14 +57,8 @@ The following 14-digit-version-less files remain under `supabase/migrations/`. S
 - `20261010_standalone_direct_assignment.sql`
 - `20261010_vehicle_live_tracking.sql`
 - `20261010zz_repair_vehicle_tracking_rpc_schema_cache.sql`
-- `20261011_booking_destination_history.sql`
-- `20261011_office_cancel_redirect_booking.sql`
-- `20261011_phase1_cancel_queue_duplicate_guard.sql`
-- `20261011_prevent_cancel_loaded_trip.sql`
-- `20261011_simplify_redirect_storage.sql`
-- `20261011_vehicle_owner_reports.sql`
 
-Note: the current inventory has 17 such files, not 16. The pair `20261010_vehicle_live_tracking.sql` and `20261010zz_repair_vehicle_tracking_rpc_schema_cache.sql` is nearly identical; the latter additionally requests a PostgREST schema-cache reload. Keep it out of any replay plan unless a clean-bootstrap test proves it is required.
+After the version-alignment changes in this PR, 11 non-standard filenames remain. The pair `20261010_vehicle_live_tracking.sql` and `20261010zz_repair_vehicle_tracking_rpc_schema_cache.sql` is nearly identical; the latter additionally requests a PostgREST schema-cache reload. Keep it out of any replay plan unless a clean-bootstrap test proves it is required.
 
 ## Recommended order of work
 
