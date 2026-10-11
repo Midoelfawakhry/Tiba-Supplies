@@ -1,4 +1,4 @@
-name: Build Signed Tiba Supplies Android Releases
+name: Build Signed Tiba Supplies Main Office Android APK
 
 on:
   push:
@@ -11,17 +11,6 @@ on:
       - 'capacitor.config.json'
       - '.github/workflows/android-signed-release.yml'
   workflow_dispatch:
-    inputs:
-      app_mode:
-        description: Which signed Android app to build
-        required: true
-        type: choice
-        options:
-          - driver
-          - office
-          - branch
-          - both
-        default: both
 
 permissions:
   contents: read
@@ -34,17 +23,7 @@ jobs:
     steps:
       - id: set-matrix
         shell: bash
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            MODE="${{ inputs.app_mode }}"
-          else
-            MODE="both"
-          fi
-          if [ "$MODE" = "both" ]; then
-            echo 'matrix={"app_mode":["driver","office","branch"]}' >> "$GITHUB_OUTPUT"
-          else
-            echo "matrix={\"app_mode\":[\"$MODE\"]}" >> "$GITHUB_OUTPUT"
-          fi
+        run: echo 'matrix={"app_mode":["office"]}' >> "$GITHUB_OUTPUT"
 
   build-signed-release:
     needs: select-builds
