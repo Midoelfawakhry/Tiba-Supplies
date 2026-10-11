@@ -172,8 +172,6 @@ jobs:
           path.write_text(text)
           print("Release signing and monotonically increasing version metadata configured.")
           PY
-        env:
-          TIBA_KEYSTORE_PATH: ${{ env.TIBA_KEYSTORE_PATH }}
 
       - name: Verify Android application identity
         shell: bash
