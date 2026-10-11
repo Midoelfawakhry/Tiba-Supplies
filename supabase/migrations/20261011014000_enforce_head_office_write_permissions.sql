@@ -19,12 +19,25 @@ DECLARE
   ];
   r record;
 BEGIN
+  -- Fail closed if any expected RPC is missing. A migration that silently skips
+  -- a renamed/removed function would leave a live write path open to BRANCH.
+  FOREACH v_name IN ARRAY v_target LOOP
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_proc p
+      JOIN pg_namespace n ON n.oid=p.pronamespace
+      WHERE n.nspname='public' AND p.proname=v_name
+    ) THEN
+      RAISE EXCEPTION 'EXPECTED_WRITE_RPC_MISSING: %', v_name;
+    END IF;
+  END LOOP;
+
   FOR r IN
     SELECT p.proname, pg_get_function_identity_arguments(p.oid) AS args,
            pg_get_functiondef(p.oid) AS def
     FROM pg_proc p
     JOIN pg_namespace n ON n.oid=p.pronamespace
     WHERE n.nspname='public' AND p.proname = ANY(v_target)
+    ORDER BY p.proname, pg_get_function_identity_arguments(p.oid)
   LOOP
     v_def := r.def;
     v_new := replace(v_def, 'r.name IN (''ADMIN'', ''HEAD_OFFICE'', ''BRANCH'')',
@@ -32,7 +45,11 @@ BEGIN
     v_new := replace(v_new, 'r.name IN (''ADMIN'',''HEAD_OFFICE'',''BRANCH'')',
                               'r.name IN (''ADMIN'',''HEAD_OFFICE'')');
     IF v_new = v_def AND r.proname <> 'office_cancel_booking' THEN
-      RAISE EXCEPTION 'ROLE_GATE_PATTERN_NOT_FOUND for %.%', r.proname, r.args;
+      -- Do not guess at a different role-gate expression; abort and require review.
+      IF position('BRANCH' in v_def) > 0 THEN
+        RAISE EXCEPTION 'ROLE_GATE_PATTERN_NOT_FOUND for %.%; manual review required', r.proname, r.args;
+      END IF;
+      -- A definition already lacking BRANCH is acceptable and should remain untouched.
     END IF;
     IF v_new <> v_def THEN
       EXECUTE v_new;
