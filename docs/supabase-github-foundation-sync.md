@@ -7,7 +7,7 @@ Keep the Tiba-Supplies application code, SQL migration files, and the live Supab
 ## Current baseline (read-only audit, 2026-10-11)
 
 - Supabase project: `tnlcvwtphbunteifoonc`; project health was reported as active/healthy.
-- The production migration registry was extended after the reviewed rollout. The newly applied migrations were recorded by Supabase with versions `20261011125635`, `20261011125637`, `20261011125640`, `20261011125643`, `20261011125645`, `20261011125650`, `20261011125652`, and `20261011125655`.
+- The existing account-statement migration is aligned to its already-recorded Supabase version `20261011105953`. The newly applied migrations were recorded by Supabase with versions `20261011125635`, `20261011125637`, `20261011125640`, `20261011125643`, `20261011125645`, `20261011125650`, `20261011125652`, and `20261011125655`.
 - The applied migrations are being normalized to local filenames whose 14-digit version prefixes match the actual Supabase migration registry. Their suffix retains the original reviewed migration filename so the audit trail remains traceable. Older legacy/non-standard filenames still need a separate baseline reconciliation.
 - The HEAD redirect migration was given a unique version and aligned to the version recorded by Supabase; it reasserts the corrected redirect implementation after the cancellation/redirect rules migration.
 - The branch snapshot/employee RPCs and trip identity columns/counter triggers have now been applied and verified in production. A read-only database regression check confirmed role gates and branch-scoped direct assignments; full end-to-end app testing is still required.
