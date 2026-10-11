@@ -190,6 +190,7 @@ jobs:
         env:
           KEYSTORE_PASSWORD: ${{ secrets.TIBA_ANDROID_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.TIBA_ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.TIBA_ANDROID_KEY_PASSWORD }}
         run: |
           cd android
           chmod +x gradlew
