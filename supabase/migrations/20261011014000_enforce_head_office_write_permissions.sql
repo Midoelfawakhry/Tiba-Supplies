@@ -81,6 +81,7 @@ DECLARE
   v_actor uuid;
   v_queue_office_id uuid;
   v_active_count integer;
+  v_active_branch_count integer;
 BEGIN
   IF v_auth IS NULL THEN RAISE EXCEPTION 'AUTH_REQUIRED'; END IF;
 
@@ -114,10 +115,16 @@ BEGIN
     SELECT * INTO v_direct FROM public.standalone_direct_load_audit
     WHERE booking_id=p_booking_id FOR UPDATE;
     IF NOT FOUND THEN RAISE EXCEPTION 'DIRECT_ASSIGNMENT_AUDIT_NOT_FOUND'; END IF;
+    SELECT count(*) INTO v_active_branch_count
+    FROM public.offices
+    WHERE office_type='BRANCH' AND is_active=true;
+    IF v_active_branch_count <> 1 THEN
+      RAISE EXCEPTION 'EXPECTED_EXACTLY_ONE_ACTIVE_GEOFENCE_BRANCH';
+    END IF;
     SELECT office_id INTO v_queue_office_id
     FROM public.offices
     WHERE office_type='BRANCH' AND is_active=true
-    ORDER BY name LIMIT 1;
+    LIMIT 1;
   END IF;
 
   UPDATE public.bookings SET status='CANCELLED' WHERE booking_id=p_booking_id;
