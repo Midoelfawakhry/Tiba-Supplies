@@ -182,18 +182,22 @@ export const SystemAiAssistant: React.FC<SystemAiAssistantProps> = ({ audience, 
     setBusy(true);
     setError('');
     setVoiceStatus('');
-    const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), 25000);
+    let timeoutId: number | undefined;
     try {
-      const { data, error: invokeError } = await supabase.functions.invoke('tiba-ai-assistant', {
+      const invokeRequest = supabase.functions.invoke('tiba-ai-assistant', {
         body: {
           question: clean,
           audience,
           context: safeContext,
           history: next.slice(0, -1).slice(-8).map(message => ({ role: message.role, content: message.content })),
         },
-        signal: controller.signal,
       });
+      const { data, error: invokeError } = await Promise.race([
+        invokeRequest,
+        new Promise<never>((_, reject) => {
+          timeoutId = window.setTimeout(() => reject(new Error('AI_REQUEST_TIMEOUT')), 25000);
+        }),
+      ]);
       if (invokeError) throw invokeError;
       if (typeof data?.answer !== 'string' || !data.answer.trim()) {
         throw new Error(data?.error === 'AI_NOT_CONFIGURED'
@@ -223,13 +227,13 @@ export const SystemAiAssistant: React.FC<SystemAiAssistantProps> = ({ audience, 
       } catch {
         // Keep the safe generic message if the function error body is unavailable.
       }
-      if (controller.signal.aborted) {
+      if (e?.message === 'AI_REQUEST_TIMEOUT') {
         message = 'المساعد اتأخر أكتر من 25 ثانية، فوقفنا الانتظار بدل ما يفضل يحمّل. جرّب تاني بعد لحظة.';
       }
       setError(message);
       setMessages(current => current.filter((message, index) => !(index === current.length - 1 && message.role === 'user' && message.content === clean)));
     } finally {
-      window.clearTimeout(timeoutId);
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
       setBusy(false);
     }
   }
