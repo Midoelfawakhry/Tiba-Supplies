@@ -1,8 +1,28 @@
-import React, { useMemo, useState } from 'react';
-import { Bot, Send, Sparkles, LoaderCircle, AlertCircle, RotateCcw } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Bot, Send, Sparkles, LoaderCircle, AlertCircle, RotateCcw, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 type AssistantMessage = { role: 'user' | 'assistant'; content: string };
+
+type SpeechRecognitionResultLike = { 0: { transcript: string }; isFinal: boolean };
+type SpeechRecognitionEventLike = { resultIndex: number; results: ArrayLike<SpeechRecognitionResultLike> };
+type SpeechRecognitionErrorLike = { error: string };
+interface SpeechRecognitionLike {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorLike) => void) | null;
+  onend: (() => void) | null;
+  start(): void;
+  stop(): void;
+  abort(): void;
+}
+type SpeechWindow = Window & {
+  SpeechRecognition?: new () => SpeechRecognitionLike;
+  webkitSpeechRecognition?: new () => SpeechRecognitionLike;
+};
+
 
 interface SystemAiAssistantProps {
   audience: 'HEAD_OFFICE' | 'BRANCH';
@@ -27,6 +47,90 @@ export const SystemAiAssistant: React.FC<SystemAiAssistantProps> = ({ audience, 
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [listening, setListening] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [voiceSupported, setVoiceSupported] = useState(false);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const voiceEnabledRef = useRef(true);
+
+  useEffect(() => {
+    const speechWindow = window as SpeechWindow;
+    setVoiceSupported(Boolean(speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition));
+    return () => {
+      recognitionRef.current?.abort();
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    };
+  }, []);
+
+  useEffect(() => { voiceEnabledRef.current = voiceEnabled; }, [voiceEnabled]);
+
+  function speak(text: string) {
+    if (!voiceEnabledRef.current || !('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'ar-EG';
+    utterance.rate = 0.94;
+    utterance.pitch = 1;
+    window.speechSynthesis.speak(utterance);
+  }
+
+  function stopVoice() {
+    recognitionRef.current?.stop();
+    setListening(false);
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+  }
+
+  function startVoiceInput() {
+    setError('');
+    const speechWindow = window as SpeechWindow;
+    const Recognition = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
+    if (!Recognition) {
+      setError('التعرّف على الكلام غير متاح في إصدار التطبيق أو متصفحك. جرّب تحديث التطبيق أو استخدم الكتابة مؤقتًا.');
+      return;
+    }
+    if (busy) return;
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    recognitionRef.current?.abort();
+    const recognition = new Recognition();
+    recognition.lang = 'ar-EG';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.onresult = event => {
+      const transcript = Array.from(event.results)
+        .slice(event.resultIndex)
+        .filter(result => result.isFinal)
+        .map(result => result[0].transcript)
+        .join(' ')
+        .trim();
+      setListening(false);
+      recognitionRef.current = null;
+      if (transcript) void ask(transcript);
+      else setError('ما التقطتش كلام واضح. جرّب تاني أو اكتب سؤالك.');
+    };
+    recognition.onerror = event => {
+      setListening(false);
+      recognitionRef.current = null;
+      const message = event.error === 'not-allowed'
+        ? 'اسمح للتطبيق باستخدام الميكروفون من إعدادات الهاتف.'
+        : event.error === 'no-speech'
+          ? 'ما سمعتش كلام. اضغط الميكروفون واتكلم بوضوح.'
+          : 'حصلت مشكلة في التقاط الصوت. جرّب مرة تانية أو استخدم الكتابة.';
+      setError(message);
+    };
+    recognition.onend = () => {
+      setListening(false);
+      recognitionRef.current = null;
+    };
+    recognitionRef.current = recognition;
+    try {
+      recognition.start();
+      setListening(true);
+    } catch {
+      recognitionRef.current = null;
+      setListening(false);
+      setError('مش قادر أشغّل الميكروفون دلوقتي. اقفل المحاولة وجرّب تاني.');
+    }
+  }
   const suggestedPrompts = prompts[audience];
 
   const safeContext = useMemo(() => JSON.parse(JSON.stringify(context)), [context]);
@@ -59,6 +163,7 @@ export const SystemAiAssistant: React.FC<SystemAiAssistantProps> = ({ audience, 
           : 'المساعد لم يرجع إجابة. جرّب مرة تانية.');
       }
       setMessages(current => [...current, { role: 'assistant', content: data.answer }]);
+      speak(data.answer);
     } catch (e: any) {
       let message = e?.message || 'تعذر الاتصال بمساعد النظام. تأكد من اتصال الإنترنت وإعداد المساعد.';
       try {
@@ -90,12 +195,28 @@ export const SystemAiAssistant: React.FC<SystemAiAssistantProps> = ({ audience, 
           <p className="mt-1 text-xs text-slate-500">{audience === 'HEAD_OFFICE' ? 'مساعد المكتب الرئيسي · تحليل بيانات التشغيل المتاحة' : 'مساعد مكتب رأس سدر · متابعة وقراءة فقط'}</p>
         </div>
       </div>
-      <button type="button" onClick={() => { setMessages([]); setError(''); }} disabled={busy || messages.length === 0} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 disabled:opacity-40"><RotateCcw size={14}/> محادثة جديدة</button>
+      <button type="button" onClick={() => { stopVoice(); setMessages([]); setError(''); }} disabled={busy || messages.length === 0} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 disabled:opacity-40"><RotateCcw size={14}/> محادثة جديدة</button>
     </header>
 
     <div className="space-y-4 p-4 sm:p-5">
       <div className="rounded-2xl border border-sky-100 bg-sky-50/70 p-4 text-sm leading-6 text-sky-950">
-        اسأل المساعد عن البيانات الظاهرة في واجهتك. المساعد للشرح والتلخيص فقط؛ لا ينشئ أوامر تحميل ولا يغيّر أي سجل أو صلاحية.
+        اسأل المساعد عن البيانات الظاهرة في واجهتك. تقدر تتكلم بالمصري وهو يرد بصوت مسموع. المساعد للشرح والتلخيص فقط؛ لا ينشئ أوامر تحميل ولا يغيّر أي سجل أو صلاحية.
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-violet-100 bg-violet-50/60 p-3">
+        <div>
+          <div className="font-black text-violet-950">المحادثة الصوتية</div>
+          <p className="mt-1 text-xs leading-5 text-slate-600">{listening ? 'سامعك دلوقتي… اتكلم بوضوح.' : voiceEnabled ? 'الردود هتتقال بصوت مصري/عربي حسب الأصوات المتاحة على جهازك.' : 'الردود هتظهر كتابة من غير صوت.'}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={() => { const next = !voiceEnabled; setVoiceEnabled(next); if (!next && 'speechSynthesis' in window) window.speechSynthesis.cancel(); }} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-violet-200 bg-white px-3 py-2 text-sm font-bold text-violet-900" aria-pressed={voiceEnabled}>
+            {voiceEnabled ? <Volume2 size={18}/> : <VolumeX size={18}/>}
+            {voiceEnabled ? 'الصوت شغال' : 'تشغيل الصوت'}
+          </button>
+          <button type="button" onClick={listening ? stopVoice : startVoiceInput} disabled={busy} className={listening ? 'inline-flex min-h-11 items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-black text-white' : 'inline-flex min-h-11 items-center gap-2 rounded-xl bg-violet-700 px-4 py-2 text-sm font-black text-white disabled:opacity-50'} aria-label={listening ? 'إيقاف الاستماع' : 'التحدث إلى مساعد طيبة'}>
+            {listening ? <MicOff size={18}/> : <Mic size={18}/>}
+            {listening ? 'إيقاف' : 'اتكلم'}
+          </button>
+        </div>
       </div>
 
       {messages.length === 0 && <div className="space-y-3">
@@ -119,6 +240,7 @@ export const SystemAiAssistant: React.FC<SystemAiAssistantProps> = ({ audience, 
         <textarea aria-label="اكتب سؤالك لمساعد طيبة" rows={2} maxLength={1200} value={question} onChange={event => setQuestion(event.target.value)} placeholder="اكتب سؤالك عن التشغيل أو البيانات..." className="min-h-14 flex-1 resize-y rounded-2xl border border-slate-300 bg-white p-3 text-sm text-slate-900" />
         <button type="submit" disabled={busy || !question.trim()} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-violet-700 px-5 py-3 text-sm font-black text-white hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-50">{busy ? <LoaderCircle size={18} className="animate-spin"/> : <Send size={18}/>} إرسال السؤال</button>
       </form>
+      {!voiceSupported && <p className="text-xs leading-5 text-amber-700">قد لا يدعم إصدار التطبيق الحالي تحويل الكلام إلى نص. لو زر الصوت لم يعمل، هنحتاج اختبار توافق الميكروفون على أندرويد؛ الردود الصوتية تعتمد أيضًا على محرك النطق المتاح على الجهاز.</p>}
       <p className="text-[11px] leading-5 text-slate-400">الإجابة تعتمد على ملخص البيانات المرسل للمساعد، وقد تحتاج مراجعة بشرية قبل اتخاذ قرار تشغيلي. لا تُرسل بيانات شخصية أو كلمات مرور في الأسئلة.</p>
     </div>
   </section>;
