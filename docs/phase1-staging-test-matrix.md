@@ -22,10 +22,12 @@ Use an isolated Supabase staging database only. Do not seed or mutate production
 | GEO-02 | Driver outside radius | Published loads/queue hidden and direct assignment rejected | Snapshot and RPC result |
 | GEO-03 | Driver leaves radius after direct assignment | Own pending/active booking remains visible; new published loads/queue hidden | Snapshot before/after movement |
 | CAN-01 | Cancel pending direct assignment with reason | Booking cancelled; audit preserved; one queue re-entry at tail | Booking/audit/queue rows |
-| CAN-02 | Cancel without reason, cancel twice, or cancel after transit/delivery/weight | Rejected with no duplicate queue entry | Error and queue count |
+| CAN-02 | Cancel without reason, cancel twice, or cancel after actual weight/delivery evidence | Rejected with no duplicate queue entry | Error and queue count |
+| CAN-04 | Cancel an IN_TRANSIT booking with no actual weight and no delivery confirmation | Allowed with reason; booking cancelled; audit preserved; one queue re-entry at HEAD tail unless vehicle is out of service | Booking/audit/queue rows |
 | CAN-03 | Cancel with vehicle out of service | Booking cancelled, no queue re-entry | Queue rows and audit |
 | RED-01 | Redirect a loaded/in-transit trip with valid reason | Same booking/actual record retained; factory_id updated; audit has reason/time/new destination | Before/after row IDs |
-| RED-02 | Redirect a cancelled, delivered, or invalid booking | Rejected | Error and unchanged rows |
+| RED-02 | Redirect a cancelled or invalid booking | Rejected | Error and unchanged rows |
+| RED-03 | Redirect after actual weight or confirmed delivery | Allowed as a corrective destination change; same actual-load row, weight, scale image, delivery timestamp/coordinates, and booking status preserved; old/new destination and reason audited | Before/after row IDs, evidence fields, and audit payload |
 | DEL-01 | Delivery confirmation missing weight or scale image | Rejected | Error and unchanged rows |
 | DEL-02 | Confirm delivery twice | Second confirmation rejected; no duplicate effects | RPC results and row counts |
 | RPT-01 | Reports include only delivered trips with actual weight | Undelivered and unweighted trips excluded | Query output compared with fixture |
