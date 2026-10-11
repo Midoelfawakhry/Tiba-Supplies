@@ -32,7 +32,7 @@
   .font-mono, .tabular-nums { font-family: 'JetBrains Mono', monospace; }
 }
 
-/* Tiba visual system: consistent surfaces, depth, and touch-friendly controls. */
+/* Tiba visual system: shared office/driver palette, consistent surfaces, depth, and touch-friendly controls. */
 @layer components {
   #root article, #root aside, #root section {
     scroll-margin-top: 1rem;
