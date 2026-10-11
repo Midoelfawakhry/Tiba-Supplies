@@ -117,7 +117,7 @@ BEGIN
     RETURNING last_number INTO v_number;
     NEW.assignment_sequence_date := v_date;
     NEW.assignment_daily_number := v_number;
-    NEW.trip_code := format('TIBA-%s-X%s', to_char(v_date, 'YYYYMMDD'), lpad(v_number::text, 6, '0'));
+    NEW.trip_code := format('TIBA-%s-%s', to_char(v_date, 'YYYYMMDD'), lpad(v_number::text, 6, '0'));
     RETURN NEW;
   END IF;
   IF NEW.trip_code IS DISTINCT FROM OLD.trip_code
@@ -166,7 +166,7 @@ BEGIN
       END IF;
       NEW.trip_code := v_booking_trip_code;
     ELSE
-      NEW.trip_code := format('TIBA-%s-%s', to_char(v_date, 'YYYYMMDD'), lpad(v_number::text, 6, '0'));
+      NEW.trip_code := format('TIBA-%s-X%s', to_char(v_date, 'YYYYMMDD'), lpad(v_number::text, 6, '0'));
     END IF;
     RETURN NEW;
   END IF;
