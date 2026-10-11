@@ -46,12 +46,15 @@ BEGIN
                               'r.name IN (''ADMIN'', ''HEAD_OFFICE'')');
     v_new := replace(v_new, 'r.name IN (''ADMIN'',''HEAD_OFFICE'',''BRANCH'')',
                               'r.name IN (''ADMIN'',''HEAD_OFFICE'')');
-    IF v_new = v_def AND r.proname <> 'office_cancel_booking' THEN
-      -- Do not guess at a different role-gate expression; abort and require review.
-      IF position('BRANCH' in v_def) > 0 THEN
-        RAISE EXCEPTION 'ROLE_GATE_PATTERN_NOT_FOUND for %.%; manual review required', r.proname, r.args;
-      END IF;
-      -- A definition already lacking BRANCH is acceptable and should remain untouched.
+    IF r.proname <> 'office_cancel_booking'
+       AND (
+         upper(v_new) ~ $R\\.NAME\\s+IN\\s*\\([^)]*'BRANCH'$
+         OR upper(v_new) ~ $R\\.NAME\\s*=\\s*'BRANCH'$
+         OR upper(v_new) ~ $ROLE_NAME\\s*=\\s*'BRANCH'$
+       ) THEN
+      -- Fail closed only when BRANCH remains in a role predicate. A plain
+      -- office_type='BRANCH' lookup is a legitimate geofence reference.
+      RAISE EXCEPTION 'BRANCH_ROLE_GATE_REMAINS for %.%; manual review required', r.proname, r.args;
     END IF;
     IF v_new <> v_def THEN
       EXECUTE v_new;
