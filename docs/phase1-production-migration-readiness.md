@@ -1,5 +1,13 @@
 # Phase 1 Production Migration Readiness
 
+## Latest audit update (2026-10-11, after PR #24)
+
+- **Confirmed authorization mismatch:** live Edge Function `create-driver-account` is ACTIVE at version 3 with JWT verification enabled, but its account-creation path allows `ADMIN`, `HEAD_OFFICE`, and `BRANCH`. This conflicts with the agreed branch monitoring-only model. The review branch now restricts account creation to `ADMIN` and `HEAD_OFFICE` and adds Node regression tests to CI. The live function is not considered fixed until the PR passes and the main-branch deployment workflow succeeds.
+- **Password setup remains separate:** `complete_password_setup` verifies the authenticated user is linked to an active driver; that flow is intentionally retained.
+- **Security advisor interpretation:** 29 tables have RLS enabled without direct policies, and 32 `SECURITY DEFINER` functions are callable by `authenticated`. These findings are not automatically defects in this RPC-only architecture; each endpoint needs its own ownership/role gate and fixed search path. Current checks show `anon` and `authenticated` lack direct SELECT/INSERT/UPDATE/DELETE on sampled operational tables, but hold TRUNCATE/REFERENCES/TRIGGER/MAINTAIN grants. Those extra grants deserve least-privilege review; do not revoke them blindly without dependency and regression testing.
+- **Migration source gap:** production's ledger contains `20261011004642_require_captured_driver_location_time`, `20261011020800_phase1_direct_assignment_acceptance_head_owned`, and `20261011022028_enforce_head_office_write_permissions_fail_closed`, but no exact matching SQL files are present in the current migration directory. Do not invent historical SQL or replay a reconstructed migration as if it were the original; recover the exact Git history where possible, otherwise create a clearly labeled, reviewed recovery/baseline plan and test clean bootstrap.
+- **Release status:** NOT APPROVED for production release until the driver-account authorization PR is deployed, missing migration sources are reconciled, clean-database SQL tests pass, and device-level GPS/acceptance tests pass. No production schema/data mutation was performed during this audit.
+
 Status: **NOT APPROVED FOR PRODUCTION** until all gates below pass.
 
 ## Non-negotiable production safeguards
@@ -11,7 +19,7 @@ Status: **NOT APPROVED FOR PRODUCTION** until all gates below pass.
 - Direct assignment stays pending until the driver explicitly accepts it; only acceptance creates the actual loading record.
 
 ## Current audit findings (2026-10-11)
-- The latest reviewed branch head is `38a2c53bb548ccf5bde2fef5d30f133a88b67242`; PR #13 remains open and draft.
+- PR #24 (`docs: reconcile legacy migration history`) is merged to `main` at `752f566d704e8862bdee1c317a5773368c9d620d`. It aligned migration filenames and documentation only; SQL contents and production schema/data were not changed by that PR.
 - The previously reported duplicate `20261011014000` filename is no longer present in the current branch listing; the current file is `20261011014000_enforce_head_office_write_permissions.sql`. Keep this as a verified fix, but re-run collision checks on the final candidate commit.
 - Migration naming is still inconsistent: the repository contains several date-only prefixes such as `20261010_...` and multiple files beginning `20261011_...`, while production's migration ledger contains 14-digit versions. Do not run a clean staging migration until every migration has a unique, deterministic version and the repo-to-production migration mapping is reconciled. Do not bulk-rename files blindly: migration ordering and whether each change has already been applied must be established first.
 - `20261011014000_enforce_head_office_write_permissions.sql` rewrites function source using text replacements. This is brittle and must not be accepted as the final authorization control until every target function/signature is checked and the migration fails closed when a role gate is not found. Prefer explicit reviewed function definitions or a tested, signature-aware patch.
@@ -22,12 +30,12 @@ Status: **NOT APPROVED FOR PRODUCTION** until all gates below pass.
 
 ## Latest review-branch correction (candidate only)
 
-- Added `supabase/migrations/20261011150000_rebuild_head_owned_cancellation.sql` as a new forward-only candidate. It replaces the cancellation RPC definition explicitly rather than rewriting role-gate source text.
+- The production ledger records the head-owned cancellation migration under version `20261011125635` (`20261011150000_rebuild_head_owned_cancellation`). The repository path is `supabase/migrations/20261011125635_20261011150000_rebuild_head_owned_cancellation.sql`; treat the ledger as evidence that the version was applied, not as proof that a clean bootstrap is validated.
 - Candidate cancellation resolves the active HEAD office, verifies the booking belongs to HEAD operational ownership, cancels the booking, clears active queue rows for the driver, and requeues eligible vehicles under HEAD only. Standalone direct assignments are checked against their HEAD-owned audit row; BRANCH is not selected as a queue office.
 - Updated `supabase/tests/phase1_direct_assignment_security_checks.sql` to correct the role-gate regex escapes and add static checks for HEAD-owned cancellation and dispatch. These checks are still **not executed**; static definition checks do not prove transactional/concurrency behavior.
-- Added `supabase/migrations/20261011151000_dispatch_from_head_queue.sql`: dispatch now selects waiting entries from `load_orders.office_id` (the operational HEAD owner), requires HEAD/ADMIN authorization, and checks the geofence helper's `eligible` result without equating the geofence office ID to the queue owner.
+- The production ledger records the dispatch-from-HEAD-queue migration under version `20261011125637` (`20261011151000_dispatch_from_head_queue`). Its live definition and its clean-bootstrap behavior still require automated validation.
 - Added static assertions for this dispatch separation. They are still unexecuted SQL checks; frontend CI does not execute them.
-- This candidate has not been run against staging or production. Before approval, validate the exact queue uniqueness constraints, test rollback and concurrent cancellation, and verify that all operational write RPCs use HEAD consistently. Production remains unchanged.
+- A clean staging/bootstrap run and transactional/concurrency regression tests are not evidenced by the current CI. This audit did not apply migrations or mutate production data. Before release, validate queue uniqueness, rollback/concurrent cancellation, and HEAD ownership across operational write RPCs.
 
 ## Repository migration hygiene
 - Migration filenames must have unique version prefixes.
@@ -73,14 +81,14 @@ Status: **NOT APPROVED FOR PRODUCTION** until all gates below pass.
 A successful frontend build does not prove database migration correctness. Production data and schema must remain untouched until the SQL and staging gates above pass.
 
 
-## Latest cancellation / redirect rule correction (review branch only)
+## Cancellation / redirect rule review
 
 - Cancellation no longer treats `IN_TRANSIT` by itself as a blocker. The database RPC still rejects delivered/completed booking statuses and any actual-weight or delivery-confirmation evidence.
 - Redirect remains available after weight or delivery confirmation as a documented correction. It preserves the actual-load row identity, weight, scale image, delivery timestamp/coordinates, and booking status; the audit entry records old/new destination, reason, and whether the correction followed delivery.
-- UI and SQL static assertions were updated on branch `fix/phase1-cancel-redirect-rules`. They have not been applied to production and the SQL regression script has not yet been run in isolated staging.
+- Static assertions exist in the repository, but the SQL regression script has not been shown passing against a clean isolated database. The behavior must be validated with transactional staging fixtures before release.
 
 
-## Ras Sedr branch app and employee access (review candidate)
+## Ras Sedr branch app and employee access (implementation review)
 
 - Main-office UI now includes a **موظفو مكتب رأس سدر** screen for creating and activating/deactivating branch employee accounts.
 - Employee authentication uses a unique username plus password; the username is mapped to an internal reserved `.invalid` Auth identifier. Passwords are stored only in Supabase Auth, never in `app_users`.
@@ -88,4 +96,4 @@ A successful frontend build does not prove database migration correctness. Produ
 - The dedicated `get_branch_office_snapshot()` RPC returns a read-only branch data model: branch-directed load orders, related allocations/actual loading, waiting-list entries and a driver/vehicle-owner contact directory.
 - `get_phase1_snapshot()` is restricted to ADMIN/HEAD_OFFICE so BRANCH accounts cannot call the full main-office snapshot.
 - Android workflow now supports a separate `branch` build with application ID `com.tibasupplies.branch`; web preview also supports `/branch`.
-- This is still a candidate implementation. Verify the SQL migration in isolated staging, deploy the `create-branch-employee` Edge Function, and build/test the branch APK before issuing accounts. No production migration or APK release has been performed here.
+- The live Supabase function listing does not currently include `create-branch-employee`. Branch employee provisioning is therefore not release-ready until the function is implemented/deployed, authorization is tested, and the branch APK is built and smoke-tested. The migration ledger does contain the branch-account migration version; that alone does not prove the complete branch app flow is deployable.

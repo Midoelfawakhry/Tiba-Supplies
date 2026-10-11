@@ -16,6 +16,7 @@ jobs:
           node-version: 22
       - run: npm install
       - run: npm run lint
+      - run: npm run test:phase1:authorization
       - run: npm run build
 
   sql-regex-smoke:

@@ -71,7 +71,7 @@ Deno.serve(async (req: Request) => {
       .eq("user_id", appUser.user_id);
     if (rolesError) throw rolesError;
     const allowed = (roleLinks ?? []).some((link: any) =>
-      ["ADMIN", "HEAD_OFFICE", "BRANCH"].includes(link.roles?.name)
+      ["ADMIN", "HEAD_OFFICE"].includes(link.roles?.name)
     );
     if (!allowed) return json({ error: "INSUFFICIENT_ROLE" }, 403);
 
