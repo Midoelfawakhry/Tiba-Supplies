@@ -442,7 +442,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
                   const { data, error: rpcError } = await supabase.rpc('office_redirect_booking', { p_booking_id: row.booking_id, p_factory_id: match[1], p_reason: reason.trim() });
                   if (rpcError) throw rpcError;
                   if (!data?.success) throw new Error('تعذر تأكيد إعادة توجيه النقلة.');
-                  setSuccess('تم تغيير وجهة النقلة مع الاحتفاظ بسجل الوجهة السابقة في سجل المراجعة.');
+                  setSuccess('تم تغيير وجهة النقلة إلى المصنع الجديد. الحسابات هتعتمد الوجهة النهائية فقط.');
                   await load();
                 } catch (e: any) { setError(e?.message || 'تعذر إعادة توجيه النقلة.'); }
               }} className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-800">إعادة توجيه</button>}<span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-500">#{index + 1}</span></div></div>
