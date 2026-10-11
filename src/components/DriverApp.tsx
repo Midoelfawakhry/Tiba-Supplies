@@ -14,6 +14,29 @@ type PositionState = {
   capturedAt: string;
 };
 
+const factoryGlyph = (name: string) => {
+  const normalized = name.trim().toLowerCase();
+  if (normalized.includes('إيكوبات') || normalized.includes('ايكوبات') || normalized.includes('ecopat') || normalized.includes('ecobat')) return 'E';
+  if (normalized.includes('مايوف') || normalized.includes('mayof')) return 'M';
+  if (normalized.includes('الدولية') || normalized.includes('الدوليه')) return 'D';
+  return [...name.trim()][0]?.toUpperCase() || 'م';
+};
+
+const quarryColor = (quarryId: string | null | undefined, quarryName: string | null | undefined) => {
+  const palette = [
+    { background: '#27864A', foreground: '#FFFFFF', border: '#176638' },
+    { background: '#D97706', foreground: '#FFFFFF', border: '#A65308' },
+    { background: '#2874C8', foreground: '#FFFFFF', border: '#1E5594' },
+    { background: '#7C4DAD', foreground: '#FFFFFF', border: '#5D3786' },
+    { background: '#C2415D', foreground: '#FFFFFF', border: '#923047' },
+    { background: '#0F8A8D', foreground: '#FFFFFF', border: '#0B6567' },
+  ];
+  const key = quarryId || quarryName || 'unknown-quarry';
+  let hash = 0;
+  for (let index = 0; index < key.length; index += 1) hash = (hash * 31 + key.charCodeAt(index)) >>> 0;
+  return palette[hash % palette.length];
+};
+
 export const DriverApp: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<any>(null);
@@ -384,7 +407,7 @@ export const DriverApp: React.FC = () => {
             </section>
             <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-center gap-2"><Truck className="text-red-700" size={22}/><h2 className="font-black">الحمولات المتاحة</h2></div>
-              {(portal.available_loads || []).length ? <div className="mt-4 space-y-3">{portal.available_loads.map((load: any) => <div key={load.load_order_id} className="rounded-2xl border border-slate-200 p-4"><div className="font-black">{load.factory_name || 'مصنع غير محدد'} <span className="text-slate-400">←</span> {load.quarry_name || 'محجر غير محدد'}</div><p className="mt-2 text-sm text-slate-600">المتبقي: {load.remaining_quantity} نقلة</p><p className="mt-1 text-xs text-slate-400">أمر: {String(load.load_order_id).slice(0, 8)}</p></div>)}</div> : <p className="mt-2 text-sm leading-7 text-slate-500">لا توجد حمولات متاحة حاليًا.</p>}
+              {(portal.available_loads || []).length ? <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">{portal.available_loads.map((load: any) => { const factoryName = String(load.factory_name || 'مصنع غير محدد'); const quarryName = String(load.quarry_name || 'محجر غير محدد'); const color = quarryColor(load.quarry_id, quarryName); return <article key={load.load_order_id} className="rounded-2xl border border-slate-200 bg-white p-3 text-center shadow-sm"><div aria-label={factoryName + ' — ' + quarryName} className="mx-auto grid h-16 w-16 place-items-center rounded-2xl border-2 text-2xl font-black shadow-sm" style={{ backgroundColor: color.background, color: color.foreground, borderColor: color.border }}>{factoryGlyph(factoryName)}</div><h3 className="mt-3 font-black leading-6">{factoryName}</h3><p className="mt-1 text-sm font-bold text-slate-600">{quarryName}</p><p className="mt-3 rounded-xl bg-slate-50 px-2 py-2 text-xs text-slate-600">المتبقي: <strong>{load.remaining_quantity}</strong> نقلة</p><p className="mt-2 text-[11px] text-slate-400">أمر: {String(load.load_order_id).slice(0, 8)}</p></article>; })}</div> : <p className="mt-2 text-sm leading-7 text-slate-500">لا توجد حمولات متاحة حاليًا.</p>}
             </section>
             <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-center gap-2"><FileText className="text-red-700" size={22}/><h2 className="font-black">أوامرك السابقة</h2></div>
