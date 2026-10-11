@@ -77,6 +77,41 @@ $function$;
 REVOKE ALL ON FUNCTION public.get_phase1_snapshot() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.get_phase1_snapshot() TO authenticated;
 
+-- Remove legacy BRANCH access to broad office-only read RPCs. This patch is
+-- signature-aware and fails closed if a deployed definition differs from the
+-- reviewed role-gate text; branch users use only get_branch_office_snapshot().
+DO $restrict_legacy_reads$
+DECLARE
+  v_signature text;
+  v_definition text;
+  v_restricted text;
+  v_targets text[] := ARRAY[
+    'public.get_available_vehicles()',
+    'public.get_driver_edit_options(uuid)',
+    'public.get_office_waiting_list()',
+    'public.get_vehicle_live_locations()',
+    'public.get_vehicle_owner_directory()',
+    'public.get_vehicle_owner_reports(date,date)'
+  ];
+BEGIN
+  FOREACH v_signature IN ARRAY v_targets LOOP
+    IF to_regprocedure(v_signature) IS NULL THEN
+      RAISE EXCEPTION 'EXPECTED_BRANCH_RESTRICTED_RPC_MISSING: %', v_signature;
+    END IF;
+    SELECT pg_get_functiondef(to_regprocedure(v_signature)) INTO v_definition;
+    v_restricted := replace(
+      v_definition,
+      'r.name IN (''ADMIN'', ''HEAD_OFFICE'', ''BRANCH'')',
+      'r.name IN (''ADMIN'', ''HEAD_OFFICE'')'
+    );
+    IF v_restricted = v_definition THEN
+      RAISE EXCEPTION 'BRANCH_ROLE_GATE_TEXT_NOT_FOUND: %', v_signature;
+    END IF;
+    EXECUTE v_restricted;
+  END LOOP;
+END
+$restrict_legacy_reads$;
+
 -- The branch snapshot deliberately returns only branch-relevant operational read models.
 CREATE OR REPLACE FUNCTION public.get_branch_office_snapshot()
 RETURNS jsonb
