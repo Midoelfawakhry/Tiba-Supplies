@@ -436,6 +436,9 @@ BEGIN
         SELECT b.booked_at,
           jsonb_build_object(
             'booking_id', b.booking_id,
+            'trip_code', b.trip_code,
+            'assignment_sequence_date', b.assignment_sequence_date,
+            'assignment_daily_number', b.assignment_daily_number,
             'status', b.status,
             'booked_at', b.booked_at,
             'driver_name', d.name,
