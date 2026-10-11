@@ -50,6 +50,7 @@ export const SystemAiAssistant: React.FC<SystemAiAssistantProps> = ({ audience, 
   const [listening, setListening] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [voiceSupported, setVoiceSupported] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState('');
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const voiceEnabledRef = useRef(true);
 
@@ -65,19 +66,39 @@ export const SystemAiAssistant: React.FC<SystemAiAssistantProps> = ({ audience, 
   useEffect(() => { voiceEnabledRef.current = voiceEnabled; }, [voiceEnabled]);
 
   function speak(text: string) {
-    if (!voiceEnabledRef.current || !('speechSynthesis' in window)) return;
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'ar-EG';
-    utterance.rate = 0.94;
-    utterance.pitch = 1;
-    window.speechSynthesis.speak(utterance);
+    if (!voiceEnabledRef.current) {
+      setVoiceStatus('الصوت مقفول؛ الإجابة مكتوبة.');
+      return;
+    }
+    if (!('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') {
+      setVoiceStatus('محرك النطق غير متاح داخل إصدار التطبيق الحالي. الإجابة مكتوبة ويمكن قراءتها من إعدادات الهاتف.');
+      return;
+    }
+    try {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'ar-EG';
+      utterance.rate = 0.92;
+      utterance.pitch = 1;
+      utterance.onstart = () => setVoiceStatus('المساعد بينطق الإجابة دلوقتي…');
+      utterance.onend = () => setVoiceStatus('انتهى نطق الإجابة.');
+      utterance.onerror = (event) => {
+        setVoiceStatus(event.error === 'canceled' || event.error === 'interrupted'
+          ? 'تم إيقاف الصوت.'
+          : 'الإجابة ظهرت كتابة، لكن الهاتف لم يشغّل الصوت. راجع محرك تحويل النص إلى كلام في إعدادات أندرويد.');
+      };
+      setVoiceStatus('جاري تجهيز الصوت…');
+      window.speechSynthesis.speak(utterance);
+    } catch {
+      setVoiceStatus('الإجابة ظهرت كتابة، لكن تعذّر تشغيل الصوت على الجهاز.');
+    }
   }
 
   function stopVoice() {
     recognitionRef.current?.stop();
     setListening(false);
     if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    setVoiceStatus('تم إيقاف الصوت.');
   }
 
   function startVoiceInput() {
@@ -147,6 +168,9 @@ export const SystemAiAssistant: React.FC<SystemAiAssistantProps> = ({ audience, 
     setQuestion('');
     setBusy(true);
     setError('');
+    setVoiceStatus('');
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 25000);
     try {
       const { data, error: invokeError } = await supabase.functions.invoke('tiba-ai-assistant', {
         body: {
@@ -155,6 +179,7 @@ export const SystemAiAssistant: React.FC<SystemAiAssistantProps> = ({ audience, 
           context: safeContext,
           history: next.slice(0, -1).slice(-8).map(message => ({ role: message.role, content: message.content })),
         },
+        signal: controller.signal,
       });
       if (invokeError) throw invokeError;
       if (typeof data?.answer !== 'string' || !data.answer.trim()) {
@@ -175,13 +200,23 @@ export const SystemAiAssistant: React.FC<SystemAiAssistantProps> = ({ audience, 
           message = 'حسابك أو مكتبك غير مصرح له باستخدام المساعد من الواجهة دي.';
         } else if (payload?.error === 'AI_RATE_LIMITED') {
           message = 'طلبات المساعد كتير في الوقت الحالي. استنى شوية وجرّب تاني.';
+        } else if (payload?.error === 'AI_TEMPORARILY_UNAVAILABLE') {
+          message = 'خدمة الذكاء الاصطناعي مشغولة حاليًا. جرّب بعد دقيقة؛ التطبيق هيوقف الانتظار بدل ما يفضل يحمّل.';
+        } else if (payload?.error === 'AI_MODEL_UNAVAILABLE') {
+          message = 'نموذج الذكاء الاصطناعي غير متاح للمفتاح الحالي. محتاجين مراجعة إعداد النموذج على الخادم.';
+        } else if (payload?.error === 'AI_PROVIDER_ERROR') {
+          message = 'خدمة الذكاء الاصطناعي رفضت الطلب. جرّب مرة واحدة لاحقًا، ولو استمر الخطأ هنراجع سجلات الخادم.';
         }
       } catch {
         // Keep the safe generic message if the function error body is unavailable.
       }
+      if (controller.signal.aborted) {
+        message = 'المساعد اتأخر أكتر من 25 ثانية، فوقفنا الانتظار بدل ما يفضل يحمّل. جرّب تاني بعد لحظة.';
+      }
       setError(message);
       setMessages(current => current.filter((message, index) => !(index === current.length - 1 && message.role === 'user' && message.content === clean)));
     } finally {
+      window.clearTimeout(timeoutId);
       setBusy(false);
     }
   }
@@ -234,6 +269,7 @@ export const SystemAiAssistant: React.FC<SystemAiAssistantProps> = ({ audience, 
         {busy && <div className="flex items-center gap-2 text-xs font-bold text-violet-700"><LoaderCircle size={16} className="animate-spin"/> المساعد بيراجع البيانات المتاحة...</div>}
       </div>}
 
+      {voiceStatus && <p aria-live="polite" className="rounded-xl bg-sky-50 px-3 py-2 text-xs leading-5 text-sky-900">{voiceStatus}</p>}
       {error && <div role="alert" className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900"><AlertCircle size={18} className="mt-1 shrink-0"/><span>{error}</span></div>}
 
       <form onSubmit={event => { event.preventDefault(); void ask(); }} className="flex flex-col gap-2 sm:flex-row">
