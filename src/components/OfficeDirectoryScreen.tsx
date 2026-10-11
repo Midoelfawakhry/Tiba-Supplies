@@ -431,7 +431,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
                 <div className="min-w-0"><h4 className="break-words font-black leading-6">{rowTitle(row, active)}</h4><p className="mt-1 break-words text-sm leading-6 text-slate-500">{rowDetails(active === 'vehicles' ? { ...row, owner_name: ownerDirectory.find(owner => String(owner.owner_id) === String(row.owner_id))?.name } : row, active) || 'لا توجد تفاصيل إضافية في السجل الحالي.'}</p></div>
               </div>
               <div className="flex shrink-0 items-center gap-2">{(active === 'drivers' || active === 'vehicles') && <button type="button" onClick={() => active === 'drivers' ? void beginDriverEdit(row) : beginVehicleEdit(row)} aria-label={active === 'drivers' ? 'تعديل بيانات السائق' : 'تعديل بيانات العربية'} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"><Pencil size={14}/> تعديل</button>}
-              {active === 'actual' && row.booking_id && snapshot?.bookings?.find((b: Row) => b.booking_id === row.booking_id)?.status !== 'IN_TRANSIT' && !row.delivery_confirmed_at && row.actual_weight == null && <button type="button" onClick={async () => {
+              {active === 'actual' && row.booking_id && !['CANCELLED', 'DELIVERED', 'COMPLETED'].includes(snapshot?.bookings?.find((b: Row) => b.booking_id === row.booking_id)?.status) && !row.delivery_confirmed_at && row.actual_weight == null && <button type="button" onClick={async () => {
                 const reason = window.prompt('اكتب سبب إلغاء النقلة:');
                 if (!reason?.trim()) return;
                 const vehicleOut = window.confirm('هل العربية فيها عطل أو لازم تفضل خارج الخدمة؟ اضغط موافق لو خارج الخدمة، أو إلغاء لو ترجع لقائمة الانتظار.');
@@ -444,7 +444,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
                   await load();
                 } catch (e: any) { setError(e?.message || 'تعذر إلغاء النقلة.'); }
               }} className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-700">إلغاء النقلة</button>}
-              {active === 'actual' && row.booking_id && !row.delivery_confirmed_at && <button type="button" onClick={async () => {
+              {active === 'actual' && row.booking_id && snapshot?.bookings?.find((b: Row) => b.booking_id === row.booking_id)?.status !== 'CANCELLED' && <button type="button" onClick={async () => {
                 const factories = snapshot?.factories ?? [];
                 const options = factories.map((f: Row) => `${f.name} [${f.factory_id}]`).join('\n');
                 const chosen = window.prompt('اكتب معرّف المصنع الجديد كما هو ظاهر بين الأقواس:\n' + options, '');
@@ -458,7 +458,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
                   const { data, error: rpcError } = await supabase.rpc('office_redirect_booking', { p_booking_id: row.booking_id, p_factory_id: match[1], p_reason: reason.trim() });
                   if (rpcError) throw rpcError;
                   if (!data?.success) throw new Error('تعذر تأكيد إعادة توجيه النقلة.');
-                  setSuccess('تم تغيير وجهة النقلة إلى المصنع الجديد. الحسابات هتعتمد الوجهة النهائية فقط.');
+                  setSuccess(row.delivery_confirmed_at || row.actual_weight != null || ['DELIVERED', 'COMPLETED'].includes(snapshot?.bookings?.find((b: Row) => b.booking_id === row.booking_id)?.status) ? 'تم تصحيح وجهة نقلة لها وزن/تسليم مسجل. احتفظ النظام ببيانات الوزن والتسليم وسجل الوجهة السابقة والجديدة وسبب التصحيح.' : 'تم تغيير وجهة النقلة إلى المصنع الجديد، مع حفظ سبب التوجيه وسجل الوجهة السابقة والجديدة.');
                   await load();
                 } catch (e: any) { setError(e?.message || 'تعذر إعادة توجيه النقلة.'); }
               }} className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-800">إعادة توجيه</button>}<span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-500">#{index + 1}</span></div></div>
