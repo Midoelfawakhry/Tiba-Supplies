@@ -55,7 +55,7 @@ SET last_number = GREATEST(public.daily_trip_counters.last_number, EXCLUDED.last
 
 -- Daily Loading Data number is independent of assignment sequence.
 WITH numbered AS (
-  SELECT alr.actual_load_id,
+  SELECT alr.actual_load_id, alr.booking_id,
     COALESCE(alr.load_date, alr.created_at::date, CURRENT_DATE) AS sequence_date,
     row_number() OVER (
       PARTITION BY COALESCE(alr.load_date, alr.created_at::date, CURRENT_DATE)
@@ -68,7 +68,7 @@ SET loading_sequence_date = n.sequence_date,
     daily_load_number = n.day_number,
     trip_code = COALESCE(b.trip_code, format('TIBA-%s-%s', to_char(n.sequence_date, 'YYYYMMDD'), lpad(n.day_number::text, 6, '0')))
 FROM numbered n
-LEFT JOIN public.bookings b ON b.booking_id = (SELECT x.booking_id FROM public.actual_loading_records x WHERE x.actual_load_id = n.actual_load_id)
+LEFT JOIN public.bookings b ON b.booking_id = n.booking_id
 WHERE alr.actual_load_id = n.actual_load_id
   AND (alr.trip_code IS NULL OR alr.daily_load_number IS NULL OR alr.loading_sequence_date IS NULL);
 
