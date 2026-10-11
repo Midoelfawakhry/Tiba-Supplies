@@ -18,6 +18,7 @@ on:
       - fix/tiba-production-supabase-apk
       - phase2-driver-app-foundation
       - feature/driver-phone-password-access
+      - phase1-direct-assignment-acceptance
     paths:
       - 'src/**'
       - 'index.html'

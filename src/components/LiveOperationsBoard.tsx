@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { VehicleTrackingScreen } from './VehicleTrackingScreen';
 import { OfficeDirectoryScreen } from './OfficeDirectoryScreen';
 import { DirectLoadAssignmentScreen } from './DirectLoadAssignmentScreen';
+import { VehicleOwnerReportsScreen } from './VehicleOwnerReportsScreen';
 import { getLiveSnapshot, LiveSnapshot, liveName } from '../services/liveData';
 
 const statusLabel: Record<string, string> = {
@@ -13,7 +14,7 @@ const statusLabel: Record<string, string> = {
   CANCELLED: 'ملغي',
 };
 
-type OfficeScreen = 'dashboard' | 'tracking' | 'directory' | 'direct' | 'drivers' | 'vehicles' | 'waiting' | 'orders' | 'actual' | 'factories' | 'quarries';
+type OfficeScreen = 'dashboard' | 'tracking' | 'directory' | 'direct' | 'drivers' | 'vehicles' | 'waiting' | 'orders' | 'actual' | 'factories' | 'quarries' | 'vehicleReports';
 const screenPalette: Record<OfficeScreen, { selected: string; wash: string }> = {
   dashboard: { selected: 'bg-teal-600 hover:bg-teal-700', wash: 'bg-teal-50/40' },
   drivers: { selected: 'bg-red-600 hover:bg-red-700', wash: 'bg-red-50/50' },
@@ -23,6 +24,7 @@ const screenPalette: Record<OfficeScreen, { selected: string; wash: string }> = 
   actual: { selected: 'bg-emerald-600 hover:bg-emerald-700', wash: 'bg-emerald-50/50' },
   factories: { selected: 'bg-sky-600 hover:bg-sky-700', wash: 'bg-sky-50/50' },
   quarries: { selected: 'bg-amber-600 hover:bg-amber-700', wash: 'bg-amber-50/50' },
+  vehicleReports: { selected: 'bg-sky-700 hover:bg-sky-800', wash: 'bg-sky-50/50' },
   tracking: { selected: 'bg-cyan-600 hover:bg-cyan-700', wash: 'bg-cyan-50/50' },
   directory: { selected: 'bg-indigo-600 hover:bg-indigo-700', wash: 'bg-indigo-50/50' },
   direct: { selected: 'bg-fuchsia-600 hover:bg-fuchsia-700', wash: 'bg-fuchsia-50/50' },
@@ -38,7 +40,7 @@ export const LiveOperationsBoard: React.FC = () => {
   const [priority, setPriority] = useState('3');
   const [savingOrder, setSavingOrder] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-  const [activeScreen, setActiveScreen] = useState<'dashboard' | 'tracking' | 'directory' | 'direct' | 'drivers' | 'vehicles' | 'waiting' | 'orders' | 'actual' | 'factories' | 'quarries'>('dashboard');
+  const [activeScreen, setActiveScreen] = useState<'dashboard' | 'tracking' | 'directory' | 'direct' | 'drivers' | 'vehicles' | 'waiting' | 'orders' | 'actual' | 'factories' | 'quarries' | 'vehicleReports'>('dashboard');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -115,10 +117,10 @@ export const LiveOperationsBoard: React.FC = () => {
 
   return (
     <div dir="rtl" className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="relative sm:sticky sm:top-0 z-20 border-b border-slate-200 bg-white shadow-sm">
+      <header className="relative sm:sticky sm:top-0 z-20 border-b border-slate-200 bg-white/95 shadow-sm shadow-slate-900/5 backdrop-blur">
         <div className="max-w-7xl mx-auto px-4 sm:px-5 py-3 sm:py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="min-w-0 w-full sm:w-auto">
-            <div className="text-[10px] leading-4 sm:text-xs font-black tracking-wide text-blue-700 whitespace-normal break-words">TIBA SUPPLIES · LIVE CORE</div>
+            <div className="inline-flex items-center gap-2 text-[10px] leading-4 sm:text-xs font-black tracking-wide text-teal-700 whitespace-normal break-words"><span className="grid h-7 w-7 place-items-center rounded-lg bg-teal-50"><Truck className="h-4 w-4" /></span>TIBA SUPPLIES · LIVE CORE</div>
             <h1 className="text-lg leading-7 sm:text-xl lg:text-2xl font-black break-words">مركز تشغيل طيبة للتوريدات</h1>
             <div className="text-xs sm:text-sm leading-5 text-slate-500 mt-1 break-words">
               <MapPin className="inline h-3 w-3 ml-1" />
@@ -141,9 +143,9 @@ export const LiveOperationsBoard: React.FC = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-5 py-6 space-y-5">
-        {error && <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">خطأ: {error}</div>}
+        {error && <div className="rounded-2xl border border-red-500/30 bg-red-50 p-4 text-sm text-red-800">خطأ: {error}</div>}
 
-        {successMessage && <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-700">{successMessage}</div>}
+        {successMessage && <div className="rounded-2xl border border-emerald-500/30 bg-emerald-50 p-4 text-sm text-emerald-800">{successMessage}</div>}
 
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
           <aside className="w-full shrink-0 rounded-3xl border border-slate-200 bg-white p-3 shadow-sm lg:sticky lg:top-28 lg:w-64" aria-label="القائمة الرئيسية للمكتب">
@@ -157,6 +159,7 @@ export const LiveOperationsBoard: React.FC = () => {
                 ['dashboard', 'مركز التشغيل', ClipboardList],
                 ['drivers', 'قائمة السائقين', Users],
                 ['vehicles', 'كل العربيات', Truck],
+                ['vehicleReports', 'حسابات العربيات والملاك', Users],
                 ['waiting', 'قائمة الانتظار', Clock3],
                 ['orders', 'أوامر التحميل', ClipboardList],
                 ['actual', 'التحميل الفعلي', CheckCircle2],
@@ -176,8 +179,8 @@ export const LiveOperationsBoard: React.FC = () => {
             </nav>
           </aside>
           <section className={`min-w-0 flex-1 space-y-5 rounded-[2rem] p-2 transition-colors sm:p-3 ${screenPalette[activeScreen].wash}`}>
-        {activeScreen === 'tracking' ? <VehicleTrackingScreen /> : activeScreen === 'drivers' ? <OfficeDirectoryScreen initialSection="drivers" showSectionTabs={false} /> : activeScreen === 'vehicles' ? <OfficeDirectoryScreen initialSection="vehicles" showSectionTabs={false} /> : activeScreen === 'waiting' ? <OfficeDirectoryScreen initialSection="waiting" showSectionTabs={false} /> : activeScreen === 'orders' ? <OfficeDirectoryScreen initialSection="loads" showSectionTabs={false} /> : activeScreen === 'actual' ? <OfficeDirectoryScreen initialSection="actual" showSectionTabs={false} /> : activeScreen === 'factories' ? <OfficeDirectoryScreen initialSection="factories" showSectionTabs={false} /> : activeScreen === 'quarries' ? <OfficeDirectoryScreen initialSection="quarries" showSectionTabs={false} /> : activeScreen === 'directory' ? <OfficeDirectoryScreen /> : activeScreen === 'direct' ? <DirectLoadAssignmentScreen /> : <>
-        <section className="rounded-3xl border border-orange-200 bg-white p-5 shadow-sm">
+        {activeScreen === 'vehicleReports' ? <VehicleOwnerReportsScreen /> : activeScreen === 'tracking' ? <VehicleTrackingScreen /> : activeScreen === 'drivers' ? <OfficeDirectoryScreen initialSection="drivers" showSectionTabs={false} /> : activeScreen === 'vehicles' ? <OfficeDirectoryScreen initialSection="vehicles" showSectionTabs={false} /> : activeScreen === 'waiting' ? <OfficeDirectoryScreen initialSection="waiting" showSectionTabs={false} /> : activeScreen === 'orders' ? <OfficeDirectoryScreen initialSection="loads" showSectionTabs={false} /> : activeScreen === 'actual' ? <OfficeDirectoryScreen initialSection="actual" showSectionTabs={false} /> : activeScreen === 'factories' ? <OfficeDirectoryScreen initialSection="factories" showSectionTabs={false} /> : activeScreen === 'quarries' ? <OfficeDirectoryScreen initialSection="quarries" showSectionTabs={false} /> : activeScreen === 'directory' ? <OfficeDirectoryScreen /> : activeScreen === 'direct' ? <DirectLoadAssignmentScreen /> : <>
+        <section className="rounded-3xl border border-orange-200/80 bg-gradient-to-br from-white via-white to-orange-50/70 p-5 shadow-sm shadow-orange-900/5">
           <div className="mb-4">
             <h2 className="text-lg font-black">إنشاء أمر تحميل جديد</h2>
             <p className="mt-1 text-xs text-slate-500">يُنشأ الأمر على مكتب الإسماعيلية ويُوجَّه تسجيل وصول السواقين إلى مكتب رأس سدر.</p>
@@ -226,7 +229,7 @@ export const LiveOperationsBoard: React.FC = () => {
             ['تخصيصات نشطة', counts.activeBookings, CheckCircle2],
             ['السائقون النشطون', data?.drivers.length ?? 0, Users],
           ].map(([label, value, Icon]: any) => (
-            <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4">
+            <div key={label} className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03]">
               <Icon className="h-5 w-5 text-blue-700" />
               <div className="mt-3 text-2xl font-black">{value}</div>
               <div className="text-xs text-slate-500">{label}</div>
@@ -235,7 +238,7 @@ export const LiveOperationsBoard: React.FC = () => {
         </section>
 
         <section className="grid lg:grid-cols-2 gap-5">
-          <div className="rounded-3xl border border-slate-200 bg-white overflow-hidden">
+          <div className="rounded-3xl border border-slate-200/80 bg-white shadow-sm shadow-slate-900/[0.03] overflow-hidden">
             <div className="p-5 border-b border-slate-200">
               <h2 className="font-black text-lg">طلبات التحميل الحقيقية</h2>
               <p className="text-xs text-slate-500 mt-1">مصدرها load_orders في Supabase</p>
@@ -244,7 +247,8 @@ export const LiveOperationsBoard: React.FC = () => {
               {(data?.load_orders ?? []).map(order => {
                 const factory = data?.factories.find(f => f.factory_id === order.factory_id);
                 const quarry = data?.quarries.find(q => q.quarry_id === order.quarry_id);
-                const booked = (data?.bookings ?? []).filter(b => b.load_order_id === order.load_order_id).length;
+                const committedStatuses = ['BOOKED', 'LOADING_STATEMENT', 'IN_TRANSIT', 'DELIVERED', 'COMPLETED'];
+                const booked = (data?.bookings ?? []).filter(b => b.load_order_id === order.load_order_id && committedStatuses.includes(b.status)).length;
                 return (
                   <article key={order.load_order_id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                     <div className="flex justify-between gap-3">
@@ -268,7 +272,7 @@ export const LiveOperationsBoard: React.FC = () => {
           </div>
 
           <div className="space-y-5">
-            <div className="rounded-3xl border border-slate-200 bg-white p-5">
+            <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm shadow-slate-900/[0.03]">
               <h2 className="font-black text-lg">البيانات الرئيسية</h2>
               <div className="grid grid-cols-2 gap-3 mt-4">
                 <div className="rounded-2xl bg-slate-50 p-4"><Factory className="h-5 w-5 text-blue-700" /><b className="block mt-2 text-xl">{data?.factories.length ?? 0}</b><span className="text-xs text-slate-500">مصنع نشط</span></div>

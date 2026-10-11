@@ -14,6 +14,29 @@ type PositionState = {
   capturedAt: string;
 };
 
+const factoryGlyph = (name: string) => {
+  const normalized = name.trim().toLowerCase();
+  if (normalized.includes('إيكوبات') || normalized.includes('ايكوبات') || normalized.includes('ecopat') || normalized.includes('ecobat')) return 'E';
+  if (normalized.includes('مايوف') || normalized.includes('mayof')) return 'M';
+  if (normalized.includes('الدولية') || normalized.includes('الدوليه')) return 'D';
+  return [...name.trim()][0]?.toUpperCase() || 'م';
+};
+
+const quarryColor = (quarryId: string | null | undefined, quarryName: string | null | undefined) => {
+  const palette = [
+    { background: '#27864A', foreground: '#FFFFFF', border: '#176638' },
+    { background: '#D97706', foreground: '#FFFFFF', border: '#A65308' },
+    { background: '#2874C8', foreground: '#FFFFFF', border: '#1E5594' },
+    { background: '#7C4DAD', foreground: '#FFFFFF', border: '#5D3786' },
+    { background: '#C2415D', foreground: '#FFFFFF', border: '#923047' },
+    { background: '#0F8A8D', foreground: '#FFFFFF', border: '#0B6567' },
+  ];
+  const key = quarryId || quarryName || 'unknown-quarry';
+  let hash = 0;
+  for (let index = 0; index < key.length; index += 1) hash = (hash * 31 + key.charCodeAt(index)) >>> 0;
+  return palette[hash % palette.length];
+};
+
 export const DriverApp: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<any>(null);
@@ -27,6 +50,8 @@ export const DriverApp: React.FC = () => {
   const [locating, setLocating] = useState(false);
   const [portal, setPortal] = useState<any>(null);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [pendingDirectAssignments, setPendingDirectAssignments] = useState<any[]>([]);
+  const [acceptingBookingId, setAcceptingBookingId] = useState<string | null>(null);
   const mustChangePassword = session?.user?.app_metadata?.must_change_password === true;
 
   useEffect(() => {
@@ -61,6 +86,15 @@ export const DriverApp: React.FC = () => {
     };
   }, []);
 
+  async function refreshPendingDirectAssignments() {
+    const { data, error: pendingError } = await supabase.rpc('get_pending_direct_assignments');
+    if (pendingError) {
+      setError(pendingError.message || 'تعذر تحميل أوامر الإسناد المباشر.');
+      return;
+    }
+    setPendingDirectAssignments(Array.isArray(data) ? data : []);
+  }
+
   async function refreshPortal() {
     if (!session) return;
     setPortalLoading(true);
@@ -69,8 +103,35 @@ export const DriverApp: React.FC = () => {
       setError(portalError.message || 'تعذر تحميل حالة التشغيل.');
     } else {
       setPortal(data);
+      await refreshPendingDirectAssignments();
     }
     setPortalLoading(false);
+  }
+
+  async function acceptDirectAssignment(bookingId: string) {
+    if (acceptingBookingId) return;
+    setAcceptingBookingId(bookingId);
+    setError('');
+    try {
+      const { data, error: acceptError } = await supabase.rpc('accept_direct_assignment', {
+        p_booking_id: bookingId,
+      });
+      if (acceptError) throw acceptError;
+      if (!data?.success) throw new Error('تعذر تأكيد قبول الإسناد المباشر.');
+      await refreshPortal();
+    } catch (e: any) {
+      const raw = String(e?.message || '');
+      const messages: Record<string, string> = {
+        DIRECT_ASSIGNMENT_NOT_YOURS: 'الأمر ده مش مسند لحسابك.',
+        DIRECT_ASSIGNMENT_NOT_PENDING: 'الأمر لم يعد في انتظار القبول.',
+        DIRECT_ASSIGNMENT_ALREADY_ACCEPTED: 'تم قبول الأمر بالفعل.',
+        DIRECT_ASSIGNMENT_NOT_FOUND: 'أمر الإسناد غير موجود.',
+      };
+      const key = Object.keys(messages).find(k => raw.includes(k));
+      setError(key ? messages[key] : raw || 'تعذر قبول الإسناد المباشر.');
+    } finally {
+      setAcceptingBookingId(null);
+    }
   }
 
   useEffect(() => {
@@ -90,11 +151,27 @@ export const DriverApp: React.FC = () => {
         return;
       }
       setPortal(data);
+      const { data: pendingData } = await supabase.rpc('get_pending_direct_assignments');
+      if (active) setPendingDirectAssignments(Array.isArray(pendingData) ? pendingData : []);
       setError('');
       setDriverAuthorized(true);
     })();
     return () => { active = false; };
   }, [session?.user?.id, mustChangePassword]);
+
+  useEffect(() => {
+    if (!session || !driverAuthorized || mustChangePassword) return;
+    const timer = window.setInterval(() => {
+      void (async () => {
+        const { data, error: portalError } = await supabase.rpc('get_driver_portal_snapshot');
+        if (portalError) return;
+        setPortal(data);
+        const { data: pendingData } = await supabase.rpc('get_pending_direct_assignments');
+        setPendingDirectAssignments(Array.isArray(pendingData) ? pendingData : []);
+      })();
+    }, 15000);
+    return () => window.clearInterval(timer);
+  }, [session?.user?.id, driverAuthorized, mustChangePassword]);
 
   useEffect(() => {
     if (!session || !driverAuthorized || mustChangePassword) return;
@@ -281,14 +358,14 @@ export const DriverApp: React.FC = () => {
   }
 
   if (loading) {
-    return <div dir="rtl" className="grid min-h-screen place-items-center bg-gradient-to-br from-red-50 via-white to-orange-50 p-6 text-slate-800"><div className="rounded-3xl border border-red-100 bg-white/90 px-8 py-9 text-center shadow-lg shadow-red-900/5"><div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-2xl bg-red-100 text-red-700"><Truck size={30}/></div><p className="text-xs font-black tracking-widest text-red-700">TIBA SUPPLIES · DRIVER</p><p className="mt-2 text-lg font-black">جاري تجهيز تطبيق السائق</p><div className="mx-auto mt-5 h-1.5 w-40 overflow-hidden rounded-full bg-red-100"><div className="h-full w-1/2 animate-pulse rounded-full bg-red-600"/></div></div></div>;
+    return <div dir="rtl" className="grid min-h-screen place-items-center bg-gradient-to-br from-red-50 via-white to-orange-50 p-6 text-slate-800"><div className="rounded-3xl border border-red-100 bg-white/90 px-8 py-9 text-center shadow-lg shadow-red-900/5"><div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-2xl bg-red-100 text-sky-700"><Truck size={30}/></div><p className="text-xs font-black tracking-widest text-red-700">TIBA SUPPLIES · DRIVER</p><p className="mt-2 text-lg font-black">جاري تجهيز تطبيق السائق</p><div className="mx-auto mt-5 h-1.5 w-40 overflow-hidden rounded-full bg-red-100"><div className="h-full w-1/2 animate-pulse rounded-full bg-red-600"/></div></div></div>;
   }
 
   if (!session) {
     return (
       <main dir="rtl" className="min-h-screen bg-rose-50/70 p-5 flex items-center justify-center">
         <form onSubmit={signIn} className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-7 shadow-sm">
-          <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-red-700"><Truck size={28} /></div>
+          <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-100 text-sky-800"><Truck size={28} /></div>
           <p className="text-xs font-black tracking-widest text-red-700">TIBA SUPPLIES · DRIVER</p>
           <h1 className="mt-2 text-2xl font-black text-slate-900">دخول السائق</h1>
           <p className="mt-2 text-sm leading-6 text-slate-500">استخدم رقم الموبايل وكلمة المرور التي استلمتها من المكتب.</p>
@@ -297,7 +374,7 @@ export const DriverApp: React.FC = () => {
           <input value={phone} onChange={e => setPhone(e.target.value)} type="tel" inputMode="tel" autoComplete="tel" required className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-slate-900 outline-none focus:border-red-500" />
           <label className="mt-4 block text-sm font-bold text-slate-700">كلمة المرور</label>
           <input value={password} onChange={e => setPassword(e.target.value)} type="password" autoComplete="current-password" required className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-slate-900 outline-none focus:border-red-500" />
-          <button disabled={authBusy} className="mt-5 w-full rounded-xl bg-red-600 p-3 font-black text-white transition hover:bg-red-700 disabled:opacity-60">{authBusy ? 'جارٍ الدخول...' : 'دخول'}</button>
+          <button disabled={authBusy} className="mt-5 w-full rounded-xl bg-gradient-to-l from-sky-700 to-teal-600 p-3 font-black text-white shadow-sm transition hover:from-sky-800 hover:to-teal-700 disabled:opacity-60">{authBusy ? 'جارٍ الدخول...' : 'دخول'}</button>
         </form>
       </main>
     );
@@ -323,13 +400,13 @@ export const DriverApp: React.FC = () => {
   }
 
   if (!driverAuthorized) {
-    return <div dir="rtl" className="min-h-screen grid place-items-center bg-rose-50/70 text-slate-700">جاري التحقق من حساب السائق...</div>;
+    return <div dir="rtl" className="min-h-screen grid place-items-center bg-gradient-to-br from-sky-50 via-white to-emerald-50 text-slate-700">جاري التحقق من حساب السائق...</div>;
   }
 
 
   return (
-    <main dir="rtl" className="min-h-screen bg-rose-50/70 text-slate-900">
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95">
+    <main dir="rtl" className="min-h-screen bg-gradient-to-b from-sky-50 via-slate-50 to-emerald-50/40 text-slate-900">
+      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur">
         <div className="mx-auto flex max-w-xl items-center justify-between px-4 py-4">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-red-50 text-red-700"><Truck size={23} /></div>
@@ -339,20 +416,20 @@ export const DriverApp: React.FC = () => {
         </div>
       </header>
       <div className="mx-auto max-w-xl space-y-4 p-4 pb-10">
-        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <section className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm shadow-slate-900/[0.04]">
           <div className="flex items-start justify-between gap-3">
             <div><p className="text-sm text-slate-500">أهلًا بك</p><h2 className="mt-1 break-all text-lg font-black">{session.user?.phone}</h2></div>
             <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">متصل</span>
           </div>
           <div className="mt-5 grid grid-cols-2 gap-3">
-            <div className="rounded-2xl bg-rose-50/70 p-4"><MapPin className="mb-2 text-red-700" size={21}/><p className="text-xs text-slate-500">مكتب تسجيل الوصول</p><p className="mt-1 font-black">رأس سدر</p></div>
+            <div className="rounded-2xl bg-gradient-to-br from-sky-50 to-white p-4 ring-1 ring-sky-100"><MapPin className="mb-2 text-red-700" size={21}/><p className="text-xs text-slate-500">مكتب تسجيل الوصول</p><p className="mt-1 font-black">رأس سدر</p></div>
             <div className="rounded-2xl bg-rose-50/70 p-4"><Navigation className="mb-2 text-red-700" size={21}/><p className="text-xs text-slate-500">نطاق الوصول</p><p className="mt-1 font-black">10 كم</p></div>
           </div>
         </section>
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center gap-2"><ShieldCheck className="text-red-700" size={22}/><h2 className="font-black">تسجيل الوصول</h2></div>
           <p className="mt-2 text-sm leading-6 text-slate-600">مشاركة الموقع تعمل تلقائيًا بعد تسجيل الدخول. اضغط الزر لفحص موقعك ومعرفة هل أنت داخل نطاق 10 كم من مكتب رأس سدر.</p>
-          <button onClick={captureLocation} disabled={locating} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 p-4 font-black text-white transition hover:bg-red-700 disabled:opacity-60">
+          <button onClick={captureLocation} disabled={locating} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-l from-sky-700 to-teal-600 p-4 font-black text-white shadow-md shadow-sky-900/15 transition hover:from-sky-800 hover:to-teal-700 disabled:opacity-60">
             <MapPin size={20}/>{locating ? 'جاري فحص الموقع...' : 'أنا وصلت — فحص الموقع'}
           </button>
           {error && <div role="alert" className="mt-4 flex gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"><CircleAlert className="shrink-0" size={18}/><span>{error}</span></div>}
@@ -365,6 +442,23 @@ export const DriverApp: React.FC = () => {
           </div>}
           {error && <div role="alert" className="mt-4 flex gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"><CircleAlert className="shrink-0" size={18}/><span>{error}</span></div>}
         </section>
+        <section className="rounded-3xl border border-amber-300 bg-amber-50 p-5 shadow-sm">
+          <div className="flex items-center gap-2"><FileText className="text-amber-800" size={22}/><h2 className="font-black">إسناد مباشر — في انتظار قبولك</h2></div>
+          <p className="mt-2 text-sm leading-6 text-amber-900">الأوامر دي اتسندت لك مباشرة من المكتب، ومش محتاجة دخول قائمة الانتظار. النقلة مش هتبدأ في بيان التحميل غير بعد ما تضغط «قبول الإسناد».</p>
+          {pendingDirectAssignments.length ? <div className="mt-4 space-y-3">{pendingDirectAssignments.map((assignment: any) => <article key={assignment.booking_id} className="rounded-2xl border border-amber-200 bg-white p-4">
+            <div className="flex items-start gap-3"><div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-amber-100 text-xl font-black text-amber-900">{factoryGlyph(String(assignment.factory_name || 'م'))}</div><div className="min-w-0 flex-1"><h3 className="font-black">{assignment.factory_name || 'مصنع غير محدد'}</h3><p className="mt-1 text-sm text-slate-600">المحجر: {assignment.quarry_name || 'غير محدد'}</p><p className="mt-1 text-xs text-slate-400">رقم الأمر: {String(assignment.booking_id).slice(0, 8)} · {assignment.assigned_at ? new Date(assignment.assigned_at).toLocaleString('ar-EG') : ''}</p></div></div>
+            <button type="button" onClick={() => void acceptDirectAssignment(assignment.booking_id)} disabled={acceptingBookingId !== null} className="mt-4 w-full rounded-xl bg-emerald-700 p-3 font-black text-white disabled:opacity-60">{acceptingBookingId === assignment.booking_id ? 'جارٍ تأكيد القبول...' : 'قبول الإسناد وبدء بيان التحميل'}</button>
+          </article>)}</div> : <p className="mt-3 rounded-xl bg-white/80 p-3 text-sm text-slate-600">مفيش أوامر مباشرة معلّقة حاليًا.</p>}
+        </section>
+        {(portal?.my_bookings || []).filter((booking: any) => booking.is_direct_assignment && booking.status !== 'BOOKED' && ['LOADING_STATEMENT', 'IN_TRANSIT'].includes(booking.status)).length > 0 && <section className="rounded-3xl border border-emerald-300 bg-emerald-50 p-5 shadow-sm">
+          <div className="flex items-center gap-2"><Truck className="text-emerald-800" size={22}/><h2 className="font-black">نقلات الإسناد المباشر النشطة</h2></div>
+          <p className="mt-2 text-sm leading-6 text-emerald-900">تم قبول الإسناد، والنقلة أصبحت ضمن التشغيل. ظهورها هنا لا يعتمد على بقاء موقعك داخل نطاق مكتب رأس سدر.</p>
+          <div className="mt-3 space-y-3">{portal.my_bookings.filter((booking: any) => booking.is_direct_assignment && booking.status !== 'BOOKED' && ['LOADING_STATEMENT', 'IN_TRANSIT'].includes(booking.status)).map((booking: any) => <article key={booking.booking_id} className="rounded-2xl border border-emerald-200 bg-white p-4">
+            <div className="font-black">{booking.factory_name} ← {booking.quarry_name}</div>
+            <p className="mt-2 text-sm text-slate-600">الحالة: {booking.status === 'LOADING_STATEMENT' ? 'بيان تحميل' : 'في الطريق'}</p>
+            <p className="mt-1 text-xs text-slate-400">رقم النقلة: {String(booking.booking_id).slice(0, 8)}</p>
+          </article>)}</div>
+        </section>}
         {!portal?.inside_geofence ? (
           <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-center gap-2"><ShieldCheck className="text-red-700" size={22}/><h2 className="font-black">الخدمات داخل نطاق المكتب</h2></div>
@@ -384,7 +478,7 @@ export const DriverApp: React.FC = () => {
             </section>
             <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-center gap-2"><Truck className="text-red-700" size={22}/><h2 className="font-black">الحمولات المتاحة</h2></div>
-              {(portal.available_loads || []).length ? <div className="mt-4 space-y-3">{portal.available_loads.map((load: any) => <div key={load.load_order_id} className="rounded-2xl border border-slate-200 p-4"><div className="font-black">{load.factory_name || 'مصنع غير محدد'} <span className="text-slate-400">←</span> {load.quarry_name || 'محجر غير محدد'}</div><p className="mt-2 text-sm text-slate-600">المتبقي: {load.remaining_quantity} نقلة</p><p className="mt-1 text-xs text-slate-400">أمر: {String(load.load_order_id).slice(0, 8)}</p></div>)}</div> : <p className="mt-2 text-sm leading-7 text-slate-500">لا توجد حمولات متاحة حاليًا.</p>}
+              {(portal.available_loads || []).length ? <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">{portal.available_loads.map((load: any) => { const factoryName = String(load.factory_name || 'مصنع غير محدد'); const quarryName = String(load.quarry_name || 'محجر غير محدد'); const color = quarryColor(load.quarry_id, quarryName); return <article key={load.load_order_id} className="rounded-2xl border border-slate-200 bg-white p-3 text-center shadow-sm"><div aria-label={factoryName + ' — ' + quarryName} className="mx-auto grid h-16 w-16 place-items-center rounded-2xl border-2 text-2xl font-black shadow-sm" style={{ backgroundColor: color.background, color: color.foreground, borderColor: color.border }}>{factoryGlyph(factoryName)}</div><h3 className="mt-3 font-black leading-6">{factoryName}</h3><p className="mt-1 text-sm font-bold text-slate-600">{quarryName}</p><p className="mt-3 rounded-xl bg-slate-50 px-2 py-2 text-xs text-slate-600">المتبقي: <strong>{load.remaining_quantity}</strong> نقلة</p><p className="mt-2 text-[11px] text-slate-400">أمر: {String(load.load_order_id).slice(0, 8)}</p></article>; })}</div> : <p className="mt-2 text-sm leading-7 text-slate-500">لا توجد حمولات متاحة حاليًا.</p>}
             </section>
             <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-center gap-2"><FileText className="text-red-700" size={22}/><h2 className="font-black">أوامرك السابقة</h2></div>
