@@ -49,7 +49,7 @@ export const SystemAiAssistant: React.FC<SystemAiAssistantProps> = ({ audience, 
           question: clean,
           audience,
           context: safeContext,
-          history: next.slice(-8).map(message => ({ role: message.role, content: message.content })),
+          history: next.slice(0, -1).slice(-8).map(message => ({ role: message.role, content: message.content })),
         },
       });
       if (invokeError) throw invokeError;
