@@ -450,6 +450,15 @@ export const DriverApp: React.FC = () => {
             <button type="button" onClick={() => void acceptDirectAssignment(assignment.booking_id)} disabled={acceptingBookingId !== null} className="mt-4 w-full rounded-xl bg-emerald-700 p-3 font-black text-white disabled:opacity-60">{acceptingBookingId === assignment.booking_id ? 'جارٍ تأكيد القبول...' : 'قبول الإسناد وبدء بيان التحميل'}</button>
           </article>)}</div> : <p className="mt-3 rounded-xl bg-white/80 p-3 text-sm text-slate-600">مفيش أوامر مباشرة معلّقة حاليًا.</p>}
         </section>
+        {(portal?.my_bookings || []).filter((booking: any) => booking.is_direct_assignment && booking.status !== 'BOOKED' && ['LOADING_STATEMENT', 'IN_TRANSIT'].includes(booking.status)).length > 0 && <section className="rounded-3xl border border-emerald-300 bg-emerald-50 p-5 shadow-sm">
+          <div className="flex items-center gap-2"><Truck className="text-emerald-800" size={22}/><h2 className="font-black">نقلات الإسناد المباشر النشطة</h2></div>
+          <p className="mt-2 text-sm leading-6 text-emerald-900">تم قبول الإسناد، والنقلة أصبحت ضمن التشغيل. ظهورها هنا لا يعتمد على بقاء موقعك داخل نطاق مكتب رأس سدر.</p>
+          <div className="mt-3 space-y-3">{portal.my_bookings.filter((booking: any) => booking.is_direct_assignment && booking.status !== 'BOOKED' && ['LOADING_STATEMENT', 'IN_TRANSIT'].includes(booking.status)).map((booking: any) => <article key={booking.booking_id} className="rounded-2xl border border-emerald-200 bg-white p-4">
+            <div className="font-black">{booking.factory_name} ← {booking.quarry_name}</div>
+            <p className="mt-2 text-sm text-slate-600">الحالة: {booking.status === 'LOADING_STATEMENT' ? 'بيان تحميل' : 'في الطريق'}</p>
+            <p className="mt-1 text-xs text-slate-400">رقم النقلة: {String(booking.booking_id).slice(0, 8)}</p>
+          </article>)}</div>
+        </section>}
         {!portal?.inside_geofence ? (
           <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-center gap-2"><ShieldCheck className="text-red-700" size={22}/><h2 className="font-black">الخدمات داخل نطاق المكتب</h2></div>
