@@ -175,12 +175,15 @@ BEGIN
         FROM public.actual_loading_records alr
         JOIN public.bookings b ON b.booking_id = alr.booking_id
         LEFT JOIN public.load_orders lo ON lo.load_order_id = b.load_order_id
+        LEFT JOIN public.standalone_direct_load_audit sda ON sda.booking_id = b.booking_id
         LEFT JOIN public.drivers d ON d.driver_id = alr.driver_id
         LEFT JOIN public.vehicles v ON v.vehicle_id = alr.vehicle_id
         LEFT JOIN public.factories f ON f.factory_id = alr.factory_id
         LEFT JOIN public.quarries q ON q.quarry_id = alr.quarry_id
-        WHERE lo.office_id = v_head_office_id
-          AND lo.check_in_office_id = v_branch_office_id
+        WHERE (
+          (lo.office_id = v_head_office_id AND lo.check_in_office_id = v_branch_office_id)
+          OR (lo.load_order_id IS NULL AND sda.office_id = v_branch_office_id)
+        )
           AND alr.load_date >= CURRENT_DATE - 89
         ORDER BY alr.created_at DESC
         LIMIT 500
@@ -236,14 +239,17 @@ BEGIN
           ) AS item
         FROM public.bookings b
         LEFT JOIN public.load_orders lo ON lo.load_order_id = b.load_order_id
+        LEFT JOIN public.standalone_direct_load_audit sda ON sda.booking_id = b.booking_id
         JOIN public.drivers d ON d.driver_id = b.driver_id
         JOIN public.vehicles v ON v.vehicle_id = b.vehicle_id
         LEFT JOIN public.vehicle_owners vo ON vo.owner_id = v.owner_id
-        JOIN public.factories f ON f.factory_id = lo.factory_id
-        JOIN public.quarries q ON q.quarry_id = lo.quarry_id
+        JOIN public.factories f ON f.factory_id = COALESCE(lo.factory_id, sda.factory_id)
+        JOIN public.quarries q ON q.quarry_id = COALESCE(lo.quarry_id, sda.quarry_id)
         LEFT JOIN public.actual_loading_records alr ON alr.booking_id = b.booking_id
-        WHERE lo.office_id = v_head_office_id
-          AND lo.check_in_office_id = v_branch_office_id
+        WHERE (
+          (lo.office_id = v_head_office_id AND lo.check_in_office_id = v_branch_office_id)
+          OR (lo.load_order_id IS NULL AND sda.office_id = v_branch_office_id)
+        )
           AND b.status NOT IN ('CANCELLED','REJECTED','NO_SHOW','FAILED')
         ORDER BY b.booked_at DESC
         LIMIT 300
