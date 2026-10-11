@@ -30,7 +30,7 @@ BEGIN
 
   SELECT * INTO v_booking FROM public.bookings WHERE booking_id=p_booking_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'BOOKING_NOT_FOUND'; END IF;
-  IF v_booking.status NOT IN ('BOOKED','LOADING_STATEMENT','IN_TRANSIT') THEN
+  IF v_booking.status NOT IN ('BOOKED','LOADING_STATEMENT') THEN
     RAISE EXCEPTION 'TRIP_NOT_ACTIVE';
   END IF;
 
@@ -42,7 +42,9 @@ BEGIN
 
   SELECT * INTO v_actual FROM public.actual_loading_records WHERE booking_id=p_booking_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'ACTUAL_LOAD_RECORD_NOT_FOUND'; END IF;
-  IF v_actual.delivery_confirmed_at IS NOT NULL THEN RAISE EXCEPTION 'TRIP_ALREADY_DELIVERED'; END IF;
+  IF v_actual.delivery_confirmed_at IS NOT NULL OR v_actual.actual_weight IS NOT NULL THEN
+    RAISE EXCEPTION 'ACTUAL_DELIVERY_ALREADY_RECORDED';
+  END IF;
   IF v_booking.load_order_id IS NOT NULL THEN
     SELECT * INTO v_order FROM public.load_orders
     WHERE load_order_id=v_booking.load_order_id FOR UPDATE;
