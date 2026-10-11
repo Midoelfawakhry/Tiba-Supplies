@@ -7,10 +7,10 @@ Keep the Tiba-Supplies application code, SQL migration files, and the live Supab
 ## Current baseline (read-only audit, 2026-10-11)
 
 - Supabase project: `tnlcvwtphbunteifoonc`; project health was reported as active/healthy.
-- The production migration registry currently ends at version `20261011105953` (`account_statement_records_head_only`).
-- The repository contains legacy/non-standard migration filenames and some migration effects were recorded in Supabase under different version/name pairs. Therefore, a filename-only comparison must not be treated as a complete list of unapplied migrations.
-- A duplicate 14-digit migration version was found for the HEAD redirect migration. The repository change renames that file to `20261011153000_head_owned_booking_redirect.sql`, immediately after `20261011152000_cancel_in_transit_redirect_delivered.sql`.
-- Confirmed production gaps from the read-only audit include the trip identity columns/counter triggers and the dedicated branch snapshot/employee directory RPCs. Verify live schema and function definitions before deciding what to apply.
+- The production migration registry was extended after the reviewed rollout. The newly applied migrations were recorded by Supabase with versions `20261011125635`, `20261011125637`, `20261011125640`, `20261011125643`, `20261011125645`, `20261011125650`, `20261011125652`, and `20261011125655`.
+- The applied migrations are being normalized to local filenames whose 14-digit version prefixes match the actual Supabase migration registry. Their suffix retains the original reviewed migration filename so the audit trail remains traceable. Older legacy/non-standard filenames still need a separate baseline reconciliation.
+- The HEAD redirect migration was given a unique version and aligned to the version recorded by Supabase; it reasserts the corrected redirect implementation after the cancellation/redirect rules migration.
+- The branch snapshot/employee RPCs and trip identity columns/counter triggers have now been applied and verified in production. A read-only database regression check confirmed role gates and branch-scoped direct assignments; full end-to-end app testing is still required.
 
 ## Safety boundary
 
@@ -23,12 +23,11 @@ Keep the Tiba-Supplies application code, SQL migration files, and the live Supab
 
 ## Required rollout sequence
 
-1. Reconcile legacy migration filenames and the production migration registry by matching actual SQL effects and function definitions—not filenames alone.
-2. Replay the normalized migration set against an isolated disposable PostgreSQL/Supabase test environment and run SQL/security tests.
+1. Continue reconciling older legacy migration filenames and the production migration registry by matching actual SQL effects and function definitions—not filenames alone.
+2. Replay the normalized migration set against an isolated disposable PostgreSQL/Supabase test environment and run full SQL/security tests.
 3. Deploy required Edge Functions only after their database dependencies exist.
-4. Apply only the reviewed, ordered migrations to production after the migration plan and expected impact are clear.
-5. Verify migration history, expected columns/functions, role gates, Supabase security/performance advisors, and the app's RPC calls after deployment.
-6. Build and test the office, driver, and branch apps against the resulting schema before distributing accounts or production APKs.
+4. Verify migration history, expected columns/functions, role gates, Supabase security/performance advisors, and the app's RPC calls after deployment.
+5. Build and test the office, driver, and branch apps against the resulting schema before distributing accounts or production APKs.
 
 ## Migration integrity CI
 
