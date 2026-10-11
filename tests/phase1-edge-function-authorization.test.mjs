@@ -12,6 +12,23 @@ const branchSource = await readFile(
   "utf8",
 );
 
+const aiFunctionSource = await readFile(
+  new URL("../supabase/functions/tiba-ai-assistant/index.ts", import.meta.url),
+  "utf8",
+);
+const aiUiSource = await readFile(
+  new URL("../src/components/SystemAiAssistant.tsx", import.meta.url),
+  "utf8",
+);
+const officeUiSource = await readFile(
+  new URL("../src/components/LiveOperationsBoard.tsx", import.meta.url),
+  "utf8",
+);
+const branchUiSource = await readFile(
+  new URL("../src/components/BranchOfficeApp.tsx", import.meta.url),
+  "utf8",
+);
+
 test("driver account creation is restricted to ADMIN and HEAD_OFFICE", () => {
   const match = source.match(
     /const allowed = \(roleLinks \?\? \[\]\)\.some\(\(link: any\) =>\s*\[([^\]]+)\]\.includes\(link\.roles\?\.name\)\s*\);/s,
@@ -66,4 +83,29 @@ test("branch employee creation validates identity, credentials, and exactly one 
   assert.match(branchSource, /EXPECTED_ONE_ACTIVE_BRANCH_OFFICE/);
   assert.match(branchSource, /username \+ "@tiba-supplies\.invalid"/);
   assert.match(branchSource, /app_metadata: \{ app_role: "BRANCH" \}/);
+});
+
+test("Tiba AI assistant requires an authenticated active profile and checks role per interface", () => {
+  assert.match(aiFunctionSource, /callerClient\.auth\.getUser\(token\)/);
+  assert.match(aiFunctionSource, /\.from\("app_users"\)[\s\S]*?\.eq\("is_active", true\)/);
+  assert.match(aiFunctionSource, /audience === "HEAD_OFFICE"[\s\S]*?\["ADMIN", "HEAD_OFFICE"\]/);
+  assert.match(aiFunctionSource, /audience === "BRANCH"[\s\S]*?roles\.includes\("BRANCH"\)/);
+  assert.match(aiFunctionSource, /\.eq\("office_id", profile\.office_id\)[\s\S]*?\.eq\("office_type", "BRANCH"\)[\s\S]*?\.eq\("is_active", true\)/);
+  assert.match(aiFunctionSource, /GEMINI_API_KEY/);
+  assert.match(aiFunctionSource, /contextText\.length > 12000/);
+  assert.match(aiFunctionSource, /question\.length > 1200/);
+});
+
+test("AI key stays server-side and assistant is advisory-only", () => {
+  assert.match(aiFunctionSource, /Deno\.env\.get\("GEMINI_API_KEY"\)/);
+  assert.doesNotMatch(aiUiSource, /GEMINI_API_KEY|generativelanguage\.googleapis\.com/);
+  assert.match(aiFunctionSource, /لا تنفذ أي إجراء/);
+  assert.match(aiFunctionSource, /لا تقترح تنفيذ تعديلات أو إسناد أو إلغاء من حساب الفرع/);
+});
+
+test("both office interfaces expose the shared AI assistant with separate role contexts", () => {
+  assert.match(officeUiSource, /SystemAiAssistant audience="HEAD_OFFICE"/);
+  assert.match(officeUiSource, /\['assistant', 'مساعد النظام AI', Bot\]/);
+  assert.match(branchUiSource, /SystemAiAssistant audience="BRANCH"/);
+  assert.match(branchUiSource, /key:'assistant',label:'مساعد النظام AI'/);
 });
