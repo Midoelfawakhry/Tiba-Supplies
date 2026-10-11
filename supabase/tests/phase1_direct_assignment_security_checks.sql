@@ -94,8 +94,7 @@ BEGIN
 
   -- Redirect must reject BRANCH and validate the booking's HEAD ownership.
   SELECT pg_get_functiondef(to_regprocedure('public.office_redirect_booking(uuid,uuid,text)')) INTO v_def;
-     OR upper(v_def) ~ $$R\.NAME\s+IN\s*\([^)]*'BRANCH'$$
-     OR upper(v_def) ~ $$R\.NAME\s*=\s*'BRANCH'$$
+  IF position('BRANCH' in upper(v_def)) > 0
      OR position('LOAD_NOT_OWNED_BY_HEAD_OFFICE' in upper(v_def)) = 0
      OR position('DIRECT_ASSIGNMENT_NOT_OWNED_BY_HEAD_OFFICE' in upper(v_def)) = 0 THEN
     RAISE EXCEPTION 'REDIRECT_MUST_BE_HEAD_ONLY_AND_CHECK_OWNERSHIP';
