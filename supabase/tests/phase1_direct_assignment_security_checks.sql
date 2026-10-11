@@ -4,7 +4,6 @@
 
 DO $checks$
 DECLARE
-  v_name text;
   v_def text;
   v_sig text;
   v_required text[] := ARRAY[
@@ -50,22 +49,24 @@ BEGIN
     'public.accept_direct_assignment(uuid)'
   )) INTO v_def;
   IF position('FOR UPDATE' in upper(v_def)) = 0
-     OR position('DIRECT_ASSIGNMENT_NOT_YOURS' in v_def) = 0
+     OR position('DIRECT_ASSIGNMENT_NOT_YOURS' in upper(v_def)) = 0
      OR position('INSERT INTO PUBLIC.ACTUAL_LOADING_RECORDS' in upper(v_def)) = 0
      OR position('ACCEPTED_AT' in upper(v_def)) = 0 THEN
     RAISE EXCEPTION 'DIRECT_ACCEPTANCE_GUARDS_MISSING';
   END IF;
 
-  -- BRANCH must not be an authorized role in any operational write RPC.
+  -- Reject common role-gate forms that explicitly authorize BRANCH. Match
+  -- role comparisons, not every occurrence of the word BRANCH (which is also
+  -- used legitimately for geofence/location configuration).
   FOR r IN
     SELECT p.proname, pg_get_function_identity_arguments(p.oid) AS args,
            pg_get_functiondef(p.oid) AS def
     FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
     WHERE n.nspname='public' AND p.proname = ANY(v_write_targets)
   LOOP
-    IF position('BRANCH' in upper(r.def)) > 0
-       AND position('r.name IN (''ADMIN'', ''HEAD_OFFICE'', ''BRANCH'')' in r.def) > 0
-       OR position('r.name IN (''ADMIN'',''HEAD_OFFICE'',''BRANCH'')' in r.def) > 0 THEN
+    IF upper(r.def) ~ $$R\.NAME\s+IN\s*\([^)]*'BRANCH'$$
+       OR upper(r.def) ~ $$R\.NAME\s*=\s*'BRANCH'$$
+       OR upper(r.def) ~ $$ROLE_NAME\s*=\s*'BRANCH'$$ THEN
       RAISE EXCEPTION 'BRANCH_ROLE_STILL_PRESENT_IN_WRITE_RPC: %.%', r.proname, r.args;
     END IF;
   END LOOP;
@@ -90,6 +91,8 @@ BEGIN
 END
 $checks$;
 
+-- Report grants for manual least-privilege review. This result is diagnostic;
+-- it does not claim that every RPC has passed authorization testing.
 SELECT
   p.proname,
   pg_get_function_identity_arguments(p.oid) AS arguments,
