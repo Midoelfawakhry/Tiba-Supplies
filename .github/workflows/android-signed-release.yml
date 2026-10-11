@@ -135,8 +135,7 @@ jobs:
       - name: Add Android platform
         run: npx cap add android
 
-      - name: Declare and verify Android location permissions
-        if: matrix.app_mode == 'driver'
+      - name: Declare and verify Android location, microphone, and media permissions
         shell: bash
         run: |
           node <<'NODE'
@@ -144,32 +143,37 @@ jobs:
           const file = 'android/app/src/main/AndroidManifest.xml';
           let xml = fs.readFileSync(file, 'utf8');
           const permissions = [
-            'android.permission.ACCESS_COARSE_LOCATION',
-            'android.permission.ACCESS_FINE_LOCATION',
-            'android.permission.ACCESS_BACKGROUND_LOCATION',
-            'android.permission.FOREGROUND_SERVICE',
-            'android.permission.FOREGROUND_SERVICE_LOCATION',
-            'android.permission.POST_NOTIFICATIONS',
-            'android.permission.RECORD_AUDIO',
-            'android.permission.MODIFY_AUDIO_SETTINGS'
-          ];
+            ['android.permission.ACCESS_COARSE_LOCATION', '    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />'],
+            ['android.permission.ACCESS_FINE_LOCATION', '    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />'],
+            ['android.permission.ACCESS_BACKGROUND_LOCATION', '    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />'],
+            ['android.permission.FOREGROUND_SERVICE', '    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />'],
+            ['android.permission.FOREGROUND_SERVICE_LOCATION', '    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />'],
+            ['android.permission.POST_NOTIFICATIONS', '    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />'],
+            ['android.permission.RECORD_AUDIO', '    <uses-permission android:name="android.permission.RECORD_AUDIO" />'],
+            ['android.permission.MODIFY_AUDIO_SETTINGS', '    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />'],
+            ['android.permission.READ_EXTERNAL_STORAGE', '    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />'],
+            ['android.permission.WRITE_EXTERNAL_STORAGE', '    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />'],
+            ['android.permission.READ_MEDIA_IMAGES', '    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />'],
+            ['android.permission.READ_MEDIA_VIDEO', '    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />'],
+            ['android.permission.READ_MEDIA_AUDIO', '    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />']
+          ];;
           const manifestTag = xml.match(/<manifest[^>]*>/);
           if (!manifestTag) throw new Error('AndroidManifest.xml manifest root tag was not found.');
           const manifestOpen = manifestTag.index + manifestTag[0].length - 1;
           const tags = permissions
-            .filter(permission => !xml.includes('android:name="' + permission + '"'))
-            .map(permission => '    <uses-permission android:name="' + permission + '" />');
+            .filter(([permission]) => !xml.includes('android:name="' + permission + '"'))
+            .map(([, tag]) => tag);
           if (tags.length) {
             xml = xml.slice(0, manifestOpen + 1) + '\n' + tags.join('\n') + xml.slice(manifestOpen + 1);
           }
           fs.writeFileSync(file, xml);
           const verified = fs.readFileSync(file, 'utf8');
-          for (const permission of permissions) {
+          for (const [permission] of permissions) {
             if (!verified.includes('android:name="' + permission + '"')) {
               throw new Error('Required Android permission missing after insertion: ' + permission);
             }
           }
-          console.log('Verified driver foreground and background location permissions in AndroidManifest.xml');
+          console.log('Verified location, microphone, notifications, and media permissions in AndroidManifest.xml');
           NODE
 
       - name: Sync Android platform
