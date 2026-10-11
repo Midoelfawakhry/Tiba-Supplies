@@ -45,3 +45,21 @@ The repository also contains multiple date-only migration prefixes (for example,
 - This reconciliation is read-only documentation; it does not alter Supabase.
 - Historical Excel/WhatsApp data remains reference-only.
 - Production remains unchanged until staging and release gates pass.
+
+## Confirmed live-definition findings (read-only production inspection, 2026-10-11)
+
+The following are observations from the current production function definitions, not assumptions based on repository files:
+
+- `direct_assign_standalone_load(uuid,uuid,uuid)` currently allows `ADMIN`, `HEAD_OFFICE`, and `BRANCH`; it creates the booking as `LOADING_STATEMENT` and inserts `actual_loading_records` immediately. This conflicts with the intended explicit driver-acceptance workflow and HEAD-only assignment rule.
+- Production `create_operational_driver`, both observed `create_operational_vehicle` overloads, `update_operational_driver`, `update_operational_vehicle`, `dispatch_load`, `office_cancel_booking`, and `office_redirect_booking` definitions include BRANCH in their role gates. The release migration must close those server-side paths, not merely hide UI actions.
+- Production `office_cancel_booking` assumes a load-order booking and derives the queue office through `load_orders`; a standalone direct booking has `load_order_id IS NULL`. The branch cancellation implementation must be tested for standalone bookings and for queue uniqueness before acceptance.
+- Production `update_driver_live_location` already rejects missing, stale, or future `p_captured_at` values. This must be reconciled with migration `20261011004642_require_captured_driver_location_time` and the repository's freshness patches before replaying anything.
+- Production has no linked driver auth accounts, no live GPS rows, no active vehicle-driver assignments, and no actual-loading rows in the inspected snapshot. Therefore, production cannot provide a meaningful driver end-to-end test; use isolated staging with synthetic fixtures.
+
+## Next gate before any migration is approved
+
+1. Obtain a complete exact inventory of migration files and production ledger versions.
+2. Reconcile the missing `require_captured_driver_location_time` ledger entry and the version mismatches.
+3. Review the actual definitions and signatures affected by the role-gate patch. The patch must fail closed if any expected function or role condition differs.
+4. Run the migration sequence on isolated staging, then test role denial for BRANCH, direct assignment pending/acceptance, duplicate acceptance, GPS freshness/geofence, cancellation/requeue, redirect, delivery, and reports.
+5. Keep PR #13 in draft and do not apply migrations to production until the above evidence is recorded and the user explicitly authorizes a production rollout.
