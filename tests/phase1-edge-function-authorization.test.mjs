@@ -7,6 +7,11 @@ const source = await readFile(
   "utf8",
 );
 
+const branchSource = await readFile(
+  new URL("../supabase/functions/create-branch-employee/index.ts", import.meta.url),
+  "utf8",
+);
+
 test("driver account creation is restricted to ADMIN and HEAD_OFFICE", () => {
   const match = source.match(
     /const allowed = \(roleLinks \?\? \[\]\)\.some\(\(link: any\) =>\s*\[([^\]]+)\]\.includes\(link\.roles\?\.name\)\s*\);/s,
@@ -39,4 +44,26 @@ test("password setup is limited to an active driver linked to the authenticated 
   assert.match(setup, /\.from\("drivers"\)/);
   assert.match(setup, /\.eq\("auth_user_id", callerId\)/);
   assert.match(setup, /\.eq\("is_active", true\)/);
+});
+
+test("branch employee creation is restricted to ADMIN and HEAD_OFFICE", () => {
+  const roleGuard = branchSource.match(
+    /\[\s*"ADMIN"\s*,\s*"HEAD_OFFICE"\s*\]\.includes\(item\.roles\?\.name\)/,
+  );
+  assert.ok(roleGuard, "Branch employee creation must allow only ADMIN and HEAD_OFFICE");
+  assert.doesNotMatch(
+    branchSource,
+    /\[\s*"ADMIN"\s*,\s*"HEAD_OFFICE"\s*,\s*"BRANCH"\s*\]\.includes/,
+    "BRANCH must not create additional branch accounts",
+  );
+});
+
+test("branch employee creation validates identity, credentials, and exactly one active branch office", () => {
+  assert.match(branchSource, /callerClient\.auth\.getUser\(token\)/);
+  assert.match(branchSource, /\.eq\("is_active", true\)/);
+  assert.match(branchSource, /password\.length < 10/);
+  assert.match(branchSource, /\^\[a-z0-9\]\[a-z0-9\._-\]\{2,29\}\$/);
+  assert.match(branchSource, /EXPECTED_ONE_ACTIVE_BRANCH_OFFICE/);
+  assert.match(branchSource, /username \+ "@tiba-supplies\.invalid"/);
+  assert.match(branchSource, /app_metadata: \{ app_role: "BRANCH" \}/);
 });
