@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Bot, Send, Sparkles, LoaderCircle, AlertCircle, RotateCcw, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { QueueStrategy, TextToSpeech } from '@capacitor-community/text-to-speech';
 
 type AssistantMessage = { role: 'user' | 'assistant'; content: string };
 
@@ -65,13 +66,29 @@ export const SystemAiAssistant: React.FC<SystemAiAssistantProps> = ({ audience, 
 
   useEffect(() => { voiceEnabledRef.current = voiceEnabled; }, [voiceEnabled]);
 
-  function speak(text: string) {
+  async function speak(text: string) {
     if (!voiceEnabledRef.current) {
       setVoiceStatus('الصوت مقفول؛ الإجابة مكتوبة.');
       return;
     }
+    setVoiceStatus('جاري تجهيز الصوت…');
+    try {
+      await TextToSpeech.stop();
+      await TextToSpeech.speak({
+        text,
+        lang: 'ar-EG',
+        rate: 0.92,
+        pitch: 1,
+        volume: 1,
+        queueStrategy: QueueStrategy.Flush,
+      });
+      setVoiceStatus('انتهى نطق الإجابة.');
+      return;
+    } catch {
+      // Fall back to Web Speech when native TTS is unavailable.
+    }
     if (!('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') {
-      setVoiceStatus('محرك النطق غير متاح داخل إصدار التطبيق الحالي. الإجابة مكتوبة ويمكن قراءتها من إعدادات الهاتف.');
+      setVoiceStatus('الإجابة ظهرت كتابة، لكن محرك النطق غير متاح. راجع إعداد تحويل النص إلى كلام في أندرويد.');
       return;
     }
     try {
@@ -82,12 +99,7 @@ export const SystemAiAssistant: React.FC<SystemAiAssistantProps> = ({ audience, 
       utterance.pitch = 1;
       utterance.onstart = () => setVoiceStatus('المساعد بينطق الإجابة دلوقتي…');
       utterance.onend = () => setVoiceStatus('انتهى نطق الإجابة.');
-      utterance.onerror = (event) => {
-        setVoiceStatus(event.error === 'canceled' || event.error === 'interrupted'
-          ? 'تم إيقاف الصوت.'
-          : 'الإجابة ظهرت كتابة، لكن الهاتف لم يشغّل الصوت. راجع محرك تحويل النص إلى كلام في إعدادات أندرويد.');
-      };
-      setVoiceStatus('جاري تجهيز الصوت…');
+      utterance.onerror = () => setVoiceStatus('الإجابة ظهرت كتابة، لكن الهاتف لم يشغّل الصوت. راجع محرك تحويل النص إلى كلام في إعدادات أندرويد.');
       window.speechSynthesis.speak(utterance);
     } catch {
       setVoiceStatus('الإجابة ظهرت كتابة، لكن تعذّر تشغيل الصوت على الجهاز.');
@@ -97,6 +109,7 @@ export const SystemAiAssistant: React.FC<SystemAiAssistantProps> = ({ audience, 
   function stopVoice() {
     recognitionRef.current?.stop();
     setListening(false);
+    void TextToSpeech.stop().catch(() => undefined);
     if ('speechSynthesis' in window) window.speechSynthesis.cancel();
     setVoiceStatus('تم إيقاف الصوت.');
   }
@@ -188,7 +201,7 @@ export const SystemAiAssistant: React.FC<SystemAiAssistantProps> = ({ audience, 
           : 'المساعد لم يرجع إجابة. جرّب مرة تانية.');
       }
       setMessages(current => [...current, { role: 'assistant', content: data.answer }]);
-      speak(data.answer);
+      void speak(data.answer);
     } catch (e: any) {
       let message = e?.message || 'تعذر الاتصال بمساعد النظام. تأكد من اتصال الإنترنت وإعداد المساعد.';
       try {
