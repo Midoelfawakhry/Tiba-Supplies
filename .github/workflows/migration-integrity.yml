@@ -1,0 +1,59 @@
+name: Migration integrity
+
+on:
+  push:
+    branches: [main, chore/migration-history-integrity]
+    paths:
+      - "supabase/migrations/**"
+      - ".github/workflows/migration-integrity.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "supabase/migrations/**"
+      - ".github/workflows/migration-integrity.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  migration-version-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check unique 14-digit migration versions
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from collections import defaultdict
+          from pathlib import Path
+          import re
+          import sys
+
+          root = Path("supabase/migrations")
+          files = sorted(root.glob("*.sql"))
+          if not files:
+              print("ERROR: no SQL migration files found")
+              sys.exit(1)
+
+          versions = defaultdict(list)
+          legacy = []
+          for path in files:
+              match = re.match(r"^(\d{14})_", path.name)
+              if match:
+                  versions[match.group(1)].append(path.name)
+              else:
+                  legacy.append(path.name)
+
+          duplicates = {version: names for version, names in versions.items() if len(names) > 1}
+          if duplicates:
+              print("ERROR: duplicate 14-digit migration versions:")
+              for version, names in sorted(duplicates.items()):
+                  print(f"  {version}: {', '.join(names)}")
+              sys.exit(1)
+
+          print(f"PASS: {len(files)} SQL migration files; no duplicate 14-digit versions.")
+          if legacy:
+              print(f"NOTICE: {len(legacy)} legacy/non-standard filenames still need baseline reconciliation:")
+              for name in legacy:
+                  print(f"  {name}")
+          PY
