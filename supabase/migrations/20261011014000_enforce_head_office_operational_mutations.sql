@@ -67,8 +67,8 @@ BEGIN
       '  SELECT * INTO v_order FROM public.load_orders WHERE load_order_id=v_booking.load_order_id FOR UPDATE;',
       '  IF v_booking.load_order_id IS NULL THEN\n    SELECT office_id INTO v_checkin_office_id FROM public.offices WHERE is_active=true AND office_type=''BRANCH'' ORDER BY name LIMIT 1;\n    IF v_checkin_office_id IS NULL THEN RAISE EXCEPTION ''CHECK_IN_OFFICE_NOT_CONFIGURED''; END IF;\n  ELSE\n    SELECT * INTO v_order FROM public.load_orders WHERE load_order_id=v_booking.load_order_id FOR UPDATE;\n    v_checkin_office_id := v_order.check_in_office_id;\n  END IF;');
     v_updated := replace(v_updated,
-      'VALUES(v_booking.driver_id,v_booking.vehicle_id,v_order.check_in_office_id,now(),''WAITING'');',
-      'VALUES(v_booking.driver_id,v_booking.vehicle_id,v_checkin_office_id,now(),''WAITING'');');
+      E'VALUES(v_booking.driver_id,v_booking.vehicle_id,v_order.check_in_office_id,now(),''WAITING'');',
+      E'VALUES(v_booking.driver_id,v_booking.vehicle_id,v_checkin_office_id,now(),''WAITING'');');
     IF v_updated = v_definition OR position('v_checkin_office_id' in v_updated) = 0 THEN
       RAISE EXCEPTION 'DIRECT_CANCEL_PATCH_FAILED: expected office_cancel_booking source did not match';
     END IF;
