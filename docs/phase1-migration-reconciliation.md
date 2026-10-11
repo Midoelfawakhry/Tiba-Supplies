@@ -126,3 +126,26 @@ The first direct-assignment migration (`20261011012000`) authorizes `BRANCH`; th
 The candidate write-permission migration replaces exact source strings in `pg_get_functiondef`. It deliberately aborts if a target definition does not match known patterns, which is safer than silently skipping, but a legitimate formatting change or an unrecognized authorization expression can still block the whole migration. Prefer explicit reviewed `CREATE OR REPLACE FUNCTION` definitions for the affected signatures and a behavioral role test on staging.
 
 All findings above are static code review only. No migration, mutation RPC, or SQL regression script was run against production.
+
+## User-confirmed operating model correction (2026-10-11)
+
+The user clarified the business invariant:
+
+- There is exactly one operational office: HEAD in Ismailia. It owns all load input, direct assignment, cancellation, redirection, and operational migration/audit decisions.
+- Ras Sedr is a geographic reference only (coordinates/radius for driver location eligibility). It is not an operational office for any input, cancellation, redirect, or transaction.
+- Therefore, do not treat BRANCH as a cancellation office, queue transaction owner, or migration-routing key.
+
+### Required design correction before implementing the next migration
+
+The current candidate cancellation function violates this separation for standalone direct assignments because it queries the active BRANCH row and writes that ID into `waiting_list_entries.office_id`. Do not deploy that candidate as-is.
+
+Separate the concepts in the schema and code:
+1. Operational ownership / audit office: always the single active HEAD office.
+2. Geofence configuration: Ras Sedr coordinates/radius, consumed only by location eligibility checks.
+3. Queue scope: explicitly define whether the queue belongs to HEAD operationally while eligibility is gated by the geofence. Do not overload `offices.office_id` to mean both the operational office and the geographic reference.
+
+For regular load orders, preserve their operational owner as HEAD and ensure `check_in_office_id` is not implicitly interpreted as the geofence-only BRANCH. Before changing existing semantics, inspect the load-order creation RPC, queue RPCs, and relevant foreign keys; then prepare an explicit forward migration on the review branch. The migration must keep audit history intact and must not rewrite production data without a reviewed release plan.
+
+Staging tests must verify: (a) every operational action/audit points to HEAD, (b) BRANCH is read only as a location reference, (c) cancellation and redirect work without selecting BRANCH as transaction office, and (d) geofence checks still use the Ras Sedr coordinates.
+
+This correction supersedes the earlier suggestion that enforcing a single active BRANCH would resolve cancellation queue routing. The invariant is not “one active BRANCH”; it is “BRANCH is not an operational transaction office.”
