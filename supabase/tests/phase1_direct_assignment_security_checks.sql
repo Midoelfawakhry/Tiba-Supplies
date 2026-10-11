@@ -166,6 +166,24 @@ BEGIN
     RAISE EXCEPTION 'BRANCH_EMPLOYEE_MANAGEMENT_MUST_BE_HEAD_ONLY';
   END IF;
 
+  -- Legacy broad read RPCs must not bypass the branch-scoped snapshot.
+  FOREACH v_sig IN ARRAY ARRAY[
+    'public.get_available_vehicles()',
+    'public.get_driver_edit_options(uuid)',
+    'public.get_office_waiting_list()',
+    'public.get_vehicle_live_locations()',
+    'public.get_vehicle_owner_directory()',
+    'public.get_vehicle_owner_reports(date,date)'
+  ] LOOP
+    IF to_regprocedure(v_sig) IS NULL THEN
+      RAISE EXCEPTION 'BRANCH_RESTRICTED_READ_RPC_MISSING: %', v_sig;
+    END IF;
+    SELECT pg_get_functiondef(to_regprocedure(v_sig)) INTO v_def;
+    IF position('R.NAME IN (''ADMIN'', ''HEAD_OFFICE'', ''BRANCH'')' in upper(v_def)) > 0 THEN
+      RAISE EXCEPTION 'LEGACY_READ_RPC_STILL_EXPOSED_TO_BRANCH: %', v_sig;
+    END IF;
+  END LOOP;
+
   -- Critical SECURITY DEFINER entry points must pin search_path to public (or
   -- an equivalently reviewed fixed path) to reduce object-shadowing risk.
   FOREACH v_sig IN ARRAY ARRAY[
