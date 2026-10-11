@@ -40,7 +40,7 @@ BEGIN
   )) INTO v_def;
   IF position('''BOOKED''' in v_def) = 0
      OR position('''LOADING_STATEMENT''' in v_def) > 0
-     OR position('INSERT INTO public.actual_loading_records' in upper(v_def)) > 0 THEN
+     OR position('INSERT INTO PUBLIC.ACTUAL_LOADING_RECORDS' in upper(v_def)) > 0 THEN
     RAISE EXCEPTION 'DIRECT_ASSIGNMENT_MUST_REMAIN_PENDING_UNTIL_ACCEPTED';
   END IF;
 
