@@ -131,7 +131,7 @@ $function$;
 
 DROP TRIGGER IF EXISTS trg_assign_booking_trip_code ON public.bookings;
 CREATE TRIGGER trg_assign_booking_trip_code
-BEFORE INSERT OR UPDATE OF trip_code, assignment_daily_number, assignment_sequence_date
+BEFORE INSERT OR UPDATE
 ON public.bookings
 FOR EACH ROW EXECUTE FUNCTION public.assign_booking_trip_code();
 REVOKE ALL ON FUNCTION public.assign_booking_trip_code() FROM PUBLIC, anon, authenticated;
@@ -182,7 +182,7 @@ $function$;
 
 DROP TRIGGER IF EXISTS trg_assign_actual_loading_trip_code ON public.actual_loading_records;
 CREATE TRIGGER trg_assign_actual_loading_trip_code
-BEFORE INSERT OR UPDATE OF trip_code, daily_load_number, loading_sequence_date
+BEFORE INSERT OR UPDATE
 ON public.actual_loading_records
 FOR EACH ROW EXECUTE FUNCTION public.assign_actual_loading_trip_code();
 REVOKE ALL ON FUNCTION public.assign_actual_loading_trip_code() FROM PUBLIC, anon, authenticated;
