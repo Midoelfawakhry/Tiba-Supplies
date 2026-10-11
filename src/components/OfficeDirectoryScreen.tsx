@@ -60,6 +60,10 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
   const [driverTemporaryPasswordConfirmation, setDriverTemporaryPasswordConfirmation] = useState('');
   const [pendingAccount, setPendingAccount] = useState<{ driverId: string; name: string } | null>(null);
   const [retryingInvite, setRetryingInvite] = useState(false);
+  const [passwordResetDriver, setPasswordResetDriver] = useState<Row | null>(null);
+  const [newDriverPassword, setNewDriverPassword] = useState('');
+  const [confirmDriverPassword, setConfirmDriverPassword] = useState('');
+  const [resettingPassword, setResettingPassword] = useState(false);
   const [driverCode, setDriverCode] = useState('');
   const [vehicleSearch, setVehicleSearch] = useState('');
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
@@ -272,6 +276,47 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     }
   }
 
+  async function resetDriverPassword(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!passwordResetDriver) return;
+    setError('');
+    setSuccess('');
+    if (newDriverPassword.length < 8) {
+      setError('كلمة المرور الجديدة يجب ألا تقل عن 8 أحرف.');
+      return;
+    }
+    if (newDriverPassword !== confirmDriverPassword) {
+      setError('تأكيد كلمة المرور غير مطابق.');
+      return;
+    }
+    setResettingPassword(true);
+    try {
+      const { data, error: invokeError } = await supabase.functions.invoke('create-driver-account', {
+        body: { action: 'reset_password', driver_id: passwordResetDriver.driver_id, temporary_password: newDriverPassword },
+      });
+      if (invokeError) throw invokeError;
+      if (!data?.success) {
+        const code = String(data?.error ?? 'PASSWORD_RESET_FAILED');
+        const messages: Record<string, string> = {
+          AUTH_REQUIRED: 'انتهت جلسة المكتب. سجّل الدخول مرة أخرى.',
+          INSUFFICIENT_ROLE: 'إدارة كلمات المرور متاحة للمكتب الرئيسي فقط.',
+          DRIVER_NOT_FOUND_OR_INACTIVE: 'السائق غير موجود أو غير نشط.',
+          DRIVER_ACCOUNT_NOT_LINKED: 'السائق ليس لديه حساب دخول مرتبط. أنشئ حسابه أولًا من قائمة السائقين.',
+          TEMPORARY_PASSWORD_TOO_SHORT: 'كلمة المرور الجديدة يجب ألا تقل عن 8 أحرف.',
+        };
+        throw new Error(messages[code] ?? 'تعذر تحديث كلمة مرور السائق.');
+      }
+      setPasswordResetDriver(null);
+      setNewDriverPassword('');
+      setConfirmDriverPassword('');
+      setSuccess('تم تحديث كلمة المرور. سيُطلب من السائق تغييرها عند أول دخول.');
+    } catch (e: any) {
+      setError(e?.message || 'تعذر تحديث كلمة مرور السائق.');
+    } finally {
+      setResettingPassword(false);
+    }
+  }
+
   async function createDriver(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError('');
@@ -401,6 +446,15 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
         </form>}
       </section>}
 
+      {passwordResetDriver && active === 'drivers' && <section className="rounded-3xl border border-amber-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="mb-4"><h3 className="font-black">تعيين كلمة مرور جديدة</h3><p className="mt-1 text-sm text-slate-500">السائق: {passwordResetDriver.name ?? passwordResetDriver.driver_name ?? 'سائق'}. سيتم طلب تغيير كلمة المرور عند أول دخول.</p></div>
+        <form onSubmit={resetDriverPassword} className="grid gap-3 sm:grid-cols-2">
+          <label className="text-sm font-bold text-slate-700">كلمة المرور الجديدة<input required type="password" autoComplete="new-password" minLength={8} value={newDriverPassword} onChange={e => setNewDriverPassword(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal"/></label>
+          <label className="text-sm font-bold text-slate-700">تأكيد كلمة المرور<input required type="password" autoComplete="new-password" minLength={8} value={confirmDriverPassword} onChange={e => setConfirmDriverPassword(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal"/></label>
+          <div className="sm:col-span-2 flex flex-wrap gap-3"><button disabled={resettingPassword} type="submit" className="rounded-xl bg-amber-600 px-5 py-3 text-sm font-black text-white disabled:opacity-60">{resettingPassword ? 'جاري تحديث كلمة المرور...' : 'تأكيد كلمة المرور الجديدة'}</button><button type="button" onClick={() => { setPasswordResetDriver(null); setNewDriverPassword(''); setConfirmDriverPassword(''); }} className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-bold">إلغاء</button></div>
+        </form>
+      </section>}
+
       {editingDriver && active === 'drivers' && <section className="rounded-3xl border border-red-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="mb-4"><h3 className="font-black">تعديل بيانات السائق</h3><p className="mt-1 text-sm text-slate-500">غيّر بياناته أو انقله لعربية متاحة. يمكنك اختيار «بدون عربية» مؤقتًا.</p></div>
         <form onSubmit={saveDriverEdit} className="grid gap-3 sm:grid-cols-2">
@@ -444,7 +498,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
                 <span className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${sectionPalette[active].wash} ${sectionPalette[active].accent}`}><ActiveIcon size={20} strokeWidth={2.1}/></span>
                 <div className="min-w-0 flex-1"><h4 className="font-black leading-6 [overflow-wrap:anywhere]">{rowTitle(row, active)}</h4><p className="mt-1 break-words text-sm leading-6 text-slate-500">{rowDetails(active === 'vehicles' ? { ...row, owner_name: ownerDirectory.find(owner => String(owner.owner_id) === String(row.owner_id))?.name } : row, active) || 'لا توجد تفاصيل إضافية في السجل الحالي.'}</p></div>
               </div>
-              <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0">{active === "drivers" && row.is_active !== false && <button type="button" disabled={savingEdit} onClick={() => void deactivateDriver(row)} aria-label="إيقاف السائق" className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-700 disabled:opacity-50"><UserX size={14}/> إيقاف</button>}{(active === 'drivers' || active === 'vehicles') && <button type="button" onClick={() => active === 'drivers' ? void beginDriverEdit(row) : beginVehicleEdit(row)} aria-label={active === 'drivers' ? 'تعديل بيانات السائق' : 'تعديل بيانات العربية'} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"><Pencil size={14}/> تعديل</button>}
+              <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0">{active === 'drivers' && row.is_active !== false && row.auth_user_id && <button type="button" onClick={() => { setPasswordResetDriver(row); setNewDriverPassword(''); setConfirmDriverPassword(''); setEditingDriver(null); setError(''); setSuccess(''); }} className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-800">كلمة المرور</button>}{active === "drivers" && row.is_active !== false && <button type="button" disabled={savingEdit} onClick={() => void deactivateDriver(row)} aria-label="إيقاف السائق" className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-700 disabled:opacity-50"><UserX size={14}/> إيقاف</button>}{(active === 'drivers' || active === 'vehicles') && <button type="button" onClick={() => active === 'drivers' ? void beginDriverEdit(row) : beginVehicleEdit(row)} aria-label={active === 'drivers' ? 'تعديل بيانات السائق' : 'تعديل بيانات العربية'} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"><Pencil size={14}/> تعديل</button>}
               {active === 'actual' && row.booking_id && !['CANCELLED', 'DELIVERED', 'COMPLETED'].includes(snapshot?.bookings?.find((b: Row) => b.booking_id === row.booking_id)?.status) && !row.delivery_confirmed_at && row.actual_weight == null && <button type="button" onClick={async () => {
                 const reason = window.prompt('اكتب سبب إلغاء النقلة:');
                 if (!reason?.trim()) return;
