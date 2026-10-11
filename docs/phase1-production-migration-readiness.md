@@ -78,3 +78,14 @@ A successful frontend build does not prove database migration correctness. Produ
 - Cancellation no longer treats `IN_TRANSIT` by itself as a blocker. The database RPC still rejects delivered/completed booking statuses and any actual-weight or delivery-confirmation evidence.
 - Redirect remains available after weight or delivery confirmation as a documented correction. It preserves the actual-load row identity, weight, scale image, delivery timestamp/coordinates, and booking status; the audit entry records old/new destination, reason, and whether the correction followed delivery.
 - UI and SQL static assertions were updated on branch `fix/phase1-cancel-redirect-rules`. They have not been applied to production and the SQL regression script has not yet been run in isolated staging.
+
+
+## Ras Sedr branch app and employee access (review candidate)
+
+- Main-office UI now includes a **موظفو مكتب رأس سدر** screen for creating and activating/deactivating branch employee accounts.
+- Employee authentication uses a unique username plus password; the username is mapped to an internal reserved `.invalid` Auth identifier. Passwords are stored only in Supabase Auth, never in `app_users`.
+- A server-side Edge Function creates the Auth user, app profile, BRANCH role and office assignment; only ADMIN/HEAD_OFFICE callers may create accounts.
+- The dedicated `get_branch_office_snapshot()` RPC returns a read-only branch data model: branch-directed load orders, related allocations/actual loading, waiting-list entries and a driver/vehicle-owner contact directory.
+- `get_phase1_snapshot()` is restricted to ADMIN/HEAD_OFFICE so BRANCH accounts cannot call the full main-office snapshot.
+- Android workflow now supports a separate `branch` build with application ID `com.tibasupplies.branch`; web preview also supports `/branch`.
+- This is still a candidate implementation. Verify the SQL migration in isolated staging, deploy the `create-branch-employee` Edge Function, and build/test the branch APK before issuing accounts. No production migration or APK release has been performed here.
