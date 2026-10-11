@@ -1,6 +1,15 @@
 name: Build Signed Tiba Supplies Android Releases
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'capacitor.config.json'
+      - '.github/workflows/android-signed-release.yml'
   workflow_dispatch:
     inputs:
       app_mode:
