@@ -10,6 +10,7 @@ AS $function$
 DECLARE
   v_auth_user_id uuid := auth.uid();
   v_office public.offices%ROWTYPE;
+  v_head_office public.offices%ROWTYPE;
   v_vehicle public.vehicles%ROWTYPE;
   v_driver_id uuid;
   v_location public.driver_live_locations%ROWTYPE;
@@ -30,7 +31,12 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM public.quarries WHERE quarry_id=p_quarry_id AND is_active=true)
     THEN RAISE EXCEPTION 'QUARRY_NOT_FOUND_OR_INACTIVE'; END IF;
 
-  -- Ras Sedr branch is used only as the geofence/location reference.
+  -- The HEAD office owns the operation and audit; the BRANCH is only the location reference.
+  SELECT * INTO v_head_office FROM public.offices
+  WHERE is_active=true AND office_type='HEAD'
+  ORDER BY created_at, name LIMIT 1;
+  IF NOT FOUND THEN RAISE EXCEPTION 'ACTIVE_HEAD_OFFICE_NOT_CONFIGURED'; END IF;
+
   SELECT * INTO v_office FROM public.offices
   WHERE is_active=true AND office_type='BRANCH'
   ORDER BY name LIMIT 1;
@@ -78,13 +84,14 @@ BEGIN
   INSERT INTO public.standalone_direct_load_audit(
     booking_id,driver_id,vehicle_id,factory_id,quarry_id,office_id,assigned_by_auth_user_id
   ) VALUES (
-    v_booking_id,v_driver_id,p_vehicle_id,p_factory_id,p_quarry_id,v_office.office_id,v_auth_user_id
+    v_booking_id,v_driver_id,p_vehicle_id,p_factory_id,p_quarry_id,v_head_office.office_id,v_auth_user_id
   );
 
   RETURN jsonb_build_object(
     'success',true,'booking_id',v_booking_id,'driver_id',v_driver_id,
     'vehicle_id',p_vehicle_id,'factory_id',p_factory_id,'quarry_id',p_quarry_id,
-    'distance_m',round(v_distance_m::numeric,1),'status','BOOKED','pending_acceptance',true
+    'distance_m',round(v_distance_m::numeric,1),'status','BOOKED','pending_acceptance',true,
+    'operational_office_id',v_head_office.office_id,'geofence_office_id',v_office.office_id
   );
 END;
 $function$;
