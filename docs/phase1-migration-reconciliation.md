@@ -63,3 +63,10 @@ The following are observations from the current production function definitions,
 3. Review the actual definitions and signatures affected by the role-gate patch. The patch must fail closed if any expected function or role condition differs.
 4. Run the migration sequence on isolated staging, then test role denial for BRANCH, direct assignment pending/acceptance, duplicate acceptance, GPS freshness/geofence, cancellation/requeue, redirect, delivery, and reports.
 5. Keep PR #13 in draft and do not apply migrations to production until the above evidence is recorded and the user explicitly authorizes a production rollout.
+
+## Follow-up changes on the review branch
+
+- Hardened `20261011014000_enforce_head_office_write_permissions.sql` so it fails if an expected write RPC is missing and refuses to guess when a BRANCH role-gate pattern differs. This reduces silent partial application risk, but does not replace a staging run against the exact schema.
+- Added `supabase/tests/phase1_direct_assignment_security_checks.sql` with read-only definition checks for pending direct assignment, explicit acceptance, BRANCH write denial, and fixed search paths.
+- These SQL checks have **not yet been executed against a clean staging database**. GitHub Actions checks frontend lint/build only; their success is not evidence that SQL migrations or SQL assertions pass.
+- The latest SQL migration inventory still needs reconciliation with production history, especially the ledger entry `20261011004642_require_captured_driver_location_time` that has no matching repository filename. No production migration was applied.
