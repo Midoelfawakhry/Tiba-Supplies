@@ -50,6 +50,8 @@ export const DriverApp: React.FC = () => {
   const [locating, setLocating] = useState(false);
   const [portal, setPortal] = useState<any>(null);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [pendingDirectAssignments, setPendingDirectAssignments] = useState<any[]>([]);
+  const [acceptingBookingId, setAcceptingBookingId] = useState<string | null>(null);
   const mustChangePassword = session?.user?.app_metadata?.must_change_password === true;
 
   useEffect(() => {
@@ -84,6 +86,15 @@ export const DriverApp: React.FC = () => {
     };
   }, []);
 
+  async function refreshPendingDirectAssignments() {
+    const { data, error: pendingError } = await supabase.rpc('get_pending_direct_assignments');
+    if (pendingError) {
+      setError(pendingError.message || 'تعذر تحميل أوامر الإسناد المباشر.');
+      return;
+    }
+    setPendingDirectAssignments(Array.isArray(data) ? data : []);
+  }
+
   async function refreshPortal() {
     if (!session) return;
     setPortalLoading(true);
@@ -92,8 +103,35 @@ export const DriverApp: React.FC = () => {
       setError(portalError.message || 'تعذر تحميل حالة التشغيل.');
     } else {
       setPortal(data);
+      await refreshPendingDirectAssignments();
     }
     setPortalLoading(false);
+  }
+
+  async function acceptDirectAssignment(bookingId: string) {
+    if (acceptingBookingId) return;
+    setAcceptingBookingId(bookingId);
+    setError('');
+    try {
+      const { data, error: acceptError } = await supabase.rpc('accept_direct_assignment', {
+        p_booking_id: bookingId,
+      });
+      if (acceptError) throw acceptError;
+      if (!data?.success) throw new Error('تعذر تأكيد قبول الإسناد المباشر.');
+      await refreshPortal();
+    } catch (e: any) {
+      const raw = String(e?.message || '');
+      const messages: Record<string, string> = {
+        DIRECT_ASSIGNMENT_NOT_YOURS: 'الأمر ده مش مسند لحسابك.',
+        DIRECT_ASSIGNMENT_NOT_PENDING: 'الأمر لم يعد في انتظار القبول.',
+        DIRECT_ASSIGNMENT_ALREADY_ACCEPTED: 'تم قبول الأمر بالفعل.',
+        DIRECT_ASSIGNMENT_NOT_FOUND: 'أمر الإسناد غير موجود.',
+      };
+      const key = Object.keys(messages).find(k => raw.includes(k));
+      setError(key ? messages[key] : raw || 'تعذر قبول الإسناد المباشر.');
+    } finally {
+      setAcceptingBookingId(null);
+    }
   }
 
   useEffect(() => {
@@ -113,11 +151,27 @@ export const DriverApp: React.FC = () => {
         return;
       }
       setPortal(data);
+      const { data: pendingData } = await supabase.rpc('get_pending_direct_assignments');
+      if (active) setPendingDirectAssignments(Array.isArray(pendingData) ? pendingData : []);
       setError('');
       setDriverAuthorized(true);
     })();
     return () => { active = false; };
   }, [session?.user?.id, mustChangePassword]);
+
+  useEffect(() => {
+    if (!session || !driverAuthorized || mustChangePassword) return;
+    const timer = window.setInterval(() => {
+      void (async () => {
+        const { data, error: portalError } = await supabase.rpc('get_driver_portal_snapshot');
+        if (portalError) return;
+        setPortal(data);
+        const { data: pendingData } = await supabase.rpc('get_pending_direct_assignments');
+        setPendingDirectAssignments(Array.isArray(pendingData) ? pendingData : []);
+      })();
+    }, 15000);
+    return () => window.clearInterval(timer);
+  }, [session?.user?.id, driverAuthorized, mustChangePassword]);
 
   useEffect(() => {
     if (!session || !driverAuthorized || mustChangePassword) return;
@@ -387,6 +441,14 @@ export const DriverApp: React.FC = () => {
             <p className="mt-3 text-xs leading-5">ملاحظة: قراءة الموقع لا تسجّل Check-in ولا تضيفك لقائمة الانتظار.</p>
           </div>}
           {error && <div role="alert" className="mt-4 flex gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"><CircleAlert className="shrink-0" size={18}/><span>{error}</span></div>}
+        </section>
+        <section className="rounded-3xl border border-amber-300 bg-amber-50 p-5 shadow-sm">
+          <div className="flex items-center gap-2"><FileText className="text-amber-800" size={22}/><h2 className="font-black">إسناد مباشر — في انتظار قبولك</h2></div>
+          <p className="mt-2 text-sm leading-6 text-amber-900">الأوامر دي اتسندت لك مباشرة من المكتب، ومش محتاجة دخول قائمة الانتظار. النقلة مش هتبدأ في بيان التحميل غير بعد ما تضغط «قبول الإسناد».</p>
+          {pendingDirectAssignments.length ? <div className="mt-4 space-y-3">{pendingDirectAssignments.map((assignment: any) => <article key={assignment.booking_id} className="rounded-2xl border border-amber-200 bg-white p-4">
+            <div className="flex items-start gap-3"><div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-amber-100 text-xl font-black text-amber-900">{factoryGlyph(String(assignment.factory_name || 'م'))}</div><div className="min-w-0 flex-1"><h3 className="font-black">{assignment.factory_name || 'مصنع غير محدد'}</h3><p className="mt-1 text-sm text-slate-600">المحجر: {assignment.quarry_name || 'غير محدد'}</p><p className="mt-1 text-xs text-slate-400">رقم الأمر: {String(assignment.booking_id).slice(0, 8)} · {assignment.assigned_at ? new Date(assignment.assigned_at).toLocaleString('ar-EG') : ''}</p></div></div>
+            <button type="button" onClick={() => void acceptDirectAssignment(assignment.booking_id)} disabled={acceptingBookingId !== null} className="mt-4 w-full rounded-xl bg-emerald-700 p-3 font-black text-white disabled:opacity-60">{acceptingBookingId === assignment.booking_id ? 'جارٍ تأكيد القبول...' : 'قبول الإسناد وبدء بيان التحميل'}</button>
+          </article>)}</div> : <p className="mt-3 rounded-xl bg-white/80 p-3 text-sm text-slate-600">مفيش أوامر مباشرة معلّقة حاليًا.</p>}
         </section>
         {!portal?.inside_geofence ? (
           <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
