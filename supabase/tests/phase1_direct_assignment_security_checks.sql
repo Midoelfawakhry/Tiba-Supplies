@@ -159,6 +159,10 @@ BEGIN
      OR position('OFFICE_TYPE = ''BRANCH''' in upper(v_def)) = 0 THEN
     RAISE EXCEPTION 'BRANCH_SNAPSHOT_MUST_ENFORCE_BRANCH_OFFICE_SCOPE';
   END IF;
+  IF position('SDA.OFFICE_ID = V_HEAD_OFFICE_ID' in upper(v_def)) > 0
+     OR position('LO.LOAD_ORDER_ID IS NULL' in upper(v_def)) > 0 THEN
+    RAISE EXCEPTION 'BRANCH_SNAPSHOT_MUST_NOT_INCLUDE_UNSCOPED_DIRECT_ASSIGNMENTS';
+  END IF;
   SELECT pg_get_functiondef(to_regprocedure('public.get_branch_employee_directory()')) INTO v_def;
   IF position('HEAD_OFFICE' in upper(v_def)) = 0
      OR position('R.NAME IN (''ADMIN'', ''HEAD_OFFICE'', ''BRANCH'')' in upper(v_def)) > 0
