@@ -63,7 +63,7 @@ BEGIN
     cos(radians(v_office.latitude))*cos(radians(v_location.latitude))*
     power(sin(radians(v_location.longitude-v_office.longitude)/2),2)
   ));
-  IF v_distance_m>10000 THEN RAISE EXCEPTION 'VEHICLE_OUTSIDE_GEOFENCE'; END IF;
+  IF v_distance_m > COALESCE(v_office.geofence_radius_m, 10000) THEN RAISE EXCEPTION 'VEHICLE_OUTSIDE_GEOFENCE'; END IF;
 
   IF EXISTS (SELECT 1 FROM public.bookings b
     WHERE b.driver_id=v_driver_id AND b.status IN ('BOOKED','LOADING_STATEMENT','IN_TRANSIT'))
