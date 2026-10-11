@@ -50,7 +50,7 @@ BEGIN
       cos(radians(v_office.latitude)) * cos(radians(v_loc.latitude)) *
       power(sin(radians(v_loc.longitude - v_office.longitude) / 2), 2)
     ));
-    v_inside := v_distance_m <= 10000;
+    v_inside := v_distance_m <= COALESCE(v_office.geofence_radius_m, 10000);
   END IF;
 
   IF v_inside THEN
@@ -70,7 +70,7 @@ BEGIN
   RETURN jsonb_build_object(
     'inside_geofence', v_inside,
     'distance_m', v_distance_m,
-    'radius_m', 10000,
+    'radius_m', COALESCE(v_office.geofence_radius_m, 10000),
     'location_updated_at', v_loc.updated_at,
     'office_name', v_office.name,
     'office_id', v_office.office_id,
