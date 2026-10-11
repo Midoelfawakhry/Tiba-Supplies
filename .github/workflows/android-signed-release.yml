@@ -28,7 +28,7 @@ jobs:
         run: |
           MODE="${{ inputs.app_mode }}"
           if [ "$MODE" = "both" ]; then
-            echo 'matrix={"app_mode":["driver","office"]}' >> "$GITHUB_OUTPUT"
+            echo 'matrix={"app_mode":["driver","office","branch"]}' >> "$GITHUB_OUTPUT"
           else
             echo "matrix={\"app_mode\":[\"$MODE\"]}" >> "$GITHUB_OUTPUT"
           fi
