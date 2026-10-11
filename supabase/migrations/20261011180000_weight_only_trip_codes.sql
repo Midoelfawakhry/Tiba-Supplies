@@ -394,7 +394,7 @@ BEGIN
         LEFT JOIN public.quarries q ON q.quarry_id = alr.quarry_id
         WHERE (
             (lo.office_id = v_head_office_id AND lo.check_in_office_id = v_branch_office_id)
-            OR (lo.load_order_id IS NULL AND sda.office_id = v_head_office_id)
+            OR (lo.load_order_id IS NULL AND sda.office_id = v_branch_office_id)
           )
           AND alr.load_date >= CURRENT_DATE - 89
         ORDER BY alr.created_at DESC
@@ -463,7 +463,7 @@ BEGIN
         LEFT JOIN public.actual_loading_records alr ON alr.booking_id = b.booking_id
         WHERE (
             (lo.office_id = v_head_office_id AND lo.check_in_office_id = v_branch_office_id)
-            OR (lo.load_order_id IS NULL AND sda.office_id = v_head_office_id)
+            OR (lo.load_order_id IS NULL AND sda.office_id = v_branch_office_id)
           )
           AND b.status NOT IN ('CANCELLED','REJECTED','NO_SHOW','FAILED')
         ORDER BY b.booked_at DESC

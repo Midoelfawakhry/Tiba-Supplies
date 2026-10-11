@@ -57,3 +57,36 @@ jobs:
               for name in legacy:
                   print(f"  {name}")
           PY
+
+  branch-snapshot-scope:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject unscoped direct assignments in branch snapshot migration
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import sys
+          paths = [
+              Path("supabase/migrations/20261011160000_branch_office_accounts_readonly_app.sql"),
+              Path("supabase/migrations/20261011180000_weight_only_trip_codes.sql"),
+          ]
+          sql = "\\n".join(path.read_text().lower() for path in paths)
+          forbidden = [
+              "or (lo.load_order_id is null and sda.office_id = v_head_office_id)",
+          ]
+          found = [pattern for pattern in forbidden if pattern in sql]
+          if found:
+              print("ERROR: branch snapshot contains an unscoped direct-assignment path:")
+              print("\\n".join(found))
+              sys.exit(1)
+          required = [
+              "or (lo.load_order_id is null and sda.office_id = v_branch_office_id)",
+          ]
+          missing = [pattern for pattern in required if pattern not in sql]
+          if missing:
+              print("ERROR: branch snapshot does not include branch-scoped direct assignments:")
+              print("\\n".join(missing))
+              sys.exit(1)
+          print("PASS: direct assignments are included only when scoped to the authenticated branch.")
+          PY
