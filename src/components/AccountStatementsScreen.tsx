@@ -96,17 +96,19 @@ export const AccountStatementsScreen: React.FC<{ kind: StatementKind }> = ({ kin
 
     <div className="flex items-start gap-2 rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs leading-5 text-blue-900">
       <FileText size={17} className="mt-0.5 shrink-0"/>
-      <p>ده كشف حركة تحميل مبني على السجلات الفعلية المتاحة. أسعار التوريد، قيمة المستحقات، المدفوعات والرصيد المالي مش هتظهر إلا بعد اعتماد وتسجيل بياناتها في النظام؛ مش بنحسب أرصدة مالية من غير بيانات موثقة.</p>
+      <p>ده سجل تشغيل للتحميل الفعلي بالأوزان فقط. كود النقلة والرقم اليومي ثابتين وبيستخدموا لربط نفس النقلة بين شاشات التشغيل والتقارير، والوزن يظهر عند تسجيله وتأكيد التسليم.</p>
     </div>
 
     {loading && !snapshot ? <p className="py-8 text-center text-sm text-slate-500">جاري تحميل البيانات...</p> : records.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center"><Scale className="mx-auto mb-2 text-slate-400" size={25}/><p className="text-sm font-bold text-slate-700">لا توجد تحميلات فعلية مطابقة للفلاتر</p><p className="mt-1 text-xs text-slate-500">جرّب تغيير المصنع أو المحجر أو الفترة.</p></div> :
       <div className="overflow-x-auto rounded-2xl border border-slate-200">
-        <table className="w-full min-w-[760px] text-right text-xs">
+        <table className="w-full min-w-[920px] text-right text-xs">
           <thead className="bg-slate-100 text-slate-700"><tr>
-            <th className="px-3 py-3 font-black">التاريخ</th><th className="px-3 py-3 font-black">رقم التذكرة</th><th className="px-3 py-3 font-black">العربية</th><th className="px-3 py-3 font-black">السائق</th><th className="px-3 py-3 font-black">المصنع</th><th className="px-3 py-3 font-black">المحجر</th><th className="px-3 py-3 text-left font-black">الوزن (طن)</th>
+            <th className="px-3 py-3 font-black">التاريخ</th><th className="px-3 py-3 font-black">كود النقلة</th><th className="px-3 py-3 font-black">تحميل اليوم</th><th className="px-3 py-3 font-black">رقم التذكرة</th><th className="px-3 py-3 font-black">العربية</th><th className="px-3 py-3 font-black">السائق</th><th className="px-3 py-3 font-black">المصنع</th><th className="px-3 py-3 font-black">المحجر</th><th className="px-3 py-3 text-left font-black">الوزن (طن)</th>
           </tr></thead>
           <tbody className="divide-y divide-slate-100 bg-white">{records.map((row: Row, index: number) => <tr key={String(row.actual_load_id ?? row.actual_loading_record_id ?? row.booking_id ?? index)} className="hover:bg-slate-50">
             <td className="whitespace-nowrap px-3 py-3">{formatDate(dateValue(row))}</td>
+            <td className="whitespace-nowrap px-3 py-3 font-black">{row.trip_code ?? '—'}</td>
+            <td className="whitespace-nowrap px-3 py-3 font-bold">{row.daily_load_number ?? '—'}</td>
             <td className="px-3 py-3 font-bold">{row.ticket_number ?? row.record_number ?? '—'}</td>
             <td className="px-3 py-3">{lookupName(vehicles, 'vehicle_id', row.vehicle_id, row.plate_number ?? '—')}</td>
             <td className="px-3 py-3">{lookupName(drivers, 'driver_id', row.driver_id, row.driver_name ?? '—')}</td>
