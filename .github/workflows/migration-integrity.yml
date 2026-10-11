@@ -78,5 +78,13 @@ jobs:
               print("ERROR: branch snapshot contains an unscoped direct-assignment path:")
               print("\\n".join(found))
               sys.exit(1)
-          print("PASS: branch snapshot does not expose unscoped direct assignments.")
+          required = [
+              "or (lo.load_order_id is null and sda.office_id = v_branch_office_id)",
+          ]
+          missing = [pattern for pattern in required if pattern not in sql]
+          if missing:
+              print("ERROR: branch snapshot does not include branch-scoped direct assignments:")
+              print("\\n".join(missing))
+              sys.exit(1)
+          print("PASS: direct assignments are included only when scoped to the authenticated branch.")
           PY
