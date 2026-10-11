@@ -1,4 +1,22 @@
 -- Static database-side regression checks for Phase 1 RPC definitions.
+-- Prove the authorization regex catches role predicates but ignores ordinary
+-- geofence references. These checks are safe to run without application fixtures.
+DO $regex_checks$
+BEGIN
+  IF NOT ('IF R.NAME IN (''ADMIN'', ''HEAD_OFFICE'', ''BRANCH'') THEN NULL; END IF;'
+      ~* $$R\\.NAME\\s+IN\\s*\\([^)]*'BRANCH'$$) THEN
+    RAISE EXCEPTION 'REGEX_MUST_MATCH_BRANCH_ROLE_GATE';
+  END IF;
+  IF NOT ('AND R.NAME = ''BRANCH''' ~* $$R\\.NAME\\s*=\\s*'BRANCH'$$) THEN
+    RAISE EXCEPTION 'REGEX_MUST_MATCH_BRANCH_ROLE_EQUALITY';
+  END IF;
+  IF ('-- BRANCH is only a geofence reference; no role predicate here'
+      ~* $$R\\.NAME\\s+IN\\s*\\([^)]*'BRANCH'$$) THEN
+    RAISE EXCEPTION 'REGEX_MUST_IGNORE_GEOFENCE_COMMENT';
+  END IF;
+END
+$regex_checks$;
+
 -- Run only in isolated staging AFTER all intended Phase 1 migrations.
 -- This script does not create bookings, drivers, GPS points, or loading records.
 
