@@ -44,7 +44,10 @@ BEGIN
   IF v_office.office_id IS NOT NULL
     AND v_office.latitude IS NOT NULL AND v_office.longitude IS NOT NULL
     AND v_loc.driver_id IS NOT NULL
-    AND v_loc.updated_at >= now() - interval '10 minutes' THEN
+    AND v_loc.updated_at >= now() - interval '10 minutes'
+    AND v_loc.captured_at IS NOT NULL
+    AND v_loc.captured_at >= now() - interval '10 minutes'
+    AND v_loc.captured_at <= now() + interval '1 minute' THEN
     v_distance_m := 2 * 6371000 * asin(sqrt(
       power(sin(radians(v_loc.latitude - v_office.latitude) / 2), 2) +
       cos(radians(v_office.latitude)) * cos(radians(v_loc.latitude)) *
