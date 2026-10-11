@@ -170,7 +170,9 @@ jobs:
             'android.permission.ACCESS_BACKGROUND_LOCATION',
             'android.permission.FOREGROUND_SERVICE',
             'android.permission.FOREGROUND_SERVICE_LOCATION',
-            'android.permission.POST_NOTIFICATIONS'
+            'android.permission.POST_NOTIFICATIONS',
+            'android.permission.RECORD_AUDIO',
+            'android.permission.MODIFY_AUDIO_SETTINGS'
           ];
           const manifestTag = xml.match(/<manifest[^>]*>/);
           if (!manifestTag) {
