@@ -2,13 +2,13 @@
 
 ## Scope and safety
 
-This inventory reconciles the repository's SQL files with the production Supabase migration history observed on 2026-10-11. It is documentation only: it does not alter production data, the Supabase migration history table, or any SQL migration contents.
+This inventory reconciles the repository's SQL files with the production Supabase migration history observed on 2026-10-11. This PR renames eight SQL files so their 14-digit prefixes match the corresponding recorded production versions; the SQL contents are unchanged. It does not alter production data or the Supabase migration history table.
 
 Do not delete a migration-history row just because a later migration replaced its effects. Do not run a legacy SQL file against production to test it. A missing effect must be addressed with a reviewed, forward-only corrective migration.
 
 ## Production versions with a clear repository candidate
 
-The version prefix is the authoritative key used by Supabase migration tracking. The repository filenames below have historically differed from production versions and need careful normalization only after reviewing file content and dependencies.
+The version prefix is the authoritative key used by Supabase migration tracking. For the eight entries marked below, only the filename changed; each SQL blob was preserved unchanged.
 
 | Production version | Current repository file | Disposition |
 | --- | --- | --- |
