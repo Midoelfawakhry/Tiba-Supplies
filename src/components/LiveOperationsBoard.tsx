@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { RefreshCw, LogOut, MapPin, Factory, Mountain, Truck, ClipboardList, CheckCircle2, Clock3, Users, HandCoins } from 'lucide-react';
+import { RefreshCw, LogOut, MapPin, Factory, Mountain, Truck, ClipboardList, CheckCircle2, Clock3, Users } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { VehicleTrackingScreen } from './VehicleTrackingScreen';
 import { OfficeDirectoryScreen } from './OfficeDirectoryScreen';
@@ -168,8 +168,8 @@ export const LiveOperationsBoard: React.FC = () => {
                 ['dashboard', 'مركز التشغيل', ClipboardList],
                 ['drivers', 'قائمة السائقين', Users],
                 ['vehicleReports', 'حسابات العربيات والملاك', Users],
-                ['factoryStatement', 'كشف حساب المصنع', Factory],
-                ['quarryStatement', 'كشف حساب المحجر', Mountain],
+                ['factoryStatement', 'كشف تحميل المصنع', Factory],
+                ['quarryStatement', 'كشف تحميل المحجر', Mountain],
                 ['waiting', 'قائمة الانتظار', Clock3],
                 ['orders', 'أوامر التحميل', ClipboardList],
                 ['actual', 'التحميل الفعلي', CheckCircle2],
@@ -177,7 +177,7 @@ export const LiveOperationsBoard: React.FC = () => {
                 ['quarries', 'المحاجر والخامات', Mountain],
                 ['tracking', 'تتبع السيارات', MapPin],
                 ['directory', 'دليل البيانات الكامل', Users],
-                ['direct', 'التحميل بالأمر المباشر', HandCoins],
+                ['direct', 'إسناد نقلة مباشرة', ClipboardList],
                 ['employees', 'موظفو مكتب رأس سدر', Users],
               ] as const).map(([key, label, Icon]) => {
                 const selected = activeScreen === key;
