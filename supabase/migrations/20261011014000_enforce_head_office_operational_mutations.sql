@@ -61,11 +61,11 @@ BEGIN
   LOOP
     v_definition := pg_get_functiondef(v_proc.oid);
     v_updated := replace(v_definition,
-      '  v_active_count integer;',
-      '  v_active_count integer;\n  v_checkin_office_id uuid;');
+      E'  v_active_count integer;',
+      E'  v_active_count integer;\n  v_checkin_office_id uuid;');
     v_updated := replace(v_updated,
-      '  SELECT * INTO v_order FROM public.load_orders WHERE load_order_id=v_booking.load_order_id FOR UPDATE;',
-      '  IF v_booking.load_order_id IS NULL THEN\n    SELECT office_id INTO v_checkin_office_id FROM public.offices WHERE is_active=true AND office_type=''BRANCH'' ORDER BY name LIMIT 1;\n    IF v_checkin_office_id IS NULL THEN RAISE EXCEPTION ''CHECK_IN_OFFICE_NOT_CONFIGURED''; END IF;\n  ELSE\n    SELECT * INTO v_order FROM public.load_orders WHERE load_order_id=v_booking.load_order_id FOR UPDATE;\n    v_checkin_office_id := v_order.check_in_office_id;\n  END IF;');
+      E'  SELECT * INTO v_order FROM public.load_orders WHERE load_order_id=v_booking.load_order_id FOR UPDATE;',
+      E'  IF v_booking.load_order_id IS NULL THEN\n    SELECT office_id INTO v_checkin_office_id FROM public.offices WHERE is_active=true AND office_type=''BRANCH'' ORDER BY name LIMIT 1;\n    IF v_checkin_office_id IS NULL THEN RAISE EXCEPTION ''CHECK_IN_OFFICE_NOT_CONFIGURED''; END IF;\n  ELSE\n    SELECT * INTO v_order FROM public.load_orders WHERE load_order_id=v_booking.load_order_id FOR UPDATE;\n    v_checkin_office_id := v_order.check_in_office_id;\n  END IF;');
     v_updated := replace(v_updated,
       E'VALUES(v_booking.driver_id,v_booking.vehicle_id,v_order.check_in_office_id,now(),''WAITING'');',
       E'VALUES(v_booking.driver_id,v_booking.vehicle_id,v_checkin_office_id,now(),''WAITING'');');
