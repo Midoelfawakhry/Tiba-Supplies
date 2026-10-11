@@ -1,0 +1,212 @@
+name: Build Signed Tiba Supplies Android Releases
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_mode:
+        description: Which signed Android app to build
+        required: true
+        type: choice
+        options:
+          - driver
+          - office
+          - both
+        default: both
+
+permissions:
+  contents: read
+
+jobs:
+  select-builds:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - id: set-matrix
+        shell: bash
+        run: |
+          MODE="${{ inputs.app_mode }}"
+          if [ "$MODE" = "both" ]; then
+            echo 'matrix={"app_mode":["driver","office"]}' >> "$GITHUB_OUTPUT"
+          else
+            echo "matrix={\"app_mode\":[\"$MODE\"]}" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-signed-release:
+    needs: select-builds
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app_mode: ${{ fromJson(needs.select-builds.outputs.matrix).app_mode }}
+    env:
+      VITE_APP_MODE: ${{ matrix.app_mode }}
+      TIBA_APP_MODE: ${{ matrix.app_mode }}
+      VITE_SUPABASE_URL: https://tnlcvwtphbunteifoonc.supabase.co
+      VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_69f6sJFpdfPMks3NS5WkFA_v_DqI7Ce
+      ANDROID_VERSION_CODE: ${{ github.run_number }}
+      ANDROID_VERSION_NAME: 1.0.${{ github.run_number }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate signing secrets
+        shell: bash
+        env:
+          KEYSTORE_B64: ${{ secrets.TIBA_ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.TIBA_ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.TIBA_ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.TIBA_ANDROID_KEY_PASSWORD }}
+        run: |
+          missing=0
+          for name in KEYSTORE_B64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Required GitHub Actions secret is missing for Android release signing."
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "Configure TIBA_ANDROID_KEYSTORE_BASE64, TIBA_ANDROID_KEYSTORE_PASSWORD, TIBA_ANDROID_KEY_ALIAS, and TIBA_ANDROID_KEY_PASSWORD using the release signing key created for Tiba-Supplies."
+            exit 1
+          fi
+          echo "Required signing secrets are present; secret values will not be logged."
+
+      - name: Decode existing Android keystore
+        shell: bash
+        env:
+          KEYSTORE_B64: ${{ secrets.TIBA_ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          umask 077
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/tiba-release.keystore"
+          test -s "$RUNNER_TEMP/tiba-release.keystore"
+          echo "TIBA_KEYSTORE_PATH=$RUNNER_TEMP/tiba-release.keystore" >> "$GITHUB_ENV"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Type-check
+        run: npm run lint
+
+      - name: Build web app
+        run: npm run build
+
+      - name: Generate Capacitor config
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const mode = process.env.TIBA_APP_MODE;
+          const office = mode === 'office';
+          const config = {
+            appId: office ? 'com.tibasupplies.office' : 'com.tibasupplies.driver',
+            appName: office ? 'Tiba Supplies Office' : 'Tiba Supplies Driver',
+            webDir: 'dist',
+            android: { allowMixedContent: false, useLegacyBridge: mode === 'driver' }
+          };
+          fs.writeFileSync('capacitor.config.json', JSON.stringify(config, null, 2) + String.fromCharCode(10));
+          NODE
+
+      - name: Add Android platform
+        run: npx cap add android
+
+      - name: Sync Android platform
+        run: npx cap sync android
+
+      - name: Configure release signing and version
+        shell: bash
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.TIBA_ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.TIBA_ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.TIBA_ANDROID_KEY_PASSWORD }}
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import os, re
+
+          path = Path("android/app/build.gradle")
+          if not path.exists():
+              raise SystemExit("Expected Android Groovy build file android/app/build.gradle was not generated.")
+          text = path.read_text()
+          signing = """
+              signingConfigs {
+                  release {
+                      storeFile file(System.getenv('TIBA_KEYSTORE_PATH'))
+                      storePassword System.getenv('KEYSTORE_PASSWORD')
+                      keyAlias System.getenv('KEY_ALIAS')
+                      keyPassword System.getenv('KEY_PASSWORD')
+                  }
+              }
+          """
+          if "signingConfigs {" not in text:
+              if "    buildTypes {" not in text:
+                  raise SystemExit("Could not safely locate buildTypes block; refusing to patch generated Gradle file.")
+              text = text.replace("    buildTypes {", signing + "\n    buildTypes {", 1)
+          if not re.search(r"buildTypes\s*\{[\s\S]*?release\s*\{", text):
+              raise SystemExit("Could not safely locate release build type; refusing to patch generated Gradle file.")
+          text, count = re.subn(r"(buildTypes\s*\{[\s\S]*?release\s*\{)", r"\1\n            signingConfig signingConfigs.release", text, count=1)
+          if count != 1:
+              raise SystemExit("Could not add release signing configuration.")
+          if "versionCode " in text:
+              text = re.sub(r"versionCode\s+\d+", "versionCode " + os.environ["ANDROID_VERSION_CODE"], text, count=1)
+          else:
+              text, count = re.subn(r"(defaultConfig\s*\{)", r"\1\n        versionCode " + os.environ["ANDROID_VERSION_CODE"], text, count=1)
+              if count != 1:
+                  raise SystemExit("Could not safely set Android versionCode.")
+          if "versionName " in text:
+              text = re.sub(r'versionName\s+"[^"]*"', 'versionName "' + os.environ["ANDROID_VERSION_NAME"] + '"', text, count=1)
+          else:
+              text, count = re.subn(r"(defaultConfig\s*\{)", r'\1\n        versionName "' + os.environ["ANDROID_VERSION_NAME"] + '"', text, count=1)
+              if count != 1:
+                  raise SystemExit("Could not safely set Android versionName.")
+          path.write_text(text)
+          print("Release signing and monotonically increasing version metadata configured.")
+          PY
+
+      - name: Verify Android application identity
+        shell: bash
+        run: |
+          if [ "$TIBA_APP_MODE" = "office" ]; then
+            EXPECTED="com.tibasupplies.office"
+          else
+            EXPECTED="com.tibasupplies.driver"
+          fi
+          grep -R -q "$EXPECTED" android/app/build.gradle android/app/src/main/AndroidManifest.xml || {
+            echo "::error::Expected Android application identity was not found."
+            exit 1
+          }
+
+      - name: Build signed release APK
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.TIBA_ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.TIBA_ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.TIBA_ANDROID_KEY_PASSWORD }}
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease
+
+      - name: Verify APK exists
+        shell: bash
+        run: |
+          APK="android/app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK" || { echo "::error::Signed release APK was not produced."; exit 1; }
+          echo "Release APK generated for $TIBA_APP_MODE."
+
+      - name: Upload signed release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: tiba-supplies-${{ matrix.app_mode }}-signed-release-v${{ github.run_number }}
+          path: android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
