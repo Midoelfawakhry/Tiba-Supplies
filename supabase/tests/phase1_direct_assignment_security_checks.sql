@@ -18,6 +18,8 @@ DECLARE
   v_write_targets text[] := ARRAY[
     'create_operational_driver',
     'create_operational_vehicle',
+    'create_load_order',
+    'direct_assign_standalone_load',
     'update_operational_driver',
     'update_operational_vehicle',
     'dispatch_load',
