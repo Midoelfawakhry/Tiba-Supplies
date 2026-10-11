@@ -67,8 +67,11 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           import sys
-          path = Path("supabase/migrations/20261011160000_branch_office_accounts_readonly_app.sql")
-          sql = path.read_text().lower()
+          paths = [
+              Path("supabase/migrations/20261011160000_branch_office_accounts_readonly_app.sql"),
+              Path("supabase/migrations/20261011180000_weight_only_trip_codes.sql"),
+          ]
+          sql = "\\n".join(path.read_text().lower() for path in paths)
           forbidden = [
               "or (lo.load_order_id is null and sda.office_id = v_head_office_id)",
           ]
