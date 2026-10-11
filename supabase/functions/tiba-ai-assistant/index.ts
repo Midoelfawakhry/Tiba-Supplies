@@ -91,29 +91,52 @@ Deno.serve(async (req: Request) => {
       },
     ];
 
-    const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=" + encodeURIComponent(geminiApiKey),
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: systemInstruction }] },
-          contents,
-          generationConfig: { temperature: 0.2, maxOutputTokens: 900 },
-        }),
-      },
-    );
-    if (!response.ok) {
+    let result: any = null;
+    let lastProviderError = "";
+    const models = ["gemini-3.8-flash", "gemini-3.5-flash-lite"];
+
+    for (const model of models) {
+      const response = await fetch(
+        "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent?key=" + encodeURIComponent(geminiApiKey),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: systemInstruction }] },
+            contents,
+            generationConfig: { temperature: 0.2, maxOutputTokens: 900 },
+          }),
+        },
+      );
+
+      if (response.ok) {
+        result = await response.json();
+        break;
+      }
+
       const providerError = await response.text();
+      lastProviderError = providerError;
       console.error("Gemini request failed", {
+        model,
         status: response.status,
         details: providerError.slice(0, 500),
       });
+
+      // Try the lighter fallback if the primary model is temporarily unavailable
+      // or is not available to this API project.
+      if ((response.status === 503 || response.status === 404) && model !== models[models.length - 1]) {
+        continue;
+      }
       if (response.status === 429) return json({ error: "AI_RATE_LIMITED" }, 429);
       if (response.status === 404) return json({ error: "AI_MODEL_UNAVAILABLE" }, 502);
+      if (response.status === 503) return json({ error: "AI_TEMPORARILY_UNAVAILABLE" }, 503);
       return json({ error: "AI_PROVIDER_ERROR" }, 502);
     }
-    const result = await response.json();
+
+    if (!result) {
+      console.error("All Gemini models unavailable", { details: lastProviderError.slice(0, 500) });
+      return json({ error: "AI_TEMPORARILY_UNAVAILABLE" }, 503);
+    }
     const answer = result?.candidates?.[0]?.content?.parts
       ?.map((part: any) => typeof part.text === "string" ? part.text : "")
       .join("")
