@@ -66,7 +66,7 @@ WITH numbered AS (
 UPDATE public.actual_loading_records alr
 SET loading_sequence_date = n.sequence_date,
     daily_load_number = n.day_number,
-    trip_code = COALESCE(b.trip_code, format('TIBA-%s-%s', to_char(n.sequence_date, 'YYYYMMDD'), lpad(n.day_number::text, 6, '0')))
+    trip_code = COALESCE(b.trip_code, format('TIBA-%s-X%s', to_char(n.sequence_date, 'YYYYMMDD'), lpad(n.day_number::text, 6, '0')))
 FROM numbered n
 LEFT JOIN public.bookings b ON b.booking_id = n.booking_id
 WHERE alr.actual_load_id = n.actual_load_id
@@ -117,7 +117,7 @@ BEGIN
     RETURNING last_number INTO v_number;
     NEW.assignment_sequence_date := v_date;
     NEW.assignment_daily_number := v_number;
-    NEW.trip_code := format('TIBA-%s-%s', to_char(v_date, 'YYYYMMDD'), lpad(v_number::text, 6, '0'));
+    NEW.trip_code := format('TIBA-%s-X%s', to_char(v_date, 'YYYYMMDD'), lpad(v_number::text, 6, '0'));
     RETURN NEW;
   END IF;
   IF NEW.trip_code IS DISTINCT FROM OLD.trip_code
