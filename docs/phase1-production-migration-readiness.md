@@ -20,6 +20,13 @@ Status: **NOT APPROVED FOR PRODUCTION** until all gates below pass.
 - Production currently has no linked driver auth accounts, no active vehicle-driver assignments, no live location rows, and no actual loading records. End-to-end driver/GPS acceptance cannot be verified against production; use a separate test environment with synthetic test records.
 - Production migration history has not been changed during this review. No production migration has been applied.
 
+## Latest review-branch correction (candidate only)
+
+- Added `supabase/migrations/20261011150000_rebuild_head_owned_cancellation.sql` as a new forward-only candidate. It replaces the cancellation RPC definition explicitly rather than rewriting role-gate source text.
+- Candidate cancellation resolves the active HEAD office, verifies the booking belongs to HEAD operational ownership, cancels the booking, clears active queue rows for the driver, and requeues eligible vehicles under HEAD only. Standalone direct assignments are checked against their HEAD-owned audit row; BRANCH is not selected as a queue office.
+- Updated `supabase/tests/phase1_direct_assignment_security_checks.sql` to correct the role-gate regex escapes and add static checks for HEAD-owned cancellation. These checks are still **not executed**; static definition checks do not prove transactional/concurrency behavior.
+- This candidate has not been run against staging or production. Before approval, validate the exact queue uniqueness constraints, test rollback and concurrent cancellation, and verify that all operational write RPCs use HEAD consistently. Production remains unchanged.
+
 ## Repository migration hygiene
 - Migration filenames must have unique version prefixes.
 - Never rely on edits to migration versions already recorded in production; add a new forward-only corrective migration.
