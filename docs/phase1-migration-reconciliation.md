@@ -70,3 +70,17 @@ The following are observations from the current production function definitions,
 - Added `supabase/tests/phase1_direct_assignment_security_checks.sql` with read-only definition checks for pending direct assignment, explicit acceptance, BRANCH write denial, and fixed search paths.
 - These SQL checks have **not yet been executed against a clean staging database**. GitHub Actions checks frontend lint/build only; their success is not evidence that SQL migrations or SQL assertions pass.
 - The latest SQL migration inventory still needs reconciliation with production history, especially the ledger entry `20261011004642_require_captured_driver_location_time` that has no matching repository filename. No production migration was applied.
+
+## Additional queue-office integrity finding (review branch, 2026-10-11)
+
+The current candidate cancellation function in `20261011014000_enforce_head_office_write_permissions.sql` resolves the queue office for a standalone direct assignment by selecting the first active `BRANCH` office ordered by name. The direct-assignment audit row records the operational `HEAD` office in `office_id`; it does not record the specific branch/geofence office used at assignment time. The production inventory also found no unique constraint limiting active `BRANCH` offices to one.
+
+**Risk:** if more than one active BRANCH office exists, cancellation can requeue the driver under a different branch from the one used for eligibility and location. The current behavior is deterministic by name, but not necessarily operationally correct.
+
+**Required resolution before staging sign-off:**
+1. Choose and document the invariant: either exactly one active BRANCH office, enforced by a database constraint/index, or persist the selected `geofence_office_id` on each direct-assignment audit record.
+2. If persisting the branch reference, use a new forward migration and backfill only where the historical association is provable; do not infer missing history.
+3. Add staging cases with zero, one, and two active BRANCH offices; cancellation must fail closed or requeue to the assignment's recorded branch.
+4. Verify the cancellation queue cleanup and insertion remain atomic and preserve one active queue entry per driver/office.
+
+This is a static review finding. No SQL migration or SQL regression test has been executed against staging, and production remains unchanged.
