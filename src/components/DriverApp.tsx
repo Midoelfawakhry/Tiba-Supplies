@@ -456,7 +456,7 @@ export const DriverApp: React.FC = () => {
           <div className="mt-3 space-y-3">{portal.my_bookings.filter((booking: any) => booking.is_direct_assignment && booking.status !== 'BOOKED' && ['LOADING_STATEMENT', 'IN_TRANSIT'].includes(booking.status)).map((booking: any) => <article key={booking.booking_id} className="rounded-2xl border border-emerald-200 bg-white p-4">
             <div className="font-black">{booking.factory_name} ← {booking.quarry_name}</div>
             <p className="mt-2 text-sm text-slate-600">الحالة: {booking.status === 'LOADING_STATEMENT' ? 'بيان تحميل' : 'في الطريق'}</p>
-            <p className="mt-1 text-sm font-black text-indigo-700">كود النقلة: <span dir="ltr" className="font-mono">{booking.trip_code || '—'}</span></p><p className="mt-1 text-xs text-slate-400">رقم التحميل اليومي: {booking.assignment_daily_number ?? '—'}</p>
+            <p className="mt-1 text-sm font-black text-indigo-700">كود النقلة: <span dir="ltr" className="font-mono">{booking.trip_code || '—'}</span></p><p className="mt-1 text-xs text-slate-400">رقم التحميل اليومي: {booking.daily_load_number ?? '—'}</p>
           </article>)}</div>
         </section>}
         {!portal?.inside_geofence ? (
