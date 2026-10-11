@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Building2, Mountain, Users, UserX, Truck, ClipboardCheck, ClipboardList, Clock3, RefreshCw, AlertTriangle, Pencil } from 'lucide-react';
+import { Building2, Users, UserX, Truck, ClipboardCheck, ClipboardList, Clock3, RefreshCw, AlertTriangle, Pencil, UserMinus } from 'lucide-react';
 import { getLiveSnapshot, LiveSnapshot, liveName } from '../services/liveData';
 import { supabase } from '../lib/supabase';
 import { AddVehicleForm } from './AddVehicleForm';
@@ -7,8 +7,7 @@ import { AddVehicleForm } from './AddVehicleForm';
 type ScreenKey = 'factories' | 'quarries' | 'drivers' | 'vehicles' | 'waiting' | 'loads' | 'actual';
 type Row = Record<string, any>;
 const tabs: { key: ScreenKey; label: string; icon: React.ElementType }[] = [
-  { key: 'factories', label: 'المصانع والعملاء', icon: Building2 },
-  { key: 'quarries', label: 'المحاجر والخامات', icon: Mountain },
+  { key: 'factories', label: 'المصانع', icon: Building2 },
   { key: 'drivers', label: 'السائقون', icon: Users },
   { key: 'vehicles', label: 'أسطول السيارات', icon: Truck },
   { key: 'waiting', label: 'قائمة انتظار رأس سدر', icon: Clock3 },
@@ -18,7 +17,6 @@ const tabs: { key: ScreenKey; label: string; icon: React.ElementType }[] = [
 
 const sectionPalette: Record<ScreenKey, { selected: string; accent: string; border: string; action: string; row: string; wash: string }> = {
   factories: { selected: 'border-sky-600 bg-sky-600', accent: 'text-sky-700', border: 'border-sky-200', action: 'bg-sky-600 hover:bg-sky-700', row: 'border-r-sky-400', wash: 'bg-sky-50/50' },
-  quarries: { selected: 'border-amber-600 bg-amber-600', accent: 'text-amber-700', border: 'border-amber-200', action: 'bg-amber-600 hover:bg-amber-700', row: 'border-r-amber-400', wash: 'bg-amber-50/50' },
   drivers: { selected: 'border-red-600 bg-red-600', accent: 'text-red-700', border: 'border-red-200', action: 'bg-red-600 hover:bg-red-700', row: 'border-r-red-400', wash: 'bg-red-50/50' },
   vehicles: { selected: 'border-blue-600 bg-blue-600', accent: 'text-blue-700', border: 'border-blue-200', action: 'bg-blue-600 hover:bg-blue-700', row: 'border-r-blue-400', wash: 'bg-blue-50/50' },
   waiting: { selected: 'border-violet-600 bg-violet-600', accent: 'text-violet-700', border: 'border-violet-200', action: 'bg-violet-600 hover:bg-violet-700', row: 'border-r-violet-400', wash: 'bg-violet-50/50' },
@@ -27,7 +25,7 @@ const sectionPalette: Record<ScreenKey, { selected: string; accent: string; bord
 };
 
 function rowTitle(row: Row, key: ScreenKey) {
-  if (key === 'factories' || key === 'quarries') return liveName(row);
+  if (key === 'factories') return liveName(row);
   if (key === 'drivers') return row.name ?? row.driver_name ?? 'سائق بدون اسم';
   if (key === 'vehicles') return row.plate_number ?? row.vehicle_code ?? 'عربية بدون لوحة';
   if (key === 'waiting') return row.plate_number ?? row.driver_name ?? 'عنصر انتظار';
@@ -35,8 +33,7 @@ function rowTitle(row: Row, key: ScreenKey) {
   return row.trip_code ?? row.ticket_number ?? row.record_number ?? row.actual_loading_record_id ?? 'سجل تحميل فعلي';
 }
 function rowDetails(row: Row, key: ScreenKey) {
-  if (key === 'factories') return [row.client_name, row.address, row.phone].filter(Boolean).join(' · ');
-  if (key === 'quarries') return [row.region, row.materials_available?.join?.('، '), row.address].filter(Boolean).join(' · ');
+  if (key === 'factories') return [row.address, row.phone].filter(Boolean).join(' · ');
   if (key === 'drivers') return [row.phone, row.driver_code, row.is_active === false ? 'غير نشط' : 'نشط'].filter(Boolean).join(' · ');
   if (key === 'vehicles') return [row.owner_name ? 'المالك: ' + row.owner_name : '', row.truck_type ?? row.vehicle_type, row.capacity_tons ? row.capacity_tons + ' طن' : '', row.is_active === false ? 'غير نشطة' : 'نشطة'].filter(Boolean).join(' · ');
   if (key === 'waiting') return [row.driver_name, row.status, row.arrived_at ? new Date(row.arrived_at).toLocaleString('ar-EG') : ''].filter(Boolean).join(' · ');
@@ -110,6 +107,40 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     }
   }, []);
   useEffect(() => { void load(); }, [load]);
+
+  async function removeWaitingEntry(row: Row) {
+    const driverName = String(row.driver_name ?? 'السائق');
+    const plate = String(row.plate_number ?? 'العربية غير محددة');
+    const reason = window.prompt(`اكتب سبب إزالة ${driverName} — ${plate} من قائمة الانتظار:`);
+    if (!reason?.trim()) return;
+    if (!window.confirm(`تأكيد إزالة ${driverName} من قائمة الانتظار؟ سيتم الاحتفاظ بسجل الدخول وتسجيل اسم منفّذ الإجراء وسببه.`)) return;
+    setError('');
+    setSuccess('');
+    setSavingEdit(true);
+    try {
+      const { data, error: rpcError } = await supabase.rpc('office_remove_waiting_entry', {
+        p_entry_id: row.entry_id,
+        p_reason: reason.trim(),
+      });
+      if (rpcError) throw rpcError;
+      if (!data?.success) throw new Error('تعذر تأكيد إزالة السائق من قائمة الانتظار.');
+      setSuccess('تمت إزالة السائق من قائمة الانتظار مع الاحتفاظ بالسجل التاريخي وتسجيل السبب.');
+      await load();
+    } catch (e: any) {
+      const raw = String(e?.message || '');
+      const messages: Record<string, string> = {
+        AUTH_REQUIRED: 'انتهت جلسة المكتب. سجّل الدخول مرة أخرى.',
+        INSUFFICIENT_ROLE: 'إزالة السائق من قائمة الانتظار متاحة للمكتب الرئيسي فقط.',
+        WAITING_ENTRY_NOT_FOUND: 'عنصر الانتظار غير موجود أو لم يعد في حالة انتظار.',
+        WAITING_ENTRY_NOT_IN_BRANCH_QUEUE: 'عنصر الانتظار ليس ضمن قائمة انتظار رأس سدر الحالية.',
+        REMOVE_REASON_REQUIRED: 'اكتب سبب الإزالة أولًا.',
+      };
+      const key = Object.keys(messages).find(code => raw.includes(code));
+      setError(key ? messages[key] : raw || 'تعذر إزالة السائق من قائمة الانتظار.');
+    } finally {
+      setSavingEdit(false);
+    }
+  }
 
   async function beginDriverEdit(row: Row) {
     setError('');
@@ -377,7 +408,6 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
 
   const lists: Record<ScreenKey, Row[]> = {
     factories: snapshot?.factories ?? [],
-    quarries: snapshot?.quarries ?? [],
     drivers: snapshot?.drivers ?? [],
     vehicles: snapshot?.vehicles ?? [],
     waiting,
@@ -498,7 +528,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
                 <span className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${sectionPalette[active].wash} ${sectionPalette[active].accent}`}><ActiveIcon size={20} strokeWidth={2.1}/></span>
                 <div className="min-w-0 flex-1"><h4 className="font-black leading-6 [overflow-wrap:anywhere]">{rowTitle(row, active)}</h4><p className="mt-1 break-words text-sm leading-6 text-slate-500">{rowDetails(active === 'vehicles' ? { ...row, owner_name: ownerDirectory.find(owner => String(owner.owner_id) === String(row.owner_id))?.name } : row, active) || 'لا توجد تفاصيل إضافية في السجل الحالي.'}</p></div>
               </div>
-              <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0">{active === 'drivers' && row.is_active !== false && row.auth_user_id && <button type="button" onClick={() => { setPasswordResetDriver(row); setNewDriverPassword(''); setConfirmDriverPassword(''); setEditingDriver(null); setError(''); setSuccess(''); }} className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-800">كلمة المرور</button>}{active === "drivers" && row.is_active !== false && <button type="button" disabled={savingEdit} onClick={() => void deactivateDriver(row)} aria-label="إيقاف السائق" className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-700 disabled:opacity-50"><UserX size={14}/> إيقاف</button>}{(active === 'drivers' || active === 'vehicles') && <button type="button" onClick={() => active === 'drivers' ? void beginDriverEdit(row) : beginVehicleEdit(row)} aria-label={active === 'drivers' ? 'تعديل بيانات السائق' : 'تعديل بيانات العربية'} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"><Pencil size={14}/> تعديل</button>}
+              <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0">{active === 'waiting' && row.status === 'WAITING' && <button type="button" disabled={savingEdit} onClick={() => void removeWaitingEntry(row)} className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-700 disabled:opacity-50"><UserMinus size={14}/> إزالة من الانتظار</button>}{active === 'drivers' && row.is_active !== false && row.auth_user_id && <button type="button" onClick={() => { setPasswordResetDriver(row); setNewDriverPassword(''); setConfirmDriverPassword(''); setEditingDriver(null); setError(''); setSuccess(''); }} className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-800">كلمة المرور</button>}{active === "drivers" && row.is_active !== false && <button type="button" disabled={savingEdit} onClick={() => void deactivateDriver(row)} aria-label="إيقاف السائق" className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-700 disabled:opacity-50"><UserX size={14}/> إيقاف</button>}{(active === 'drivers' || active === 'vehicles') && <button type="button" onClick={() => active === 'drivers' ? void beginDriverEdit(row) : beginVehicleEdit(row)} aria-label={active === 'drivers' ? 'تعديل بيانات السائق' : 'تعديل بيانات العربية'} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"><Pencil size={14}/> تعديل</button>}
               {active === 'actual' && row.booking_id && !['CANCELLED', 'DELIVERED', 'COMPLETED'].includes(snapshot?.bookings?.find((b: Row) => b.booking_id === row.booking_id)?.status) && !row.delivery_confirmed_at && row.actual_weight == null && <button type="button" onClick={async () => {
                 const reason = window.prompt('اكتب سبب إلغاء النقلة:');
                 if (!reason?.trim()) return;
