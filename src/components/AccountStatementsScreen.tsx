@@ -39,7 +39,7 @@ export const AccountStatementsScreen: React.FC<{ kind: StatementKind }> = ({ kin
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fromDate, toDate]);
 
   useEffect(() => { void load(); }, [load]);
 
