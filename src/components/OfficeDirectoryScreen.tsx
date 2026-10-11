@@ -430,8 +430,8 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
               }} className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-700">إلغاء النقلة</button>}
               {active === 'actual' && row.booking_id && !row.delivery_confirmed_at && <button type="button" onClick={async () => {
                 const factories = snapshot?.factories ?? [];
-                const options = factories.map((f: Row) => `${f.name} [${f.factory_id}]`).join('\\n');
-                const chosen = window.prompt('اكتب معرّف المصنع الجديد كما هو ظاهر بين الأقواس:\\n' + options, '');
+                const options = factories.map((f: Row) => `${f.name} [${f.factory_id}]`).join('\n');
+                const chosen = window.prompt('اكتب معرّف المصنع الجديد كما هو ظاهر بين الأقواس:\n' + options, '');
                 if (!chosen?.trim()) return;
                 const match = chosen.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
                 if (!match || !factories.some((f: Row) => f.factory_id === match[1])) { setError('معرّف المصنع غير صحيح. انسخه من القائمة المعروضة.'); return; }
