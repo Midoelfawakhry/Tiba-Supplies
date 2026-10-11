@@ -161,8 +161,8 @@ BEGIN
   END IF;
   SELECT pg_get_functiondef(to_regprocedure('public.get_branch_employee_directory()')) INTO v_def;
   IF position('HEAD_OFFICE' in upper(v_def)) = 0
-     OR upper(v_def) ~ $R\\.NAME\\s+IN\\s*\\([^)]*'BRANCH'$
-     OR upper(v_def) ~ $R\\.NAME\\s*=\\s*'BRANCH'$ THEN
+     OR position('R.NAME IN (''ADMIN'', ''HEAD_OFFICE'', ''BRANCH'')' in upper(v_def)) > 0
+     OR position('R.NAME = ''BRANCH''' in upper(v_def)) > 0 THEN
     RAISE EXCEPTION 'BRANCH_EMPLOYEE_MANAGEMENT_MUST_BE_HEAD_ONLY';
   END IF;
 
