@@ -102,6 +102,16 @@ BEGIN
     RAISE EXCEPTION 'CANCELLATION_MUST_USE_HEAD_OPERATIONAL_QUEUE';
   END IF;
 
+  -- Cancellation may allow IN_TRANSIT only when no weight/delivery evidence exists.
+  SELECT pg_get_functiondef(to_regprocedure(
+    'public.office_cancel_booking(uuid,text,boolean)'
+  )) INTO v_def;
+  IF position('ACTUAL_WEIGHT IS NOT NULL' in upper(v_def)) = 0
+     OR position('DELIVERY_CONFIRMED_AT IS NOT NULL' in upper(v_def)) = 0
+     OR position('V_BOOKING.STATUS IN (''IN_TRANSIT'', ''DELIVERED'', ''COMPLETED'')' in upper(v_def)) > 0 THEN
+    RAISE EXCEPTION 'CANCELLATION_MUST_USE_WEIGHT_DELIVERY_EVIDENCE_NOT_TRANSIT_STATUS';
+  END IF;
+
   -- Dispatch must authorize only HEAD/ADMIN and consume the HEAD-owned queue.
   SELECT pg_get_functiondef(to_regprocedure('public.dispatch_load(uuid)')) INTO v_def;
   IF position('W.OFFICE_ID = V_LOAD.OFFICE_ID' in upper(v_def)) = 0
@@ -120,6 +130,16 @@ BEGIN
      OR position('LOAD_NOT_OWNED_BY_HEAD_OFFICE' in upper(v_def)) = 0
      OR position('DIRECT_ASSIGNMENT_NOT_OWNED_BY_HEAD_OFFICE' in upper(v_def)) = 0 THEN
     RAISE EXCEPTION 'REDIRECT_MUST_BE_HEAD_ONLY_AND_CHECK_OWNERSHIP';
+  END IF;
+
+  -- Redirect must remain available after weight/delivery and preserve the audit trail.
+  SELECT pg_get_functiondef(to_regprocedure('public.office_redirect_booking(uuid,uuid,text)')) INTO v_def;
+  IF position('''DELIVERED''' in upper(v_def)) = 0
+     OR position('''COMPLETED''' in upper(v_def)) = 0
+     OR position('CORRECTIVE_AFTER_DELIVERY' in upper(v_def)) = 0
+     OR position('FACTORY_ID' in upper(v_def)) = 0
+     OR position('ACTUAL_WEIGHT' in upper(v_def)) = 0 THEN
+    RAISE EXCEPTION 'REDIRECT_MUST_SUPPORT_POST_DELIVERY_CORRECTION_AND_AUDIT';
   END IF;
 
   -- Critical SECURITY DEFINER entry points must pin search_path to public (or
