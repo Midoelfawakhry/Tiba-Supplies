@@ -80,6 +80,27 @@ Deno.serve(async (req: Request) => {
     if (!driverId) return json({ error: "DRIVER_ID_REQUIRED" }, 400);
     if (temporaryPassword.length < 8) return json({ error: "TEMPORARY_PASSWORD_TOO_SHORT" }, 400);
 
+    if (body.action === "reset_password") {
+      const { data: driver, error: driverError } = await admin
+        .from("drivers")
+        .select("driver_id,auth_user_id,is_active")
+        .eq("driver_id", driverId)
+        .maybeSingle();
+      if (driverError) throw driverError;
+      if (!driver || !driver.is_active) return json({ error: "DRIVER_NOT_FOUND_OR_INACTIVE" }, 404);
+      if (!driver.auth_user_id) return json({ error: "DRIVER_ACCOUNT_NOT_LINKED" }, 409);
+
+      const { data: authUser, error: authUserError } = await admin.auth.admin.getUserById(driver.auth_user_id);
+      if (authUserError) throw authUserError;
+      const appMetadata = authUser.user.app_metadata ?? {};
+      const { error: passwordError } = await admin.auth.admin.updateUserById(driver.auth_user_id, {
+        password: temporaryPassword,
+        app_metadata: { ...appMetadata, must_change_password: true },
+      });
+      if (passwordError) throw passwordError;
+      return json({ success: true, driver_id: driverId, must_change_password: true });
+    }
+
     const { data: driver, error: driverError } = await admin
       .from("drivers")
       .select("driver_id,name,phone,auth_user_id,is_active")
