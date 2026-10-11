@@ -83,7 +83,7 @@ BEGIN
   ] LOOP
     SELECT pg_get_functiondef(to_regprocedure(v_sig)) INTO v_def;
     IF position('SECURITY DEFINER' in upper(v_def)) > 0
-       AND position('SET search_path' in lower(v_def)) = 0 THEN
+       AND position('set search_path' in lower(v_def)) = 0 THEN
       RAISE EXCEPTION 'SECURITY_DEFINER_WITHOUT_FIXED_SEARCH_PATH: %', v_sig;
     END IF;
   END LOOP;
