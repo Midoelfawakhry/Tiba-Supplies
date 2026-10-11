@@ -332,16 +332,21 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
 
   return (
     <section className={`space-y-4 rounded-[2rem] p-2 transition-colors sm:p-3 ${sectionPalette[active].wash}`}>
-      <div className="flex flex-col gap-3 rounded-3xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
-        <div><h2 className="text-xl font-black">شاشات إدارة المكتب</h2><p className="mt-1 text-sm leading-6 text-slate-500">دليل موحّد لبيانات التشغيل الحقيقية المحمّلة من Supabase.</p></div>
-        <button onClick={() => void load()} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 py-2 font-bold disabled:opacity-60"><RefreshCw size={17} className={loading ? 'animate-spin' : ''}/> تحديث البيانات</button>
+      <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="pointer-events-none absolute -left-8 -top-10 h-32 w-32 rounded-full bg-sky-100/70 blur-2xl"/>
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-md"><Building2 size={25}/></span><div><h2 className="text-xl font-black tracking-tight">إدارة المكتب</h2><p className="mt-1 text-sm leading-6 text-slate-500">مركز تشغيل موحّد لبيانات المكتب الفعلية.</p></div></div>
+          <button onClick={() => void load()} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold shadow-sm transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-60"><RefreshCw size={17} className={loading ? 'animate-spin' : ''}/> تحديث البيانات</button>
+        </div>
       </div>
       {showSectionTabs && <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
         {tabs.map(tab => {
           const Icon = tab.icon;
           const selected = active === tab.key;
-          return <button key={tab.key} type="button" onClick={() => setActive(tab.key)} className={selected ? `flex min-h-16 items-center gap-2 rounded-2xl border p-3 text-right text-sm font-black text-white shadow-sm ${sectionPalette[tab.key].selected}` : 'flex min-h-16 items-center gap-2 rounded-2xl border border-slate-200 bg-white p-3 text-right text-sm font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50'}>
-            <Icon size={19} className="shrink-0"/><span>{tab.label}</span><span className="mr-auto text-xs opacity-80">{lists[tab.key].length}</span>
+          return <button key={tab.key} type="button" onClick={() => setActive(tab.key)} aria-pressed={selected} className={selected ? `group flex min-h-[88px] items-center gap-3 rounded-2xl border p-3 text-right text-sm font-black text-white shadow-md ring-2 ring-offset-1 transition ${sectionPalette[tab.key].selected} ring-white/70` : 'group flex min-h-[88px] items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-right text-sm font-bold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md'}>
+            <span className={selected ? 'flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/20' : `flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${sectionPalette[tab.key].wash} ${sectionPalette[tab.key].accent}`}><Icon size={22} strokeWidth={2.2}/></span>
+            <span className="min-w-0 flex-1 leading-5">{tab.label}</span>
+            <span className={selected ? 'flex h-7 min-w-7 items-center justify-center rounded-full bg-white/20 px-2 text-xs tabular-nums' : `flex h-7 min-w-7 items-center justify-center rounded-full px-2 text-xs tabular-nums ${sectionPalette[tab.key].wash} ${sectionPalette[tab.key].accent}`}>{lists[tab.key].length}</span>
           </button>;
         })}
       </div>}
@@ -411,10 +416,21 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
       </section>}
 
       <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white">
-        <div className="flex items-center gap-3 border-b border-slate-200 p-4 sm:p-5"><ActiveIcon className={sectionPalette[active].accent} size={23}/><div><h3 className="font-black">{tabs.find(tab => tab.key === active)?.label}</h3><p className="text-xs text-slate-500">{rows.length} سجل</p></div></div>
+        <div className={`flex flex-wrap items-center justify-between gap-4 border-b p-4 sm:p-5 ${sectionPalette[active].border} ${sectionPalette[active].wash}`}>
+          <div className="flex min-w-0 items-center gap-3">
+            <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-black/5 ${sectionPalette[active].accent}`}><ActiveIcon size={25} strokeWidth={2.2}/></span>
+            <div><h3 className="font-black">{tabs.find(tab => tab.key === active)?.label}</h3><p className="mt-1 text-xs text-slate-500">بيانات التشغيل الفعلية · محدثة من النظام</p></div>
+          </div>
+          <span className={`inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-sm font-black shadow-sm ring-1 ring-black/5 ${sectionPalette[active].accent}`}><ClipboardList size={15}/>{rows.length} سجل</span>
+        </div>
         <div className="divide-y divide-slate-100">
           {rows.map((row, index) => <article key={String(row.factory_id ?? row.quarry_id ?? row.driver_id ?? row.vehicle_id ?? row.entry_id ?? row.load_order_id ?? row.booking_id ?? row.actual_loading_record_id ?? index)} className={`border-r-4 p-4 transition-colors hover:bg-slate-50/70 sm:p-5 ${sectionPalette[active].row}`}>
-            <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h4 className="break-words font-black">{rowTitle(row, active)}</h4><p className="mt-1 break-words text-sm leading-6 text-slate-500">{rowDetails(active === 'vehicles' ? { ...row, owner_name: ownerDirectory.find(owner => String(owner.owner_id) === String(row.owner_id))?.name } : row, active) || 'لا توجد تفاصيل إضافية في السجل الحالي.'}</p></div><div className="flex shrink-0 items-center gap-2">{(active === 'drivers' || active === 'vehicles') && <button type="button" onClick={() => active === 'drivers' ? void beginDriverEdit(row) : beginVehicleEdit(row)} aria-label={active === 'drivers' ? 'تعديل بيانات السائق' : 'تعديل بيانات العربية'} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"><Pencil size={14}/> تعديل</button>}
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-start gap-3">
+                <span className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${sectionPalette[active].wash} ${sectionPalette[active].accent}`}><ActiveIcon size={20} strokeWidth={2.1}/></span>
+                <div className="min-w-0"><h4 className="break-words font-black leading-6">{rowTitle(row, active)}</h4><p className="mt-1 break-words text-sm leading-6 text-slate-500">{rowDetails(active === 'vehicles' ? { ...row, owner_name: ownerDirectory.find(owner => String(owner.owner_id) === String(row.owner_id))?.name } : row, active) || 'لا توجد تفاصيل إضافية في السجل الحالي.'}</p></div>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">{(active === 'drivers' || active === 'vehicles') && <button type="button" onClick={() => active === 'drivers' ? void beginDriverEdit(row) : beginVehicleEdit(row)} aria-label={active === 'drivers' ? 'تعديل بيانات السائق' : 'تعديل بيانات العربية'} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"><Pencil size={14}/> تعديل</button>}
               {active === 'actual' && row.booking_id && snapshot?.bookings?.find((b: Row) => b.booking_id === row.booking_id)?.status !== 'IN_TRANSIT' && !row.delivery_confirmed_at && row.actual_weight == null && <button type="button" onClick={async () => {
                 const reason = window.prompt('اكتب سبب إلغاء النقلة:');
                 if (!reason?.trim()) return;
