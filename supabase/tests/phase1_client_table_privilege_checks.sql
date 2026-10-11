@@ -14,7 +14,7 @@ DROP TABLE IF EXISTS public.phase1_privilege_existing_test;
 DROP TABLE IF EXISTS public.phase1_privilege_future_test;
 
 CREATE TABLE public.phase1_privilege_existing_test (id integer PRIMARY KEY);
-GRANT TRUNCATE, REFERENCES, TRIGGER TO anon, authenticated, service_role;
+GRANT TRUNCATE, REFERENCES, TRIGGER ON TABLE public.phase1_privilege_existing_test TO anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
   GRANT TRUNCATE, REFERENCES, TRIGGER ON TABLES TO anon, authenticated, service_role;
 
