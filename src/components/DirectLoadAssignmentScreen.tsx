@@ -48,7 +48,7 @@ export const DirectLoadAssignmentScreen: React.FC = () => {
       });
       if (rpcError) throw rpcError;
       if (!result?.success) throw new Error('تعذر تأكيد الإسناد المباشر.');
-      setSuccess(`تم الإسناد المباشر بنجاح. المسافة من المكتب: ${result.distance_m} متر.`);
+      setSuccess(`تم إرسال الإسناد المباشر للسائق، وهو الآن في انتظار قبوله. المسافة من المكتب: ${result.distance_m} متر.`);
       setVehicleId('');
       await refresh();
     } catch (e: any) {
