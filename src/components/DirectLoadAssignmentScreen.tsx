@@ -48,11 +48,9 @@ export const DirectLoadAssignmentScreen: React.FC = () => {
       });
       if (rpcError) throw rpcError;
       if (!result?.success) throw new Error('تعذر تأكيد الإسناد المباشر.');
-      const { data: identity, error: identityError } = await supabase
-        .from('bookings')
-        .select('trip_code, assignment_daily_number')
-        .eq('booking_id', result.booking_id)
-        .maybeSingle();
+      const { data: identity, error: identityError } = await supabase.rpc('get_direct_assignment_trip_identity', {
+        p_booking_id: result.booking_id,
+      });
       if (identityError) throw identityError;
       setSuccess(`تم إسناد النقلة للسائق وهي في انتظار قبوله. كود النقلة: ${identity?.trip_code ?? 'تم الإسناد'} · رقم الإسناد اليومي: ${identity?.assignment_daily_number ?? '—'} · المسافة من المكتب: ${result.distance_m} متر.`);
       setVehicleId('');
