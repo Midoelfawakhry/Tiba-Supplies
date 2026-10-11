@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ClipboardCheck, ClipboardList, Clock3, Truck, Users, RefreshCw, LogOut, Phone, MapPin, Factory, Mountain, CheckCircle2, Eye } from 'lucide-react';
+import { ClipboardCheck, ClipboardList, Clock3, Truck, Users, RefreshCw, LogOut, Phone, MapPin, Factory, Mountain, CheckCircle2, Eye, Bot } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { SystemAiAssistant } from './SystemAiAssistant';
 
-type Tab = 'overview' | 'loads' | 'allocations' | 'actual' | 'waiting' | 'directory';
+type Tab = 'overview' | 'loads' | 'allocations' | 'actual' | 'waiting' | 'directory' | 'assistant';
 type Item = Record<string, any>;
 const tabs: {key:Tab; label:string; icon:React.ElementType}[] = [
   {key:'overview',label:'ملخص الفرع',icon:Eye},
@@ -11,6 +12,7 @@ const tabs: {key:Tab; label:string; icon:React.ElementType}[] = [
   {key:'actual',label:'التحميل الفعلي',icon:ClipboardCheck},
   {key:'waiting',label:'قائمة الانتظار',icon:Clock3},
   {key:'directory',label:'دليل التواصل',icon:Users},
+  {key:'assistant',label:'مساعد النظام AI',icon:Bot},
 ];
 const dateTime=(v:any)=>v?new Date(v).toLocaleString('ar-EG'):'—';
 const phoneLink=(v:any)=>v? <a href={'tel:'+v} className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-black text-emerald-800"><Phone size={15}/>{v}</a> : <span className="text-slate-400">لا يوجد رقم</span>;
@@ -75,7 +77,15 @@ export const BranchOfficeApp: React.FC = () => {
         <button onClick={()=>setTab('loads')} className="rounded-2xl border border-orange-200 bg-white p-5 text-right hover:bg-orange-50"><Factory className="mb-3 text-orange-700" size={24}/><h2 className="font-black">أوامر التحميل المتاحة</h2><p className="mt-1 text-sm text-slate-500">أوامر المكتب الرئيسي الموجّهة إلى فرع رأس سدر.</p></button>
         <button onClick={()=>setTab('actual')} className="rounded-2xl border border-emerald-200 bg-white p-5 text-right hover:bg-emerald-50"><ClipboardCheck className="mb-3 text-emerald-700" size={24}/><h2 className="font-black">كشف التحميل الفعلي</h2><p className="mt-1 text-sm text-slate-500">عرض السجلات الحالية والسابقة للتحميل الفعلي.</p></button>
       </div></>}
-      {tab!=='overview'&&<section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+      {tab==='assistant'&&snapshot&&<SystemAiAssistant audience="BRANCH" context={{
+        office: snapshot?.office?.name ?? 'مكتب رأس سدر',
+        totals: { available_loads: counts.loads, allocations: counts.allocations, actual_loading_records: counts.actual, waiting_entries: counts.waiting },
+        available_loads: (snapshot?.available_loads ?? []).slice(0, 60).map((row:Item)=>({ factory:row.factory_name, quarry:row.quarry_name, status:row.status, requested_quantity:row.requested_quantity, committed_quantity:row.committed_quantity })),
+        allocations: (snapshot?.allocations ?? []).slice(0, 60).map((row:Item)=>({ plate_number:row.plate_number, driver_name:row.driver_name, factory:row.factory_name, quarry:row.quarry_name, status:row.status, trip_code:row.trip_code })),
+        actual_loading_records: (snapshot?.actual_loading_records ?? []).slice(0, 60).map((row:Item)=>({ plate_number:row.plate_number, driver_name:row.driver_name, factory:row.factory_name, quarry:row.quarry_name, actual_weight:row.actual_weight, status:row.status, loading_sequence_date:row.loading_sequence_date })),
+        waiting_list: (snapshot?.waiting_list ?? []).slice(0, 60).map((row:Item)=>({ plate_number:row.plate_number, driver_name:row.driver_name, status:row.status, arrived_at:row.arrived_at }))
+      }} />}
+      {tab!=='overview'&&tab!=='assistant'&&<section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="mb-4 flex items-center justify-between gap-3"><div><h2 className="text-lg font-black">{tabs.find(x=>x.key===tab)?.label}</h2><p className="text-xs text-slate-500">عرض فقط · {rows.length} سجل</p></div><span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">بدون صلاحيات تعديل</span></div>
         {rows.length===0?<div className="rounded-xl bg-slate-50 p-8 text-center text-slate-500">{loading?'جاري التحديث...':'لا توجد سجلات للعرض حاليًا.'}</div>:<div className="space-y-3">
           {rows.map((row:Item,index:number)=><article key={row.booking_id||row.load_order_id||row.actual_load_id||row.entry_id||row.driver_id||index} className="rounded-2xl border border-slate-200 p-4">
