@@ -1,24 +1,61 @@
 -- Phase 1: weight-only trip identity and daily Loading Data sequence.
 -- Candidate migration: review and validate in isolated staging before production.
 -- No monetary columns, prices, balances, or payment logic are introduced.
+-- The trip code is assigned at booking/vehicle assignment time. The daily Loading Data
+-- number is assigned when the actual loading row is created.
 
 CREATE TABLE IF NOT EXISTS public.daily_loading_counters (
   loading_date date PRIMARY KEY,
   last_number bigint NOT NULL CHECK (last_number >= 0),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
-
+CREATE TABLE IF NOT EXISTS public.daily_trip_counters (
+  assignment_date date PRIMARY KEY,
+  last_number bigint NOT NULL CHECK (last_number >= 0),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
 REVOKE ALL ON TABLE public.daily_loading_counters FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE public.daily_trip_counters FROM PUBLIC, anon, authenticated;
+
+ALTER TABLE public.bookings
+  ADD COLUMN IF NOT EXISTS trip_code text,
+  ADD COLUMN IF NOT EXISTS assignment_sequence_date date,
+  ADD COLUMN IF NOT EXISTS assignment_daily_number bigint;
 
 ALTER TABLE public.actual_loading_records
   ADD COLUMN IF NOT EXISTS trip_code text,
   ADD COLUMN IF NOT EXISTS daily_load_number bigint,
   ADD COLUMN IF NOT EXISTS loading_sequence_date date;
 
--- Stable one-time backfill for existing loading rows, ordered deterministically.
+-- Deterministic one-time code backfill for existing vehicle assignments.
 WITH numbered AS (
-  SELECT
-    alr.actual_load_id,
+  SELECT b.booking_id,
+    COALESCE(b.booked_at::date, CURRENT_DATE) AS sequence_date,
+    row_number() OVER (
+      PARTITION BY COALESCE(b.booked_at::date, CURRENT_DATE)
+      ORDER BY b.booked_at, b.booking_id
+    )::bigint AS day_number
+  FROM public.bookings b
+)
+UPDATE public.bookings b
+SET assignment_sequence_date = n.sequence_date,
+    assignment_daily_number = n.day_number,
+    trip_code = format('TIBA-%s-%s', to_char(n.sequence_date, 'YYYYMMDD'), lpad(n.day_number::text, 6, '0'))
+FROM numbered n
+WHERE n.booking_id = b.booking_id
+  AND (b.trip_code IS NULL OR b.assignment_daily_number IS NULL OR b.assignment_sequence_date IS NULL);
+
+INSERT INTO public.daily_trip_counters (assignment_date, last_number)
+SELECT assignment_sequence_date, max(assignment_daily_number)
+FROM public.bookings
+GROUP BY assignment_sequence_date
+ON CONFLICT (assignment_date) DO UPDATE
+SET last_number = GREATEST(public.daily_trip_counters.last_number, EXCLUDED.last_number),
+    updated_at = now();
+
+-- Daily Loading Data number is independent of assignment sequence.
+WITH numbered AS (
+  SELECT alr.actual_load_id,
     COALESCE(alr.load_date, alr.created_at::date, CURRENT_DATE) AS sequence_date,
     row_number() OVER (
       PARTITION BY COALESCE(alr.load_date, alr.created_at::date, CURRENT_DATE)
@@ -29,9 +66,10 @@ WITH numbered AS (
 UPDATE public.actual_loading_records alr
 SET loading_sequence_date = n.sequence_date,
     daily_load_number = n.day_number,
-    trip_code = format('TIBA-%s-%s', to_char(n.sequence_date, 'YYYYMMDD'), lpad(n.day_number::text, 6, '0'))
+    trip_code = COALESCE(b.trip_code, format('TIBA-%s-%s', to_char(n.sequence_date, 'YYYYMMDD'), lpad(n.day_number::text, 6, '0')))
 FROM numbered n
-WHERE n.actual_load_id = alr.actual_load_id
+LEFT JOIN public.bookings b ON b.booking_id = (SELECT x.booking_id FROM public.actual_loading_records x WHERE x.actual_load_id = n.actual_load_id)
+WHERE alr.actual_load_id = n.actual_load_id
   AND (alr.trip_code IS NULL OR alr.daily_load_number IS NULL OR alr.loading_sequence_date IS NULL);
 
 INSERT INTO public.daily_loading_counters (loading_date, last_number)
@@ -42,15 +80,61 @@ ON CONFLICT (loading_date) DO UPDATE
 SET last_number = GREATEST(public.daily_loading_counters.last_number, EXCLUDED.last_number),
     updated_at = now();
 
+ALTER TABLE public.bookings
+  ALTER COLUMN trip_code SET NOT NULL,
+  ALTER COLUMN assignment_sequence_date SET NOT NULL,
+  ALTER COLUMN assignment_daily_number SET NOT NULL;
 ALTER TABLE public.actual_loading_records
   ALTER COLUMN trip_code SET NOT NULL,
   ALTER COLUMN daily_load_number SET NOT NULL,
   ALTER COLUMN loading_sequence_date SET NOT NULL;
 
+CREATE UNIQUE INDEX IF NOT EXISTS uq_bookings_trip_code ON public.bookings (trip_code);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_bookings_assignment_daily_number
+  ON public.bookings (assignment_sequence_date, assignment_daily_number);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_actual_loading_records_trip_code
   ON public.actual_loading_records (trip_code);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_actual_loading_records_daily_number
   ON public.actual_loading_records (loading_sequence_date, daily_load_number);
+
+CREATE OR REPLACE FUNCTION public.assign_booking_trip_code()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $function$
+DECLARE
+  v_date date;
+  v_number bigint;
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    v_date := COALESCE(NEW.booked_at::date, CURRENT_DATE);
+    INSERT INTO public.daily_trip_counters (assignment_date, last_number)
+    VALUES (v_date, 1)
+    ON CONFLICT (assignment_date) DO UPDATE
+      SET last_number = public.daily_trip_counters.last_number + 1,
+          updated_at = now()
+    RETURNING last_number INTO v_number;
+    NEW.assignment_sequence_date := v_date;
+    NEW.assignment_daily_number := v_number;
+    NEW.trip_code := format('TIBA-%s-%s', to_char(v_date, 'YYYYMMDD'), lpad(v_number::text, 6, '0'));
+    RETURN NEW;
+  END IF;
+  IF NEW.trip_code IS DISTINCT FROM OLD.trip_code
+     OR NEW.assignment_daily_number IS DISTINCT FROM OLD.assignment_daily_number
+     OR NEW.assignment_sequence_date IS DISTINCT FROM OLD.assignment_sequence_date THEN
+    RAISE EXCEPTION 'TRIP_IDENTITY_IS_IMMUTABLE';
+  END IF;
+  RETURN NEW;
+END;
+$function$;
+
+DROP TRIGGER IF EXISTS trg_assign_booking_trip_code ON public.bookings;
+CREATE TRIGGER trg_assign_booking_trip_code
+BEFORE INSERT OR UPDATE OF trip_code, assignment_daily_number, assignment_sequence_date
+ON public.bookings
+FOR EACH ROW EXECUTE FUNCTION public.assign_booking_trip_code();
+REVOKE ALL ON FUNCTION public.assign_booking_trip_code() FROM PUBLIC, anon, authenticated;
 
 CREATE OR REPLACE FUNCTION public.assign_actual_loading_trip_code()
 RETURNS trigger
@@ -61,6 +145,7 @@ AS $function$
 DECLARE
   v_date date;
   v_number bigint;
+  v_booking_trip_code text;
 BEGIN
   IF TG_OP = 'INSERT' THEN
     v_date := COALESCE(NEW.load_date, NEW.created_at::date, CURRENT_DATE);
@@ -73,7 +158,16 @@ BEGIN
 
     NEW.loading_sequence_date := v_date;
     NEW.daily_load_number := v_number;
-    NEW.trip_code := format('TIBA-%s-%s', to_char(v_date, 'YYYYMMDD'), lpad(v_number::text, 6, '0'));
+    IF NEW.booking_id IS NOT NULL THEN
+      SELECT b.trip_code INTO v_booking_trip_code
+      FROM public.bookings b WHERE b.booking_id = NEW.booking_id;
+      IF v_booking_trip_code IS NULL THEN
+        RAISE EXCEPTION 'BOOKING_TRIP_CODE_MISSING';
+      END IF;
+      NEW.trip_code := v_booking_trip_code;
+    ELSE
+      NEW.trip_code := format('TIBA-%s-%s', to_char(v_date, 'YYYYMMDD'), lpad(v_number::text, 6, '0'));
+    END IF;
     RETURN NEW;
   END IF;
 
@@ -90,9 +184,7 @@ DROP TRIGGER IF EXISTS trg_assign_actual_loading_trip_code ON public.actual_load
 CREATE TRIGGER trg_assign_actual_loading_trip_code
 BEFORE INSERT OR UPDATE OF trip_code, daily_load_number, loading_sequence_date
 ON public.actual_loading_records
-FOR EACH ROW
-EXECUTE FUNCTION public.assign_actual_loading_trip_code();
-
+FOR EACH ROW EXECUTE FUNCTION public.assign_actual_loading_trip_code();
 REVOKE ALL ON FUNCTION public.assign_actual_loading_trip_code() FROM PUBLIC, anon, authenticated;
 
 CREATE OR REPLACE FUNCTION public.get_account_statement_records(
