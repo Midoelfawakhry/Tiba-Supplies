@@ -71,6 +71,17 @@ BEGIN
     END IF;
   END LOOP;
 
+  -- Cancellation must never route queue ownership through the geofence BRANCH.
+  SELECT pg_get_functiondef(to_regprocedure(
+    'public.office_cancel_booking(uuid,text,boolean)'
+  )) INTO v_def;
+  IF position('OFFICE_TYPE = ''HEAD''' in upper(v_def)) = 0
+     OR position('OFFICE_TYPE = ''BRANCH''' in upper(v_def)) > 0
+     OR position('V_HEAD_OFFICE_ID' in upper(v_def)) = 0
+     OR position('QUEUE_ENTRY_ID' in upper(v_def)) = 0 THEN
+    RAISE EXCEPTION 'CANCELLATION_MUST_USE_HEAD_OPERATIONAL_QUEUE';
+  END IF;
+
   -- Critical SECURITY DEFINER entry points must pin search_path to public (or
   -- an equivalently reviewed fixed path) to reduce object-shadowing risk.
   FOREACH v_sig IN ARRAY ARRAY[
