@@ -24,7 +24,9 @@ Status: **NOT APPROVED FOR PRODUCTION** until all gates below pass.
 
 - Added `supabase/migrations/20261011150000_rebuild_head_owned_cancellation.sql` as a new forward-only candidate. It replaces the cancellation RPC definition explicitly rather than rewriting role-gate source text.
 - Candidate cancellation resolves the active HEAD office, verifies the booking belongs to HEAD operational ownership, cancels the booking, clears active queue rows for the driver, and requeues eligible vehicles under HEAD only. Standalone direct assignments are checked against their HEAD-owned audit row; BRANCH is not selected as a queue office.
-- Updated `supabase/tests/phase1_direct_assignment_security_checks.sql` to correct the role-gate regex escapes and add static checks for HEAD-owned cancellation. These checks are still **not executed**; static definition checks do not prove transactional/concurrency behavior.
+- Updated `supabase/tests/phase1_direct_assignment_security_checks.sql` to correct the role-gate regex escapes and add static checks for HEAD-owned cancellation and dispatch. These checks are still **not executed**; static definition checks do not prove transactional/concurrency behavior.
+- Added `supabase/migrations/20261011151000_dispatch_from_head_queue.sql`: dispatch now selects waiting entries from `load_orders.office_id` (the operational HEAD owner), requires HEAD/ADMIN authorization, and checks the geofence helper's `eligible` result without equating the geofence office ID to the queue owner.
+- Added static assertions for this dispatch separation. They are still unexecuted SQL checks; frontend CI does not execute them.
 - This candidate has not been run against staging or production. Before approval, validate the exact queue uniqueness constraints, test rollback and concurrent cancellation, and verify that all operational write RPCs use HEAD consistently. Production remains unchanged.
 
 ## Repository migration hygiene
