@@ -82,6 +82,16 @@ BEGIN
     RAISE EXCEPTION 'CANCELLATION_MUST_USE_HEAD_OPERATIONAL_QUEUE';
   END IF;
 
+  -- Dispatch must authorize only HEAD/ADMIN and consume the HEAD-owned queue.
+  SELECT pg_get_functiondef(to_regprocedure('public.dispatch_load(uuid)')) INTO v_def;
+  IF position('W.OFFICE_ID = V_LOAD.OFFICE_ID' in upper(v_def)) = 0
+     OR position('GEO.RESULT->>''ELIGIBLE'' = ''TRUE''' in upper(v_def)) = 0
+     OR position('W.OFFICE_ID = V_LOAD.CHECK_IN_OFFICE_ID' in upper(v_def)) > 0
+     OR upper(v_def) ~ $R\.NAME\s+IN\s*\([^)]*'BRANCH'$
+     OR upper(v_def) ~ $R\.NAME\s*=\s*'BRANCH'$ THEN
+    RAISE EXCEPTION 'DISPATCH_MUST_USE_HEAD_QUEUE_AND_GEOFENCE_ELIGIBILITY_ONLY';
+  END IF;
+
   -- Critical SECURITY DEFINER entry points must pin search_path to public (or
   -- an equivalently reviewed fixed path) to reduce object-shadowing risk.
   FOREACH v_sig IN ARRAY ARRAY[
