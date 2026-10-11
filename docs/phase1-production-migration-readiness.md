@@ -10,12 +10,24 @@ Status: **NOT APPROVED FOR PRODUCTION** until all gates below pass.
 - Keep BRANCH (Ras Sedr) as the geofence/location reference only.
 - Direct assignment stays pending until the driver explicitly accepts it; only acceptance creates the actual loading record.
 
+## Current audit findings (2026-10-11)
+- The latest reviewed branch head is `38a2c53bb548ccf5bde2fef5d30f133a88b67242`; PR #13 remains open and draft.
+- The previously reported duplicate `20261011014000` filename is no longer present in the current branch listing; the current file is `20261011014000_enforce_head_office_write_permissions.sql`. Keep this as a verified fix, but re-run collision checks on the final candidate commit.
+- Migration naming is still inconsistent: the repository contains several date-only prefixes such as `20261010_...` and multiple files beginning `20261011_...`, while production's migration ledger contains 14-digit versions. Do not run a clean staging migration until every migration has a unique, deterministic version and the repo-to-production migration mapping is reconciled. Do not bulk-rename files blindly: migration ordering and whether each change has already been applied must be established first.
+- `20261011014000_enforce_head_office_write_permissions.sql` rewrites function source using text replacements. This is brittle and must not be accepted as the final authorization control until every target function/signature is checked and the migration fails closed when a role gate is not found. Prefer explicit reviewed function definitions or a tested, signature-aware patch.
+- The direct-assignment flow is intended to create a `BOOKED` offer, with an actual loading record created only after the assigned driver accepts. This must be proven by database tests, including concurrent acceptance.
+- The current driver snapshot migration includes both `updated_at` and `captured_at` freshness checks. Confirm the same rule in every eligibility/dispatch RPC and test stale/future timestamps.
+- Production currently has no linked driver auth accounts, no active vehicle-driver assignments, no live location rows, and no actual loading records. End-to-end driver/GPS acceptance cannot be verified against production; use a separate test environment with synthetic test records.
+- Production migration history has not been changed during this review. No production migration has been applied.
+
 ## Repository migration hygiene
 - Migration filenames must have unique version prefixes.
 - Never rely on edits to migration versions already recorded in production; add a new forward-only corrective migration.
-- Apply the migration set to a clean non-production database in filename order.
+- Reconcile every repository migration against the production migration ledger before deciding what staging should replay.
+- Apply the migration set to a clean non-production database in the intended order.
 - Compare the resulting schema and function definitions against production before considering release.
 - Inspect every SECURITY DEFINER RPC for explicit role/ownership checks and explicit EXECUTE grants.
+- Do not merge PR #13 or apply production migrations until all release gates pass.
 
 ## Required SQL regression cases
 1. HEAD can create and directly assign a load; BRANCH cannot create, dispatch, cancel, redirect, or edit operational driver/vehicle records.
@@ -38,7 +50,9 @@ Status: **NOT APPROVED FOR PRODUCTION** until all gates below pass.
 - Verify notification, driver acceptance, delivery ticket upload, and final report end-to-end.
 
 ## Release gates
+- [ ] Migration inventory and repo-to-production version mapping approved.
 - [ ] Unique migration versions and a reviewed migration manifest.
+- [ ] Authorization migration no longer relies on unverified text replacements.
 - [ ] Clean staging migration run succeeds.
 - [ ] SQL regression tests pass, including negative authorization cases.
 - [ ] App lint/build passes on the final commit.
