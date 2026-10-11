@@ -142,6 +142,29 @@ BEGIN
     RAISE EXCEPTION 'REDIRECT_MUST_SUPPORT_POST_DELIVERY_CORRECTION_AND_AUDIT';
   END IF;
 
+  -- Branch app must be read-only and must not receive the full HEAD snapshot.
+  IF to_regprocedure('public.get_branch_office_snapshot()') IS NULL
+     OR to_regprocedure('public.get_branch_employee_directory()') IS NULL
+     OR to_regprocedure('public.set_branch_employee_active(uuid,boolean)') IS NULL THEN
+    RAISE EXCEPTION 'BRANCH_APP_REQUIRED_RPC_MISSING';
+  END IF;
+  SELECT pg_get_functiondef(to_regprocedure('public.get_phase1_snapshot()')) INTO v_def;
+  IF position('R.NAME IN (''ADMIN'', ''HEAD_OFFICE'')' in upper(v_def)) = 0
+     OR position('R.NAME IN (''ADMIN'', ''HEAD_OFFICE'', ''BRANCH'')' in upper(v_def)) > 0 THEN
+    RAISE EXCEPTION 'BRANCH_MUST_NOT_READ_FULL_HEAD_SNAPSHOT';
+  END IF;
+  SELECT pg_get_functiondef(to_regprocedure('public.get_branch_office_snapshot()')) INTO v_def;
+  IF position('R.NAME = ''BRANCH''' in upper(v_def)) = 0
+     OR position('AU.OFFICE_ID' in upper(v_def)) = 0
+     OR position('OFFICE_TYPE = ''BRANCH''' in upper(v_def)) = 0 THEN
+    RAISE EXCEPTION 'BRANCH_SNAPSHOT_MUST_ENFORCE_BRANCH_OFFICE_SCOPE';
+  END IF;
+  SELECT pg_get_functiondef(to_regprocedure('public.get_branch_employee_directory()')) INTO v_def;
+  IF position('R.NAME IN (''ADMIN'', ''HEAD_OFFICE'')' in upper(v_def)) = 0
+     OR position('R.NAME IN (''ADMIN'', ''HEAD_OFFICE'', ''BRANCH'')' in upper(v_def)) > 0 THEN
+    RAISE EXCEPTION 'BRANCH_EMPLOYEE_MANAGEMENT_MUST_BE_HEAD_ONLY';
+  END IF;
+
   -- Critical SECURITY DEFINER entry points must pin search_path to public (or
   -- an equivalently reviewed fixed path) to reduce object-shadowing risk.
   FOREACH v_sig IN ARRAY ARRAY[
