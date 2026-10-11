@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Building2, Mountain, RefreshCw, Printer, FileText, Scale } from 'lucide-react';
 import { getLiveSnapshot, LiveSnapshot } from '../services/liveData';
+import { supabase } from '../lib/supabase';
 
 type StatementKind = 'factory' | 'quarry';
 type Row = Record<string, any>;
@@ -15,6 +16,7 @@ const numericWeight = (row: Row) => {
 
 export const AccountStatementsScreen: React.FC<{ kind: StatementKind }> = ({ kind }) => {
   const [snapshot, setSnapshot] = useState<LiveSnapshot | null>(null);
+  const [statementRows, setStatementRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [entityId, setEntityId] = useState('');
@@ -25,7 +27,13 @@ export const AccountStatementsScreen: React.FC<{ kind: StatementKind }> = ({ kin
     setLoading(true);
     setError('');
     try {
-      setSnapshot(await getLiveSnapshot());
+      const [snapshotData, statementResult] = await Promise.all([
+        getLiveSnapshot(),
+        supabase.rpc('get_account_statement_records', { p_from: fromDate || null, p_to: toDate || null }),
+      ]);
+      if (statementResult.error) throw statementResult.error;
+      setSnapshot(snapshotData);
+      setStatementRows(Array.isArray(statementResult.data) ? statementResult.data : []);
     } catch (e: any) {
       setError(e?.message || 'تعذر تحميل كشف الحساب.');
     } finally {
@@ -39,13 +47,13 @@ export const AccountStatementsScreen: React.FC<{ kind: StatementKind }> = ({ kin
   const entityKey = kind === 'factory' ? 'factory_id' : 'quarry_id';
   const entityName = kind === 'factory' ? 'factory_name' : 'quarry_name';
   const Icon = kind === 'factory' ? Building2 : Mountain;
-  const records = useMemo(() => (snapshot?.actual_loading_records ?? []).filter((row: Row) => {
+  const records = useMemo(() => statementRows.filter((row: Row) => {
     if (entityId && String(row[entityKey] ?? '') !== entityId) return false;
     const date = dateValue(row);
     if (fromDate && (!date || date < fromDate)) return false;
     if (toDate && (!date || date > toDate)) return false;
     return true;
-  }).sort((a: Row, b: Row) => dateValue(b).localeCompare(dateValue(a))), [snapshot, entityId, entityKey, fromDate, toDate]);
+  }).sort((a: Row, b: Row) => dateValue(b).localeCompare(dateValue(a))), [statementRows, entityId, entityKey, fromDate, toDate]);
 
   const totalWeight = records.reduce((sum: number, row: Row) => sum + numericWeight(row), 0);
   const selectedEntity = entities.find((entity: Row) => String(entity[entityKey]) === entityId);
