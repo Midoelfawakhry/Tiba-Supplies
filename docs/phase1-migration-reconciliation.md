@@ -84,3 +84,23 @@ The current candidate cancellation function in `20261011014000_enforce_head_offi
 4. Verify the cancellation queue cleanup and insertion remain atomic and preserve one active queue entry per driver/office.
 
 This is a static review finding. No SQL migration or SQL regression test has been executed against staging, and production remains unchanged.
+
+## Read-only production checks (2026-10-11, no writes performed)
+
+The following checks were executed using SELECT-only queries and Supabase advisory inspection. They are live observations, not staging test results.
+
+- Office configuration: one active HEAD office (Ismailia) and one active BRANCH office (Ras Sedr); BRANCH has coordinates and a 10,000 m radius. HEAD has no coordinates, which is consistent with HEAD being the operational office rather than the geofence reference.
+- Operational data snapshot: 153 drivers, 138 vehicles, 0 drivers linked to auth users, 0 active vehicle-driver assignments, 0 live-location rows, 0 bookings, 0 active waiting-list entries, 0 actual-loading records, and 0 historical-loading-staging rows. This confirms that live end-to-end dispatch/acceptance tests cannot be meaningfully run with existing production data.
+- The listed critical RPCs are SECURITY DEFINER and their definitions include a fixed `search_path` setting. This check only confirms the setting is present; it does not prove the role logic is safe.
+- The live definitions for the listed write RPCs still contain the term `BRANCH`. Since BRANCH is also a legitimate geofence reference, a text match alone is not proof of authorization; exact role predicates must be reviewed per function. The earlier production definition audit did find BRANCH in role gates, so server-side authorization remains a release blocker until proven otherwise.
+- A read-only query of `pg_policies` returned no policies for the sampled operational tables (`bookings`, `actual_loading_records`, `standalone_direct_load_audit`, `waiting_list_entries`, `driver_live_locations`, `drivers`, `vehicles`). RLS is enabled on these tables. This may be intentional if all access is through SECURITY DEFINER RPCs, but it requires a deliberate access-path review before launch; do not add broad policies as a quick fix.
+- Supabase security advisor reports leaked-password protection is disabled. Review and enable it in Auth settings if compatible with the app's sign-in flow.
+- Supabase performance advisor reports 20 foreign keys without covering indexes, including several on actual loading, audit, driver location, and load-order tables. These are performance findings, not proof of incorrect behavior. Prioritize indexes based on actual query patterns and validate each candidate before changing production.
+- The advisory output also flags SECURITY DEFINER functions exposed to authenticated users. This warning is generic; each RPC must be reviewed for intentional exposure, internal authorization, ownership checks, and least-privilege grants.
+
+## Safe-check execution status
+
+- Completed: read-only migration ledger retrieval; read-only schema/column/foreign-key inventory; read-only office and operational count queries; read-only function metadata checks; read-only policy inventory; Supabase security and performance advisor retrieval.
+- Not executed: the SQL regression script in `supabase/tests/phase1_direct_assignment_security_checks.sql`, because it is a DO block that raises errors and is intended to validate a fully reconciled migration set; running it against production is not an acceptable substitute for staging.
+- Not executed: role-based RPC calls, booking acceptance, cancellation, redirect, delivery, or queue mutation tests, because they would require synthetic auth identities/data and could mutate production.
+- No schema changes, data writes, migration applications, PR merges, or production releases were performed during these checks.
