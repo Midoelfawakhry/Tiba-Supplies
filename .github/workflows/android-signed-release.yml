@@ -66,7 +66,7 @@ jobs:
             fi
           done
           if [ "$missing" -ne 0 ]; then
-            echo "Configure TIBA_ANDROID_KEYSTORE_BASE64, TIBA_ANDROID_KEYSTORE_PASSWORD, TIBA_ANDROID_KEY_ALIAS, and TIBA_ANDROID_KEY_PASSWORD using the existing production signing key."
+            echo "Configure TIBA_ANDROID_KEYSTORE_BASE64, TIBA_ANDROID_KEYSTORE_PASSWORD, TIBA_ANDROID_KEY_ALIAS, and TIBA_ANDROID_KEY_PASSWORD using the release signing key created for Tiba-Supplies."
             exit 1
           fi
           echo "Required signing secrets are present; secret values will not be logged."
