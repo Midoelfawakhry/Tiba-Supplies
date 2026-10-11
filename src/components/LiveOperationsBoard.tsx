@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { RefreshCw, LogOut, MapPin, Factory, Mountain, Truck, ClipboardList, CheckCircle2, Clock3, Users } from 'lucide-react';
+import { RefreshCw, LogOut, MapPin, Factory, Mountain, Truck, ClipboardList, CheckCircle2, Clock3, Users, Bot } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { VehicleTrackingScreen } from './VehicleTrackingScreen';
 import { OfficeDirectoryScreen } from './OfficeDirectoryScreen';
