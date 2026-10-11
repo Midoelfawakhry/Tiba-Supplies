@@ -6,9 +6,10 @@ import { supabase } from '../lib/supabase';
 type StatementKind = 'factory' | 'quarry';
 type Row = Record<string, any>;
 
-const dateValue = (row: Row) => String(row.load_date ?? row.created_at ?? '').slice(0, 10);
+const dateValue = (row: Row) => String(row.loading_sequence_date ?? row.load_date ?? row.created_at ?? '').slice(0, 10);
 const formatDate = (value: string) => value ? new Date(`${value}T12:00:00`).toLocaleDateString('ar-EG') : '—';
 const numericWeight = (row: Row) => {
+  if (!row.delivery_confirmed_at) return 0;
   const value = row.actual_weight ?? row.actual_weight_tons ?? row.weight_tons ?? row.net_weight;
   const number = Number(value);
   return Number.isFinite(number) ? number : 0;
@@ -68,7 +69,7 @@ export const AccountStatementsScreen: React.FC<{ kind: StatementKind }> = ({ kin
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex items-center gap-3">
         <span className={kind === 'factory' ? 'grid h-11 w-11 place-items-center rounded-2xl bg-sky-100 text-sky-700' : 'grid h-11 w-11 place-items-center rounded-2xl bg-amber-100 text-amber-700'}><Icon size={22}/></span>
-        <div><h2 className="text-lg font-black">{kind === 'factory' ? 'كشف حساب المصنع' : 'كشف حساب المحجر'}</h2><p className="mt-1 text-xs text-slate-500">كشف حركة التحميل الفعلي حسب الفترة المحددة</p></div>
+        <div><h2 className="text-lg font-black">{kind === 'factory' ? 'كشف تحميل المصنع' : 'كشف تحميل المحجر'}</h2><p className="mt-1 text-xs text-slate-500">كشف حركة التحميل الفعلي حسب الفترة المحددة</p></div>
       </div>
       <div className="flex gap-2 print:hidden">
         <button type="button" onClick={() => void load()} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-3 py-2 text-xs font-bold disabled:opacity-50"><RefreshCw size={15} className={loading ? 'animate-spin' : ''}/> تحديث</button>
@@ -118,6 +119,6 @@ export const AccountStatementsScreen: React.FC<{ kind: StatementKind }> = ({ kin
           </tr>)}</tbody>
         </table>
       </div>}
-    <p className="text-[10px] text-slate-400">Tiba Supplies · {selectedEntity?.name ?? (kind === 'factory' ? 'كشف حساب المصانع' : 'كشف حساب المحاجر')}</p>
+    <p className="text-[10px] text-slate-400">Tiba Supplies · {selectedEntity?.name ?? (kind === 'factory' ? 'كشف تحميل المصانع' : 'كشف تحميل المحاجر')}</p>
   </section>;
 };
