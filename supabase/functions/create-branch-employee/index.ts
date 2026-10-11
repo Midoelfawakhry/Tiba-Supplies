@@ -105,7 +105,7 @@ function normalizeEgyptianPhone(value: unknown): string | null {
   if (phone.startsWith("00")) phone = "+" + phone.slice(2);
   if (/^01[0125]\d{8}$/.test(phone)) phone = "+20" + phone.slice(1);
   if (/^20(10|11|12|15)\d{8}$/.test(phone)) phone = "+" + phone;
-  return /^\\+20(10|11|12|15)\d{8}$/.test(phone) ? phone : null;
+  return /^\+20(10|11|12|15)\d{8}$/.test(phone) ? phone : null;
 }
 
 function json(body: Record<string, unknown>, status = 200) {
