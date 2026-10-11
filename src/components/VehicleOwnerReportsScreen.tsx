@@ -41,7 +41,7 @@ export const VehicleOwnerReportsScreen: React.FC = () => {
         trips: Array.isArray(data?.trips) ? data.trips : [],
       });
     } catch (e: any) {
-      setError(e?.message || 'تعذر تحميل حسابات العربيات والملاك.');
+      setError(e?.message || 'تعذر تحميل تقارير أوزان العربيات والملاك.');
     } finally { setLoading(false); }
   }
 
