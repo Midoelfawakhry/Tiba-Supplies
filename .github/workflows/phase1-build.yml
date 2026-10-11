@@ -46,3 +46,7 @@ jobs:
         env:
           PGPASSWORD: postgres
         run: psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -U postgres -d tibasupplies_test -f supabase/tests/phase1_client_table_privilege_checks.sql
+      - name: Run single active branch office regression test
+        env:
+          PGPASSWORD: postgres
+        run: psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -U postgres -d tibasupplies_test -f supabase/tests/phase1_single_active_branch_office_checks.sql
