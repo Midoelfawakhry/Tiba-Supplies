@@ -60,7 +60,21 @@ export const SystemAiAssistant: React.FC<SystemAiAssistantProps> = ({ audience, 
       }
       setMessages(current => [...current, { role: 'assistant', content: data.answer }]);
     } catch (e: any) {
-      setError(e?.message || 'تعذر الاتصال بمساعد النظام. تأكد من اتصال الإنترنت وإعداد المساعد.');
+      let message = e?.message || 'تعذر الاتصال بمساعد النظام. تأكد من اتصال الإنترنت وإعداد المساعد.';
+      try {
+        const response = e?.context?.clone?.();
+        const payload = response ? await response.json() : null;
+        if (payload?.error === 'AI_NOT_CONFIGURED') {
+          message = 'مساعد الذكاء الاصطناعي محتاج إعداد مفتاح Gemini الآمن في Supabase قبل الاستخدام.';
+        } else if (payload?.error === 'INSUFFICIENT_ROLE' || payload?.error === 'BRANCH_OFFICE_REQUIRED') {
+          message = 'حسابك أو مكتبك غير مصرح له باستخدام المساعد من الواجهة دي.';
+        } else if (payload?.error === 'AI_RATE_LIMITED') {
+          message = 'طلبات المساعد كتير في الوقت الحالي. استنى شوية وجرّب تاني.';
+        }
+      } catch {
+        // Keep the safe generic message if the function error body is unavailable.
+      }
+      setError(message);
       setMessages(current => current.filter((message, index) => !(index === current.length - 1 && message.role === 'user' && message.content === clean)));
     } finally {
       setBusy(false);
