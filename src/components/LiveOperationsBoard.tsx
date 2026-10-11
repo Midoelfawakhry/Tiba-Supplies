@@ -161,7 +161,6 @@ export const LiveOperationsBoard: React.FC = () => {
               {([
                 ['dashboard', 'مركز التشغيل', ClipboardList],
                 ['drivers', 'قائمة السائقين', Users],
-                ['vehicles', 'كل العربيات', Truck],
                 ['vehicleReports', 'حسابات العربيات والملاك', Users],
                 ['factoryStatement', 'كشف حساب المصنع', Factory],
                 ['quarryStatement', 'كشف حساب المحجر', Mountain],
@@ -282,7 +281,6 @@ export const LiveOperationsBoard: React.FC = () => {
               <div className="grid grid-cols-2 gap-3 mt-4">
                 <div className="rounded-2xl bg-slate-50 p-4"><Factory className="h-5 w-5 text-blue-700" /><b className="block mt-2 text-xl">{data?.factories.length ?? 0}</b><span className="text-xs text-slate-500">مصنع نشط</span></div>
                 <div className="rounded-2xl bg-slate-50 p-4"><Mountain className="h-5 w-5 text-orange-600" /><b className="block mt-2 text-xl">{data?.quarries.length ?? 0}</b><span className="text-xs text-slate-500">محجر نشط</span></div>
-                <div className="rounded-2xl bg-slate-50 p-4"><Truck className="h-5 w-5 text-blue-600" /><b className="block mt-2 text-xl">{data?.vehicles.length ?? 0}</b><span className="text-xs text-slate-500">عربية نشطة</span></div>
                 <div className="rounded-2xl bg-slate-50 p-4"><Clock3 className="h-5 w-5 text-violet-600" /><b className="block mt-2 text-xl">{data?.actual_loading_records.length ?? 0}</b><span className="text-xs text-slate-500">سجل تحميل فعلي</span></div>
               </div>
             </div>
