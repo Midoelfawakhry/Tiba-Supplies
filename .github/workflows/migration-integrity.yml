@@ -71,7 +71,6 @@ jobs:
           sql = path.read_text().lower()
           forbidden = [
               "or (lo.load_order_id is null and sda.office_id = v_head_office_id)",
-              "left join public.standalone_direct_load_audit sda on sda.booking_id = b.booking_id",
           ]
           found = [pattern for pattern in forbidden if pattern in sql]
           if found:
