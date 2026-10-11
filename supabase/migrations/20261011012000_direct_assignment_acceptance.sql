@@ -51,7 +51,11 @@ BEGIN
 
   SELECT * INTO v_location FROM public.driver_live_locations
   WHERE driver_id=v_driver_id AND vehicle_id=p_vehicle_id;
-  IF NOT FOUND OR v_location.updated_at < now()-interval '10 minutes'
+  IF NOT FOUND
+     OR v_location.captured_at IS NULL
+     OR v_location.captured_at < now()-interval '10 minutes'
+     OR v_location.captured_at > now()+interval '1 minute'
+     OR v_location.updated_at < now()-interval '10 minutes'
     THEN RAISE EXCEPTION 'VEHICLE_LOCATION_MISSING_OR_STALE'; END IF;
 
   v_distance_m := 2*6371000*asin(sqrt(

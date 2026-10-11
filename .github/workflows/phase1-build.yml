@@ -2,7 +2,7 @@ name: Phase 1 build
 
 on:
   push:
-    branches: [main, phase1-core-workflow]
+    branches: [main, phase1-core-workflow, phase1-direct-assignment-acceptance]
   pull_request:
     branches: [main]
 
