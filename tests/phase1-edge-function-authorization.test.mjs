@@ -99,6 +99,7 @@ test("Tiba AI assistant requires an authenticated active profile and checks role
 test("AI key stays server-side and assistant is advisory-only", () => {
   assert.match(aiFunctionSource, /Deno\.env\.get\("GEMINI_API_KEY"\)/);
   assert.doesNotMatch(aiUiSource, /GEMINI_API_KEY|generativelanguage\.googleapis\.com/);
+  assert.match(aiUiSource, /محتاج إعداد مفتاح Gemini الآمن في Supabase/);
   assert.match(aiFunctionSource, /لا تنفذ أي إجراء/);
   assert.match(aiFunctionSource, /لا تقترح تنفيذ تعديلات أو إسناد أو إلغاء من حساب الفرع/);
 });
