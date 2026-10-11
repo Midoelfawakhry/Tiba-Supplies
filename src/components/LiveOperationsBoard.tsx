@@ -5,6 +5,7 @@ import { VehicleTrackingScreen } from './VehicleTrackingScreen';
 import { OfficeDirectoryScreen } from './OfficeDirectoryScreen';
 import { DirectLoadAssignmentScreen } from './DirectLoadAssignmentScreen';
 import { VehicleOwnerReportsScreen } from './VehicleOwnerReportsScreen';
+import { AccountStatementsScreen } from './AccountStatementsScreen';
 import { getLiveSnapshot, LiveSnapshot, liveName } from '../services/liveData';
 
 const statusLabel: Record<string, string> = {
@@ -14,7 +15,7 @@ const statusLabel: Record<string, string> = {
   CANCELLED: 'ملغي',
 };
 
-type OfficeScreen = 'dashboard' | 'tracking' | 'directory' | 'direct' | 'drivers' | 'vehicles' | 'waiting' | 'orders' | 'actual' | 'factories' | 'quarries' | 'vehicleReports';
+type OfficeScreen = 'dashboard' | 'tracking' | 'directory' | 'direct' | 'drivers' | 'vehicles' | 'waiting' | 'orders' | 'actual' | 'factories' | 'quarries' | 'vehicleReports' | 'factoryStatement' | 'quarryStatement';
 const screenPalette: Record<OfficeScreen, { selected: string; wash: string }> = {
   dashboard: { selected: 'bg-teal-600 hover:bg-teal-700', wash: 'bg-teal-50/40' },
   drivers: { selected: 'bg-red-600 hover:bg-red-700', wash: 'bg-red-50/50' },
@@ -25,6 +26,8 @@ const screenPalette: Record<OfficeScreen, { selected: string; wash: string }> = 
   factories: { selected: 'bg-sky-600 hover:bg-sky-700', wash: 'bg-sky-50/50' },
   quarries: { selected: 'bg-amber-600 hover:bg-amber-700', wash: 'bg-amber-50/50' },
   vehicleReports: { selected: 'bg-sky-700 hover:bg-sky-800', wash: 'bg-sky-50/50' },
+  factoryStatement: { selected: 'bg-cyan-700 hover:bg-cyan-800', wash: 'bg-cyan-50/50' },
+  quarryStatement: { selected: 'bg-amber-700 hover:bg-amber-800', wash: 'bg-amber-50/50' },
   tracking: { selected: 'bg-cyan-600 hover:bg-cyan-700', wash: 'bg-cyan-50/50' },
   directory: { selected: 'bg-indigo-600 hover:bg-indigo-700', wash: 'bg-indigo-50/50' },
   direct: { selected: 'bg-fuchsia-600 hover:bg-fuchsia-700', wash: 'bg-fuchsia-50/50' },
@@ -40,7 +43,7 @@ export const LiveOperationsBoard: React.FC = () => {
   const [priority, setPriority] = useState('3');
   const [savingOrder, setSavingOrder] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-  const [activeScreen, setActiveScreen] = useState<'dashboard' | 'tracking' | 'directory' | 'direct' | 'drivers' | 'vehicles' | 'waiting' | 'orders' | 'actual' | 'factories' | 'quarries' | 'vehicleReports'>('dashboard');
+  const [activeScreen, setActiveScreen] = useState<OfficeScreen>('dashboard');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -160,6 +163,8 @@ export const LiveOperationsBoard: React.FC = () => {
                 ['drivers', 'قائمة السائقين', Users],
                 ['vehicles', 'كل العربيات', Truck],
                 ['vehicleReports', 'حسابات العربيات والملاك', Users],
+                ['factoryStatement', 'كشف حساب المصنع', Factory],
+                ['quarryStatement', 'كشف حساب المحجر', Mountain],
                 ['waiting', 'قائمة الانتظار', Clock3],
                 ['orders', 'أوامر التحميل', ClipboardList],
                 ['actual', 'التحميل الفعلي', CheckCircle2],
@@ -179,7 +184,7 @@ export const LiveOperationsBoard: React.FC = () => {
             </nav>
           </aside>
           <section className={`min-w-0 flex-1 space-y-5 rounded-[2rem] p-2 transition-colors sm:p-3 ${screenPalette[activeScreen].wash}`}>
-        {activeScreen === 'vehicleReports' ? <VehicleOwnerReportsScreen /> : activeScreen === 'tracking' ? <VehicleTrackingScreen /> : activeScreen === 'drivers' ? <OfficeDirectoryScreen initialSection="drivers" showSectionTabs={false} /> : activeScreen === 'vehicles' ? <OfficeDirectoryScreen initialSection="vehicles" showSectionTabs={false} /> : activeScreen === 'waiting' ? <OfficeDirectoryScreen initialSection="waiting" showSectionTabs={false} /> : activeScreen === 'orders' ? <OfficeDirectoryScreen initialSection="loads" showSectionTabs={false} /> : activeScreen === 'actual' ? <OfficeDirectoryScreen initialSection="actual" showSectionTabs={false} /> : activeScreen === 'factories' ? <OfficeDirectoryScreen initialSection="factories" showSectionTabs={false} /> : activeScreen === 'quarries' ? <OfficeDirectoryScreen initialSection="quarries" showSectionTabs={false} /> : activeScreen === 'directory' ? <OfficeDirectoryScreen /> : activeScreen === 'direct' ? <DirectLoadAssignmentScreen /> : <>
+        {activeScreen === 'factoryStatement' ? <AccountStatementsScreen kind="factory" /> : activeScreen === 'quarryStatement' ? <AccountStatementsScreen kind="quarry" /> : activeScreen === 'vehicleReports' ? <VehicleOwnerReportsScreen /> : activeScreen === 'tracking' ? <VehicleTrackingScreen /> : activeScreen === 'drivers' ? <OfficeDirectoryScreen initialSection="drivers" showSectionTabs={false} /> : activeScreen === 'vehicles' ? <OfficeDirectoryScreen initialSection="vehicles" showSectionTabs={false} /> : activeScreen === 'waiting' ? <OfficeDirectoryScreen initialSection="waiting" showSectionTabs={false} /> : activeScreen === 'orders' ? <OfficeDirectoryScreen initialSection="loads" showSectionTabs={false} /> : activeScreen === 'actual' ? <OfficeDirectoryScreen initialSection="actual" showSectionTabs={false} /> : activeScreen === 'factories' ? <OfficeDirectoryScreen initialSection="factories" showSectionTabs={false} /> : activeScreen === 'quarries' ? <OfficeDirectoryScreen initialSection="quarries" showSectionTabs={false} /> : activeScreen === 'directory' ? <OfficeDirectoryScreen /> : activeScreen === 'direct' ? <DirectLoadAssignmentScreen /> : <>
         <section className="rounded-3xl border border-orange-200/80 bg-gradient-to-br from-white via-white to-orange-50/70 p-5 shadow-sm shadow-orange-900/5">
           <div className="mb-4">
             <h2 className="text-lg font-black">إنشاء أمر تحميل جديد</h2>
