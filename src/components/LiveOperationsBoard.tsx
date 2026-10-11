@@ -61,6 +61,10 @@ export const LiveOperationsBoard: React.FC = () => {
 
   useEffect(() => { load(); }, [load]);
 
+  const localNow = new Date();
+  const todayKey = `${localNow.getFullYear()}-${String(localNow.getMonth() + 1).padStart(2, '0')}-${String(localNow.getDate()).padStart(2, '0')}`;
+  const todaysActualCount = (data?.actual_loading_records ?? []).filter((row: Record<string, any>) => String(row.loading_sequence_date ?? row.load_date ?? '').slice(0, 10) === todayKey).length;
+
   async function createLoadOrder(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError('');
@@ -284,7 +288,8 @@ export const LiveOperationsBoard: React.FC = () => {
               <div className="grid grid-cols-2 gap-3 mt-4">
                 <div className="rounded-2xl bg-slate-50 p-4"><Factory className="h-5 w-5 text-blue-700" /><b className="block mt-2 text-xl">{data?.factories.length ?? 0}</b><span className="text-xs text-slate-500">مصنع نشط</span></div>
                 <div className="rounded-2xl bg-slate-50 p-4"><Mountain className="h-5 w-5 text-orange-600" /><b className="block mt-2 text-xl">{data?.quarries.length ?? 0}</b><span className="text-xs text-slate-500">محجر نشط</span></div>
-                <div className="rounded-2xl bg-slate-50 p-4"><Clock3 className="h-5 w-5 text-violet-600" /><b className="block mt-2 text-xl">{data?.actual_loading_records.length ?? 0}</b><span className="text-xs text-slate-500">سجل تحميل فعلي</span></div>
+                <div className="rounded-2xl bg-slate-50 p-4"><Clock3 className="h-5 w-5 text-violet-600" /><b className="block mt-2 text-xl">{data?.actual_loading_records.length ?? 0}</b><span className="text-xs text-slate-500">إجمالي سجلات التحميل</span></div>
+                <div className="rounded-2xl bg-emerald-50 p-4"><Truck className="h-5 w-5 text-emerald-700" /><b className="block mt-2 text-xl">{todaysActualCount}</b><span className="text-xs text-slate-500">تحميلات اليوم</span></div>
               </div>
             </div>
             <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5">
