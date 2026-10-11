@@ -92,7 +92,7 @@ Deno.serve(async (req: Request) => {
     ];
 
     const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + encodeURIComponent(geminiApiKey),
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=" + encodeURIComponent(geminiApiKey),
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -104,8 +104,14 @@ Deno.serve(async (req: Request) => {
       },
     );
     if (!response.ok) {
-      console.error("Gemini request failed with status", response.status);
-      return json({ error: response.status === 429 ? "AI_RATE_LIMITED" : "AI_PROVIDER_ERROR" }, response.status === 429 ? 429 : 502);
+      const providerError = await response.text();
+      console.error("Gemini request failed", {
+        status: response.status,
+        details: providerError.slice(0, 500),
+      });
+      if (response.status === 429) return json({ error: "AI_RATE_LIMITED" }, 429);
+      if (response.status === 404) return json({ error: "AI_MODEL_UNAVAILABLE" }, 502);
+      return json({ error: "AI_PROVIDER_ERROR" }, 502);
     }
     const result = await response.json();
     const answer = result?.candidates?.[0]?.content?.parts
