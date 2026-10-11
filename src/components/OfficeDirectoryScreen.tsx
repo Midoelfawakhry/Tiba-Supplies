@@ -4,7 +4,7 @@ import { getLiveSnapshot, LiveSnapshot, liveName } from '../services/liveData';
 import { supabase } from '../lib/supabase';
 import { AddVehicleForm } from './AddVehicleForm';
 
-type ScreenKey = 'factories' | 'quarries' | 'drivers' | 'vehicles' | 'waiting' | 'loads' | 'actual';
+type ScreenKey = 'factories' | 'drivers' | 'vehicles' | 'waiting' | 'loads' | 'actual';
 type Row = Record<string, any>;
 const tabs: { key: ScreenKey; label: string; icon: React.ElementType }[] = [
   { key: 'factories', label: 'المصانع', icon: Building2 },
