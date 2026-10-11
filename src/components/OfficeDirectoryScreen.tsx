@@ -140,6 +140,20 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     setNewOwnerPhone('');
   }
 
+  async function deactivateDriver(row: Row) {
+    const name = String(row.name ?? row.driver_name ?? 'السائق');
+    if (!window.confirm('تأكيد إيقاف ' + name + '؟ سيتم منعه من الاختيارات الجديدة مع الاحتفاظ بكل سجلات التحميل والربط السابقة. لن يتم الإيقاف لو عليه نقلة نشطة.')) return;
+    setError(''); setSuccess(''); setSavingEdit(true);
+    try {
+      const { data, error: rpcError } = await supabase.rpc('set_operational_driver_active', { p_driver_id: row.driver_id, p_is_active: false });
+      if (rpcError) throw rpcError; if (!data?.success) throw new Error('تعذر تأكيد إيقاف السائق.');
+      setEditingDriver(null); setSuccess('تم إيقاف السائق مع الاحتفاظ بالسجلات التاريخية.'); await load();
+    } catch (e: any) {
+      const raw = String(e?.message || '');
+      const messages: Record<string,string> = { AUTH_REQUIRED: 'انتهت جلسة المكتب. سجّل الدخول مرة أخرى.', INSUFFICIENT_ROLE: 'إيقاف السائق متاح للمكتب الرئيسي فقط.', DRIVER_NOT_FOUND: 'السائق غير موجود.', DRIVER_HAS_ACTIVE_BOOKING: 'لا يمكن إيقاف السائق لأن عليه نقلة نشطة. أنهِ النقلة أو ألغها أولًا.' };
+      const key = Object.keys(messages).find(code => raw.includes(code)); setError(key ? messages[key] : raw || 'تعذر إيقاف السائق.');
+    } finally { setSavingEdit(false); }
+  }
   async function saveDriverEdit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!editingDriver) return;
@@ -430,7 +444,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
                 <span className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${sectionPalette[active].wash} ${sectionPalette[active].accent}`}><ActiveIcon size={20} strokeWidth={2.1}/></span>
                 <div className="min-w-0"><h4 className="break-words font-black leading-6">{rowTitle(row, active)}</h4><p className="mt-1 break-words text-sm leading-6 text-slate-500">{rowDetails(active === 'vehicles' ? { ...row, owner_name: ownerDirectory.find(owner => String(owner.owner_id) === String(row.owner_id))?.name } : row, active) || 'لا توجد تفاصيل إضافية في السجل الحالي.'}</p></div>
               </div>
-              <div className="flex shrink-0 items-center gap-2">{(active === 'drivers' || active === 'vehicles') && <button type="button" onClick={() => active === 'drivers' ? void beginDriverEdit(row) : beginVehicleEdit(row)} aria-label={active === 'drivers' ? 'تعديل بيانات السائق' : 'تعديل بيانات العربية'} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"><Pencil size={14}/> تعديل</button>}
+              <div className="flex shrink-0 items-center gap-2">{active === "drivers" && row.is_active !== false && <button type="button" disabled={savingEdit} onClick={() => void deactivateDriver(row)} aria-label="إيقاف السائق" className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-700 disabled:opacity-50"><UserX size={14}/> إيقاف</button>}{(active === 'drivers' || active === 'vehicles') && <button type="button" onClick={() => active === 'drivers' ? void beginDriverEdit(row) : beginVehicleEdit(row)} aria-label={active === 'drivers' ? 'تعديل بيانات السائق' : 'تعديل بيانات العربية'} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"><Pencil size={14}/> تعديل</button>}
               {active === 'actual' && row.booking_id && !['CANCELLED', 'DELIVERED', 'COMPLETED'].includes(snapshot?.bookings?.find((b: Row) => b.booking_id === row.booking_id)?.status) && !row.delivery_confirmed_at && row.actual_weight == null && <button type="button" onClick={async () => {
                 const reason = window.prompt('اكتب سبب إلغاء النقلة:');
                 if (!reason?.trim()) return;
