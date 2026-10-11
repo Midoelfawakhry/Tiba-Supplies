@@ -57,8 +57,8 @@ BEGIN
   SELECT pg_get_functiondef(to_regprocedure(
     'public.direct_assign_standalone_load(uuid,uuid,uuid)'
   )) INTO v_def;
-  IF position('''BOOKED''' in v_def) = 0
-     OR position('''LOADING_STATEMENT''' in v_def) > 0
+  IF position('VALUES(NULL,V_DRIVER_ID,P_VEHICLE_ID,''BOOKED'',NOW())' in upper(v_def)) = 0
+     OR position('VALUES(NULL,V_DRIVER_ID,P_VEHICLE_ID,''LOADING_STATEMENT'',NOW())' in upper(v_def)) > 0
      OR position('INSERT INTO PUBLIC.ACTUAL_LOADING_RECORDS' in upper(v_def)) > 0 THEN
     RAISE EXCEPTION 'DIRECT_ASSIGNMENT_MUST_REMAIN_PENDING_UNTIL_ACCEPTED';
   END IF;
