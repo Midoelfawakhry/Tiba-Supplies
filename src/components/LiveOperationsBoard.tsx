@@ -247,7 +247,8 @@ export const LiveOperationsBoard: React.FC = () => {
               {(data?.load_orders ?? []).map(order => {
                 const factory = data?.factories.find(f => f.factory_id === order.factory_id);
                 const quarry = data?.quarries.find(q => q.quarry_id === order.quarry_id);
-                const booked = (data?.bookings ?? []).filter(b => b.load_order_id === order.load_order_id).length;
+                const committedStatuses = ['BOOKED', 'LOADING_STATEMENT', 'IN_TRANSIT', 'DELIVERED', 'COMPLETED'];
+                const booked = (data?.bookings ?? []).filter(b => b.load_order_id === order.load_order_id && committedStatuses.includes(b.status)).length;
                 return (
                   <article key={order.load_order_id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                     <div className="flex justify-between gap-3">
