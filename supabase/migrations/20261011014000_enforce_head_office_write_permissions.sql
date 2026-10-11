@@ -121,11 +121,14 @@ BEGIN
 
   IF NOT p_vehicle_out_of_service THEN
     IF v_queue_office_id IS NULL THEN RAISE EXCEPTION 'CHECK_IN_OFFICE_NOT_CONFIGURED'; END IF;
-    -- Reuse an existing active WAITING entry if present; otherwise append at the end.
+    -- A driver may have only one active queue entry per office, even if an older
+    -- row references another vehicle. Clear any active entry in this office
+    -- before appending one fresh row at the tail.
     UPDATE public.waiting_list_entries
     SET status='LEFT_QUEUE'
-    WHERE driver_id=v_booking.driver_id AND vehicle_id=v_booking.vehicle_id
-      AND office_id=v_queue_office_id AND status='WAITING';
+    WHERE driver_id=v_booking.driver_id
+      AND office_id=v_queue_office_id
+      AND status IN ('WAITING','SELECTED','ASSIGNED');
 
     INSERT INTO public.waiting_list_entries(driver_id,vehicle_id,office_id,arrived_at,status)
     VALUES(v_booking.driver_id,v_booking.vehicle_id,v_queue_office_id,now(),'WAITING');
