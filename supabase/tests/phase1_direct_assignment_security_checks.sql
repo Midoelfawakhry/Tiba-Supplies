@@ -87,15 +87,15 @@ BEGIN
   IF position('W.OFFICE_ID = V_LOAD.OFFICE_ID' in upper(v_def)) = 0
      OR position('GEO.RESULT->>''ELIGIBLE'' = ''TRUE''' in upper(v_def)) = 0
      OR position('W.OFFICE_ID = V_LOAD.CHECK_IN_OFFICE_ID' in upper(v_def)) > 0
-     OR upper(v_def) ~ $R\.NAME\s+IN\s*\([^)]*'BRANCH'$
-     OR upper(v_def) ~ $R\.NAME\s*=\s*'BRANCH'$ THEN
+     OR upper(v_def) ~ $\.NAME\s+IN\s*\([^)]*'BRANCH'$
+     OR upper(v_def) ~ $\.NAME\s*=\s*'BRANCH'$ THEN
     RAISE EXCEPTION 'DISPATCH_MUST_USE_HEAD_QUEUE_AND_GEOFENCE_ELIGIBILITY_ONLY';
   END IF;
 
   -- Redirect must reject BRANCH and validate the booking's HEAD ownership.
   SELECT pg_get_functiondef(to_regprocedure('public.office_redirect_booking(uuid,uuid,text)')) INTO v_def;
-  IF upper(v_def) ~ $R\.NAME\s+IN\s*\([^)]*'BRANCH'$
-     OR upper(v_def) ~ $R\.NAME\s*=\s*'BRANCH'$
+  IF upper(v_def) ~ $\.NAME\s+IN\s*\([^)]*'BRANCH'$
+     OR upper(v_def) ~ $\.NAME\s*=\s*'BRANCH'$
      OR position('LOAD_NOT_OWNED_BY_HEAD_OFFICE' in upper(v_def)) = 0
      OR position('DIRECT_ASSIGNMENT_NOT_OWNED_BY_HEAD_OFFICE' in upper(v_def)) = 0 THEN
     RAISE EXCEPTION 'REDIRECT_MUST_BE_HEAD_ONLY_AND_CHECK_OWNERSHIP';
