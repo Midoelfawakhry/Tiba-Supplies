@@ -358,14 +358,14 @@ export const DriverApp: React.FC = () => {
   }
 
   if (loading) {
-    return <div dir="rtl" className="grid min-h-screen place-items-center bg-gradient-to-br from-red-50 via-white to-orange-50 p-6 text-slate-800"><div className="rounded-3xl border border-red-100 bg-white/90 px-8 py-9 text-center shadow-lg shadow-red-900/5"><div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-2xl bg-red-100 text-red-700"><Truck size={30}/></div><p className="text-xs font-black tracking-widest text-red-700">TIBA SUPPLIES · DRIVER</p><p className="mt-2 text-lg font-black">جاري تجهيز تطبيق السائق</p><div className="mx-auto mt-5 h-1.5 w-40 overflow-hidden rounded-full bg-red-100"><div className="h-full w-1/2 animate-pulse rounded-full bg-red-600"/></div></div></div>;
+    return <div dir="rtl" className="grid min-h-screen place-items-center bg-gradient-to-br from-red-50 via-white to-orange-50 p-6 text-slate-800"><div className="rounded-3xl border border-red-100 bg-white/90 px-8 py-9 text-center shadow-lg shadow-red-900/5"><div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-2xl bg-red-100 text-sky-700"><Truck size={30}/></div><p className="text-xs font-black tracking-widest text-red-700">TIBA SUPPLIES · DRIVER</p><p className="mt-2 text-lg font-black">جاري تجهيز تطبيق السائق</p><div className="mx-auto mt-5 h-1.5 w-40 overflow-hidden rounded-full bg-red-100"><div className="h-full w-1/2 animate-pulse rounded-full bg-red-600"/></div></div></div>;
   }
 
   if (!session) {
     return (
       <main dir="rtl" className="min-h-screen bg-rose-50/70 p-5 flex items-center justify-center">
         <form onSubmit={signIn} className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-7 shadow-sm">
-          <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-red-700"><Truck size={28} /></div>
+          <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-100 text-sky-800"><Truck size={28} /></div>
           <p className="text-xs font-black tracking-widest text-red-700">TIBA SUPPLIES · DRIVER</p>
           <h1 className="mt-2 text-2xl font-black text-slate-900">دخول السائق</h1>
           <p className="mt-2 text-sm leading-6 text-slate-500">استخدم رقم الموبايل وكلمة المرور التي استلمتها من المكتب.</p>
@@ -374,7 +374,7 @@ export const DriverApp: React.FC = () => {
           <input value={phone} onChange={e => setPhone(e.target.value)} type="tel" inputMode="tel" autoComplete="tel" required className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-slate-900 outline-none focus:border-red-500" />
           <label className="mt-4 block text-sm font-bold text-slate-700">كلمة المرور</label>
           <input value={password} onChange={e => setPassword(e.target.value)} type="password" autoComplete="current-password" required className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-slate-900 outline-none focus:border-red-500" />
-          <button disabled={authBusy} className="mt-5 w-full rounded-xl bg-red-600 p-3 font-black text-white transition hover:bg-red-700 disabled:opacity-60">{authBusy ? 'جارٍ الدخول...' : 'دخول'}</button>
+          <button disabled={authBusy} className="mt-5 w-full rounded-xl bg-gradient-to-l from-sky-700 to-teal-600 p-3 font-black text-white shadow-sm transition hover:from-sky-800 hover:to-teal-700 disabled:opacity-60">{authBusy ? 'جارٍ الدخول...' : 'دخول'}</button>
         </form>
       </main>
     );
@@ -400,13 +400,13 @@ export const DriverApp: React.FC = () => {
   }
 
   if (!driverAuthorized) {
-    return <div dir="rtl" className="min-h-screen grid place-items-center bg-rose-50/70 text-slate-700">جاري التحقق من حساب السائق...</div>;
+    return <div dir="rtl" className="min-h-screen grid place-items-center bg-gradient-to-br from-sky-50 via-white to-emerald-50 text-slate-700">جاري التحقق من حساب السائق...</div>;
   }
 
 
   return (
-    <main dir="rtl" className="min-h-screen bg-rose-50/70 text-slate-900">
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95">
+    <main dir="rtl" className="min-h-screen bg-gradient-to-b from-sky-50 via-slate-50 to-emerald-50/40 text-slate-900">
+      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur">
         <div className="mx-auto flex max-w-xl items-center justify-between px-4 py-4">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-red-50 text-red-700"><Truck size={23} /></div>
@@ -416,20 +416,20 @@ export const DriverApp: React.FC = () => {
         </div>
       </header>
       <div className="mx-auto max-w-xl space-y-4 p-4 pb-10">
-        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <section className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm shadow-slate-900/[0.04]">
           <div className="flex items-start justify-between gap-3">
             <div><p className="text-sm text-slate-500">أهلًا بك</p><h2 className="mt-1 break-all text-lg font-black">{session.user?.phone}</h2></div>
             <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">متصل</span>
           </div>
           <div className="mt-5 grid grid-cols-2 gap-3">
-            <div className="rounded-2xl bg-rose-50/70 p-4"><MapPin className="mb-2 text-red-700" size={21}/><p className="text-xs text-slate-500">مكتب تسجيل الوصول</p><p className="mt-1 font-black">رأس سدر</p></div>
+            <div className="rounded-2xl bg-gradient-to-br from-sky-50 to-white p-4 ring-1 ring-sky-100"><MapPin className="mb-2 text-red-700" size={21}/><p className="text-xs text-slate-500">مكتب تسجيل الوصول</p><p className="mt-1 font-black">رأس سدر</p></div>
             <div className="rounded-2xl bg-rose-50/70 p-4"><Navigation className="mb-2 text-red-700" size={21}/><p className="text-xs text-slate-500">نطاق الوصول</p><p className="mt-1 font-black">10 كم</p></div>
           </div>
         </section>
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center gap-2"><ShieldCheck className="text-red-700" size={22}/><h2 className="font-black">تسجيل الوصول</h2></div>
           <p className="mt-2 text-sm leading-6 text-slate-600">مشاركة الموقع تعمل تلقائيًا بعد تسجيل الدخول. اضغط الزر لفحص موقعك ومعرفة هل أنت داخل نطاق 10 كم من مكتب رأس سدر.</p>
-          <button onClick={captureLocation} disabled={locating} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 p-4 font-black text-white transition hover:bg-red-700 disabled:opacity-60">
+          <button onClick={captureLocation} disabled={locating} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-l from-sky-700 to-teal-600 p-4 font-black text-white shadow-md shadow-sky-900/15 transition hover:from-sky-800 hover:to-teal-700 disabled:opacity-60">
             <MapPin size={20}/>{locating ? 'جاري فحص الموقع...' : 'أنا وصلت — فحص الموقع'}
           </button>
           {error && <div role="alert" className="mt-4 flex gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"><CircleAlert className="shrink-0" size={18}/><span>{error}</span></div>}
