@@ -104,3 +104,25 @@ The following checks were executed using SELECT-only queries and Supabase adviso
 - Not executed: the SQL regression script in `supabase/tests/phase1_direct_assignment_security_checks.sql`, because it is a DO block that raises errors and is intended to validate a fully reconciled migration set; running it against production is not an acceptable substitute for staging.
 - Not executed: role-based RPC calls, booking acceptance, cancellation, redirect, delivery, or queue mutation tests, because they would require synthetic auth identities/data and could mutate production.
 - No schema changes, data writes, migration applications, PR merges, or production releases were performed during these checks.
+
+## Follow-up static review: test reliability and cancellation semantics (2026-10-11)
+
+### Finding A — BRANCH role-gate regex may fail to detect the intended pattern
+
+The static SQL test currently uses dollar-quoted patterns such as `$$R\\.NAME\\s+IN...$$`. In PostgreSQL regex syntax, the doubled backslashes may cause the pattern to match a literal backslash rather than the dot/whitespace escapes intended by the test author. As a result, the test may fail to detect a forbidden `r.name IN (..., 'BRANCH')` predicate. **Do not treat this test as a passing authorization test until the regex is corrected and verified against positive and negative sample definitions.**
+
+Safe fix criteria: use a single regex escape in dollar-quoted SQL (for example, `R\.NAME\s+IN\s*\([^)]*'BRANCH'` as the actual SQL pattern), and add a small isolated test block that proves the matcher returns true for representative forbidden patterns and false for legitimate geofence references. This must be done on the review branch only.
+
+### Finding B — cancellation uses a branch chosen at cancellation time
+
+For standalone direct bookings, the candidate cancellation RPC selects the first active BRANCH office by name when it requeues the driver. The direct-assignment audit does not persist the geofence branch used at assignment time. Current production has one active BRANCH, so the present snapshot is unambiguous, but the schema does not enforce that invariant. Before sign-off, persist the selected geofence office ID or enforce exactly one active branch; then test cancellation under zero/one/multiple active branch configurations.
+
+### Finding C — assignment migration order and effective definitions matter
+
+The first direct-assignment migration (`20261011012000`) authorizes `BRANCH`; the later HEAD-only migration (`20261011013000`) overrides that function. A clean replay must preserve the intended order and the final definition must be inspected after all migrations. The current migration manifest reconciliation remains blocked, so neither filename presence nor frontend CI success is sufficient evidence that production and repository definitions match.
+
+### Finding D — function-text replacement remains brittle
+
+The candidate write-permission migration replaces exact source strings in `pg_get_functiondef`. It deliberately aborts if a target definition does not match known patterns, which is safer than silently skipping, but a legitimate formatting change or an unrecognized authorization expression can still block the whole migration. Prefer explicit reviewed `CREATE OR REPLACE FUNCTION` definitions for the affected signatures and a behavioral role test on staging.
+
+All findings above are static code review only. No migration, mutation RPC, or SQL regression script was run against production.
