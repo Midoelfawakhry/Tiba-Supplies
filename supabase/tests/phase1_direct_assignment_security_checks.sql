@@ -92,6 +92,15 @@ BEGIN
     RAISE EXCEPTION 'DISPATCH_MUST_USE_HEAD_QUEUE_AND_GEOFENCE_ELIGIBILITY_ONLY';
   END IF;
 
+  -- Redirect must reject BRANCH and validate the booking's HEAD ownership.
+  SELECT pg_get_functiondef(to_regprocedure('public.office_redirect_booking(uuid,uuid,text)')) INTO v_def;
+  IF upper(v_def) ~ $R\.NAME\s+IN\s*\([^)]*'BRANCH'$
+     OR upper(v_def) ~ $R\.NAME\s*=\s*'BRANCH'$
+     OR position('LOAD_NOT_OWNED_BY_HEAD_OFFICE' in upper(v_def)) = 0
+     OR position('DIRECT_ASSIGNMENT_NOT_OWNED_BY_HEAD_OFFICE' in upper(v_def)) = 0 THEN
+    RAISE EXCEPTION 'REDIRECT_MUST_BE_HEAD_ONLY_AND_CHECK_OWNERSHIP';
+  END IF;
+
   -- Critical SECURITY DEFINER entry points must pin search_path to public (or
   -- an equivalently reviewed fixed path) to reduce object-shadowing risk.
   FOREACH v_sig IN ARRAY ARRAY[
