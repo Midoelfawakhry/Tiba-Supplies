@@ -35,7 +35,11 @@ jobs:
       - id: set-matrix
         shell: bash
         run: |
-          MODE="${{ inputs.app_mode }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            MODE="${{ inputs.app_mode }}"
+          else
+            MODE="both"
+          fi
           if [ "$MODE" = "both" ]; then
             echo 'matrix={"app_mode":["driver","office","branch"]}' >> "$GITHUB_OUTPUT"
           else
