@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { KeyRound, UserPlus, Users, RefreshCw, Phone, UserX, UserCheck, ShieldCheck, Pencil, X } from 'lucide-react';
+import { KeyRound, UserPlus, Users, RefreshCw, Phone, UserX, UserCheck, ShieldCheck, Pencil, X, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 type Employee = {
@@ -34,6 +34,7 @@ export const BranchEmployeeManagementScreen: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState('');
   const [editing, setEditing] = useState<Employee | null>(null);
+  const [showInactive, setShowInactive] = useState(false);
   const [editName, setEditName] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [error, setError] = useState('');
@@ -104,6 +105,22 @@ export const BranchEmployeeManagementScreen: React.FC = () => {
       const key = Object.keys(labels).find(code => raw.includes(code)); setError(key ? labels[key] : raw || 'تعذر تعديل بيانات الموظف.');
     } finally { setBusyId(''); }
   }
+  async function removeEmployee(employee: Employee) {
+    if (!employee.is_active) return;
+    if (!window.confirm('حذف الموظف ' + employee.display_name + ' من قائمة الموظفين النشطين؟ سيتم إيقاف حسابه ومنعه من الدخول، مع الاحتفاظ بسجل العمليات.')) return;
+    setBusyId(employee.user_id); setError(''); setSuccess('');
+    try {
+      const { data, error: rpcError } = await supabase.rpc('set_branch_employee_active', { p_user_id: employee.user_id, p_is_active: false });
+      if (rpcError) throw rpcError;
+      if (!data?.success) throw new Error('تعذر إيقاف حساب الموظف.');
+      setSuccess('تمت إزالة الموظف من القائمة النشطة وإيقاف حسابه. سجل العمليات محفوظ.');
+      await load();
+    } catch (e: any) {
+      const raw = String(e?.message || '');
+      const key = Object.keys(errorLabels).find(code => raw.includes(code));
+      setError(key ? errorLabels[key] : raw || 'تعذر حذف الموظف من القائمة النشطة.');
+    } finally { setBusyId(''); }
+  }
   async function setActive(employee: Employee) {
     setBusyId(employee.user_id);
     setError('');
@@ -168,12 +185,12 @@ export const BranchEmployeeManagementScreen: React.FC = () => {
       </section>}
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="mb-4 flex items-center justify-between gap-3">
-          <div><h3 className="text-lg font-black">الحسابات المسجلة</h3><p className="text-sm text-slate-500">تفعيل أو إيقاف الوصول دون حذف سجل الموظف.</p></div>
-          <button onClick={()=>void load()} className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-bold"><RefreshCw className="ml-1 inline h-4 w-4"/>تحديث</button>
+          <div><h3 className="text-lg font-black">{showInactive ? 'الحسابات الموقوفة' : 'الموظفون النشطون'}</h3><p className="text-sm text-slate-500">يمكنك إزالة الموظف من القائمة النشطة دون مسح سجل العمليات.</p></div>
+          <div className="flex flex-wrap gap-2"><button onClick={()=>setShowInactive(v=>!v)} className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-bold">{showInactive ? 'عرض النشطين' : 'عرض المحذوفين/الموقوفين'}</button><button onClick={()=>void load()} className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-bold"><RefreshCw className="ml-1 inline h-4 w-4"/>تحديث</button></div>
         </div>
-        {loading ? <p className="py-8 text-center text-slate-500">جاري تحميل الموظفين...</p> : employees.length === 0 ? <p className="rounded-xl bg-slate-50 p-6 text-center text-slate-500">لسه مفيش حسابات موظفين للفرع.</p> : (
+        {loading ? <p className="py-8 text-center text-slate-500">جاري تحميل الموظفين...</p> : employees.filter(employee => showInactive ? !employee.is_active : employee.is_active).length === 0 ? <p className="rounded-xl bg-slate-50 p-6 text-center text-slate-500">{showInactive ? 'مفيش حسابات موقوفة.' : 'لسه مفيش موظفين نشطين للفرع.'}</p> : (
           <div className="space-y-3">
-            {employees.map(employee => <article key={employee.user_id} className="flex flex-col gap-3 rounded-2xl border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
+            {employees.filter(employee => showInactive ? !employee.is_active : employee.is_active).map(employee => <article key={employee.user_id} className="flex flex-col gap-3 rounded-2xl border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-start gap-3">
                 <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600"><Users size={20}/></div>
                 <div><div className="font-black">{employee.display_name}</div><div className="mt-1 text-sm text-slate-600">اسم المستخدم: <bdi className="font-bold">{employee.username || 'غير مسجل'}</bdi></div>
@@ -185,6 +202,7 @@ export const BranchEmployeeManagementScreen: React.FC = () => {
                 <span className={employee.is_active ? "rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700" : "rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600"}>{employee.is_active ? "الحساب نشط" : "الحساب موقوف"}</span>
                 <button disabled={busyId===employee.user_id} onClick={()=>beginEdit(employee)} className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-bold text-slate-700 disabled:opacity-50"><Pencil className="ml-1 inline h-4 w-4"/>تعديل</button>
                 <button disabled={busyId===employee.user_id} onClick={()=>void setActive(employee)} className={employee.is_active ? "rounded-xl border border-red-200 px-3 py-2 text-sm font-bold text-red-700 disabled:opacity-50" : "rounded-xl border border-emerald-200 px-3 py-2 text-sm font-bold text-emerald-700 disabled:opacity-50"}>{employee.is_active ? <><UserX className="ml-1 inline h-4 w-4"/>إيقاف</> : <><UserCheck className="ml-1 inline h-4 w-4"/>تفعيل</>}</button>
+                {employee.is_active && <button disabled={busyId===employee.user_id} onClick={()=>void removeEmployee(employee)} className="rounded-xl border border-red-300 px-3 py-2 text-sm font-bold text-red-700 disabled:opacity-50"><Trash2 className="ml-1 inline h-4 w-4"/>حذف</button>}
               </div>
             </article>)}
           </div>
