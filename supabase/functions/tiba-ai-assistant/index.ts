@@ -36,7 +36,7 @@ Deno.serve(async (req: Request) => {
     if (authError || !authData.user) return json({ error: "AUTH_REQUIRED" }, 401);
 
     const { data: profile, error: profileError } = await admin.from("app_users")
-      .select("user_id,is_active").eq("auth_user_id", authData.user.id).eq("is_active", true).maybeSingle();
+      .select("user_id,is_active,office_id").eq("auth_user_id", authData.user.id).eq("is_active", true).maybeSingle();
     if (profileError) throw profileError;
     if (!profile) return json({ error: "ACTIVE_APP_PROFILE_REQUIRED" }, 403);
 
@@ -51,6 +51,13 @@ Deno.serve(async (req: Request) => {
     }
     if (audience === "BRANCH" && !roles.includes("BRANCH")) {
       return json({ error: "INSUFFICIENT_ROLE" }, 403);
+    }
+    if (audience === "BRANCH") {
+      const { data: branchOffice, error: branchOfficeError } = await admin.from("offices")
+        .select("office_id").eq("office_id", profile.office_id)
+        .eq("office_type", "BRANCH").eq("is_active", true).maybeSingle();
+      if (branchOfficeError) throw branchOfficeError;
+      if (!branchOffice) return json({ error: "BRANCH_OFFICE_REQUIRED" }, 403);
     }
     if (!["HEAD_OFFICE", "BRANCH"].includes(audience)) return json({ error: "INVALID_AUDIENCE" }, 400);
 
