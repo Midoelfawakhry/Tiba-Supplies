@@ -48,9 +48,10 @@ BEGIN
                               'r.name IN (''ADMIN'',''HEAD_OFFICE'')');
     IF r.proname <> 'office_cancel_booking'
        AND (
-         upper(v_new) ~ $R\\.NAME\\s+IN\\s*\\([^)]*'BRANCH'$
-         OR upper(v_new) ~ $R\\.NAME\\s*=\\s*'BRANCH'$
-         OR upper(v_new) ~ $ROLE_NAME\\s*=\\s*'BRANCH'$
+         position('r.name in (''admin'', ''head_office'', ''branch'')' in lower(v_new)) > 0
+         OR position('r.name in (''admin'',''head_office'',''branch'')' in lower(v_new)) > 0
+         OR position('r.name = ''branch''' in lower(v_new)) > 0
+         OR position('role_name = ''branch''' in lower(v_new)) > 0
        ) THEN
       -- Fail closed only when BRANCH remains in a role predicate. A plain
       -- office_type='BRANCH' lookup is a legitimate geofence reference.
