@@ -1,4 +1,4 @@
-name: Build Signed Tiba Supplies Office, Ras Sedr, and Driver Android APKs
+name: Build Signed Tiba Supplies Main Office Android APK
 
 on:
   push:
@@ -24,7 +24,7 @@ jobs:
     steps:
       - id: set-matrix
         shell: bash
-        run: echo 'matrix={"app_mode":["office","branch","driver"]}' >> "$GITHUB_OUTPUT"
+        run: echo 'matrix={"app_mode":["office"]}' >> "$GITHUB_OUTPUT"
 
   build-signed-release:
     needs: select-builds
