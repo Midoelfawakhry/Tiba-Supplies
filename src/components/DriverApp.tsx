@@ -237,18 +237,18 @@ export const DriverApp: React.FC = () => {
   }, [session, driverAuthorized, mustChangePassword]);
 
   function normalizePhone(input: string) {
-    let value = input.trim().replace(/[\\s()-]/g, '');
+    let value = input.trim().replace(/[\s()-]/g, '');
     if (value.startsWith('00')) value = `+${value.slice(2)}`;
-    if (/^01[0125]\\d{8}$/.test(value)) value = `+20${value.slice(1)}`;
-    if (/^20(10|11|12|15)\\d{8}$/.test(value)) value = `+${value}`;
-    if (/^\\+20(10|11|12|15)\\d{8}$/.test(value)) return value;
+    if (/^01[0125]\d{8}$/.test(value)) value = `+20${value.slice(1)}`;
+    if (/^20(10|11|12|15)\d{8}$/.test(value)) value = `+${value}`;
+    if (/^\+20(10|11|12|15)\d{8}$/.test(value)) return value;
     throw new Error('أدخل رقم موبايل مصري صحيحًا مثل 01012345678.');
   }
 
-  // The visible username remains the driver's phone number, digits only.
+  // The driver enters only their phone digits; this alias is internal to Supabase Auth.
   function driverLoginEmail(input: string) {
     const normalized = normalizePhone(input);
-    return `${normalized.replace(/\\D/g, '')}@driver-login.tiba.invalid`;
+    return `${normalized.replace(/\D/g, '')}@driver-login.tiba.invalid`;
   }
 
   async function signIn(event: React.FormEvent<HTMLFormElement>) {
