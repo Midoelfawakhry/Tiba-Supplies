@@ -1,5 +1,27 @@
 # Phase 1 Migration Reconciliation
 
+## Current audit update (2026-10-12, PR #55)
+
+**Status: candidate hardening changes pass GitHub CI; full Phase 1 release remains BLOCKED.**
+
+PR #55 adds these forward-only candidate migrations:
+- `20261012160000_head_office_master_directory_write.sql`: head-office-only factory/quarry create/update, normalized duplicate-code checks, duplicate-name checks, and audit-log entries.
+- `20261012170000_harden_available_driver_vehicles.sql`: restricts the vehicle picker RPC to authenticated, active driver accounts; direct anonymous execution is revoked.
+- `20261012180000_enable_counter_rls.sql`: enables RLS on internal daily loading/trip counters and explicitly revokes direct client privileges. Existing SECURITY DEFINER trigger functions are expected to continue allocation as the table owner; validate that behavior in full staging before production.
+
+CI at head `8a1f385d58daac41ce76ba0257ad039f8d584e51` passed:
+- Phase 1 build workflow: lint, Phase 1 authorization tests, web build, existing SQL smoke checks, and new disposable-PostgreSQL tests for all three candidate hardening areas.
+- Migration integrity workflow: passed.
+
+These are isolated fixture tests, not a clean bootstrap of the entire production schema and not full app-to-Supabase E2E tests. PR #55 is still unmerged. None of these migrations has been applied to production, and no production business data was changed.
+
+**Read-only inventory comparison (2026-10-12):** the current `main` branch contains 41 SQL migration files; the live Supabase ledger contains 29 entries. Seven production ledger versions do not have an exact 14-digit filename-version match in the repository: `20261011004642`, `20261011020800`, `20261011022028`, `20261011142837`, `20261011142841`, `20261011210402`, and `20261011213115`. Eight repository files with 14-digit versions are not present as exact versions in the live ledger: `20261011012000`, `20261011012500`, `20261011013000`, `20261011014000`, `20261011133300`, `20261011133500`, `20261011170000`, and `20261012120000`. Eleven other filenames use legacy/non-standard version prefixes. These are version/filename mismatches, **not proof by themselves that the SQL effects are missing or that an unapplied migration should be replayed**; each needs semantic comparison with the deployed definitions and migration history.
+
+**Still release-blocking:** reconcile the production migration ledger against repository SQL filenames and effective order; create/authorize an isolated staging branch only after confirming any cost; validate trigger-based counter allocation with RLS enabled; exercise actual role-specific flows and direct assignment/GPS/concurrency/cancellation/redirect/delivery scenarios; and run Android/device smoke tests. Do not treat PR #55 CI success as Phase 1 release approval.
+
+---
+
+
 ## Current audit update (2026-10-11, after PRs #25–#27)
 
 **Release status remains BLOCKED for full Phase 1 rollout.** The notes below include earlier point-in-time findings; where those older statements conflict with this section, this current verified snapshot takes precedence.
@@ -162,3 +184,36 @@ For regular load orders, preserve their operational owner as HEAD and ensure `ch
 Staging tests must verify: (a) every operational action/audit points to HEAD, (b) BRANCH is read only as a location reference, (c) cancellation and redirect work without selecting BRANCH as transaction office, and (d) geofence checks still use the Ras Sedr coordinates.
 
 This correction supersedes the earlier suggestion that enforcing a single active BRANCH would resolve cancellation queue routing. The invariant is not “one active BRANCH”; it is “BRANCH is not an operational transaction office.”
+
+
+## Migration-source recovery investigation (2026-10-12)
+
+This is a follow-up source investigation, not approval to deploy or replay SQL. The live production ledger was re-read read-only; it still contains the three historical versions below without exact same-version source files on `main`. A search of the current branch and selected historical/reconciliation branches did not recover exact files under those paths. The candidates below are semantic leads only; they are **not** proof that the original migration source has been recovered.
+
+| Production ledger entry | Candidate source found in repository history | What the candidate supports | Remaining gap / disposition |
+| --- | --- | --- | --- |
+| `20261011004642_require_captured_driver_location_time` | `20261011004304_validate_captured_driver_location_time.sql`; later checks also appear in `20261011012000_direct_assignment_acceptance.sql` and `20261011012500_direct_assignment_driver_snapshot.sql` | Stale/future captured timestamps are checked in geofence/assignment/snapshot paths. | No exact source recovered. In `20261011004304`, the `update_driver_live_location` guard is conditional on `p_captured_at IS NOT NULL`, so it does not itself prove that a missing captured timestamp is rejected. Verify the live function and intended contract before deciding whether a forward correction is needed. |
+| `20261011020800_phase1_direct_assignment_acceptance_head_owned` | `20261011012000_direct_assignment_acceptance.sql` plus `20261011013000_enforce_head_office_direct_assignment.sql` (found on `phase1-direct-assignment-acceptance`) | The former implements pending direct-assignment offers and driver acceptance; the latter restricts direct assignment to ADMIN/HEAD_OFFICE and writes the audit to HEAD. | These are separate candidate files with different version prefixes, not the original recorded migration. Compare their effective definitions to production and recover original commit/blob if possible; otherwise document a reviewed baseline/recovery plan rather than relabeling them as the original. |
+| `20261011022028_enforce_head_office_write_permissions_fail_closed` | `20261011014000_enforce_head_office_write_permissions.sql` (found on `phase1-direct-assignment-acceptance`) | The candidate targets operational write RPCs and attempts to fail closed if expected functions are absent or BRANCH role gates remain. | Not an exact source recovery. The candidate rewrites function definitions with text replacements; validate every overload/signature and replacement outcome. Do not assume the word “fail_closed” in the ledger proves the current candidate is safe. |
+
+### Next reconciliation actions
+
+1. Preserve the production migration ledger exactly as recorded; do not delete ledger rows or replay historical SQL on production.
+2. Continue source recovery through Git history/PRs for the exact blobs and commit ancestry of the three entries.
+3. Compare the current live definitions with the candidate migrations by function signature and behavior, especially required `p_captured_at`, direct assignment status before acceptance, audit ownership, and all HEAD-only mutation gates.
+4. Inventory every repository migration filename/version and check for duplicate or non-deterministic prefixes before attempting a clean bootstrap.
+5. Only after the source map is reviewed, prepare a clean-bootstrap validation plan and any necessary **new forward-only** correction. No production migration or business-data mutation is authorized by this note.
+
+**Status remains BLOCKED.** This investigation narrowed possible semantic counterparts but did not recover the original three migration sources or prove that a clean bootstrap succeeds.
+
+
+### Read-only production definition check (2026-10-12)
+
+A fresh read-only query of the current production function definitions confirms the following effective behavior is present now:
+
+- `update_driver_live_location(..., p_captured_at timestamptz)` rejects a null captured timestamp and checks stale and future timestamps.
+- `direct_assign_standalone_load(uuid,uuid,uuid)` is HEAD/ADMIN-gated, creates a `BOOKED` pending offer, and does not itself insert an actual-loading row.
+- `accept_direct_assignment(uuid)` verifies the authenticated driver owns the pending booking, locks booking/audit rows, rejects duplicate acceptance/loading rows, and creates the actual-loading record during acceptance.
+- The inspected operational write RPCs (`create_load_order`, both `create_operational_driver` overloads, both `create_operational_vehicle` overloads, `update_operational_driver`, `update_operational_vehicle`, `dispatch_load`, `office_cancel_booking`, and `office_redirect_booking`) currently show HEAD/ADMIN role checks; the simple definition scan did not find BRANCH role gates in these definitions.
+
+These are static observations of current production function definitions only. They do **not** recover the missing historical source files, prove clean-bootstrap replay, or substitute for behavioral authorization/concurrency tests. Therefore the missing-source reconciliation and production-release block remain open.

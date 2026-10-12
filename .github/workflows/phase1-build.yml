@@ -50,3 +50,19 @@ jobs:
         env:
           PGPASSWORD: postgres
         run: psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -U postgres -d tibasupplies_test -f supabase/tests/phase1_single_active_branch_office_checks.sql
+      - name: Test master directory migration on disposable PostgreSQL
+        env:
+          PGPASSWORD: postgres
+        run: psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -U postgres -d tibasupplies_test -f supabase/tests/master_directory_write_migration_test.sql
+      - name: Test driver vehicle picker authorization on disposable PostgreSQL
+        env:
+          PGPASSWORD: postgres
+        run: psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -U postgres -d tibasupplies_test -f supabase/tests/available_driver_vehicles_security_test.sql
+      - name: Test internal counter RLS on disposable PostgreSQL
+        env:
+          PGPASSWORD: postgres
+        run: psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -U postgres -d tibasupplies_test -f supabase/tests/internal_counter_rls_test.sql
+      - name: Test trigger-only driver office assignment privileges and behavior
+        env:
+          PGPASSWORD: postgres
+        run: psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -U postgres -d tibasupplies_test -f supabase/tests/auto_assign_driver_trigger_privileges_test.sql
