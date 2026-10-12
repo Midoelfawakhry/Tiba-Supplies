@@ -560,7 +560,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
                   setSuccess(row.delivery_confirmed_at || row.actual_weight != null || ['DELIVERED', 'COMPLETED'].includes(snapshot?.bookings?.find((b: Row) => b.booking_id === row.booking_id)?.status) ? 'تم تصحيح وجهة نقلة لها وزن/تسليم مسجل. احتفظ النظام ببيانات الوزن والتسليم وسجل الوجهة السابقة والجديدة وسبب التصحيح.' : 'تم تغيير وجهة النقلة إلى المصنع الجديد، مع حفظ سبب التوجيه وسجل الوجهة السابقة والجديدة.');
                   await load();
                 } catch (e: any) { setError(e?.message || 'تعذر إعادة توجيه النقلة.'); }
-              }} className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-800">إعادة توجيه</button>}<span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-500">#{index + 1}</span></div></div>
+              }} className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-800">إعادة توجيه</button>}{active !== 'waiting' && <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-500">#{index + 1}</span>}</div></div>
           </article>)}
           {!loading && rows.length === 0 && <div className="p-10 text-center text-sm leading-6 text-slate-500">لا توجد سجلات في هذا القسم حاليًا. لن نعرض بيانات تجريبية بدل البيانات الحقيقية.</div>}
           {loading && <div className="p-8 text-center text-sm text-slate-500">جاري تحميل بيانات المكتب...</div>}
