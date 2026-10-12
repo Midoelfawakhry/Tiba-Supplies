@@ -15,6 +15,8 @@ CI at head `8a1f385d58daac41ce76ba0257ad039f8d584e51` passed:
 
 These are isolated fixture tests, not a clean bootstrap of the entire production schema and not full app-to-Supabase E2E tests. PR #55 is still unmerged. None of these migrations has been applied to production, and no production business data was changed.
 
+**Read-only inventory comparison (2026-10-12):** the current `main` branch contains 41 SQL migration files; the live Supabase ledger contains 29 entries. Seven production ledger versions do not have an exact 14-digit filename-version match in the repository: `20261011004642`, `20261011020800`, `20261011022028`, `20261011142837`, `20261011142841`, `20261011210402`, and `20261011213115`. Eight repository files with 14-digit versions are not present as exact versions in the live ledger: `20261011012000`, `20261011012500`, `20261011013000`, `20261011014000`, `20261011133300`, `20261011133500`, `20261011170000`, and `20261012120000`. Eleven other filenames use legacy/non-standard version prefixes. These are version/filename mismatches, **not proof by themselves that the SQL effects are missing or that an unapplied migration should be replayed**; each needs semantic comparison with the deployed definitions and migration history.
+
 **Still release-blocking:** reconcile the production migration ledger against repository SQL filenames and effective order; create/authorize an isolated staging branch only after confirming any cost; validate trigger-based counter allocation with RLS enabled; exercise actual role-specific flows and direct assignment/GPS/concurrency/cancellation/redirect/delivery scenarios; and run Android/device smoke tests. Do not treat PR #55 CI success as Phase 1 release approval.
 
 ---
