@@ -68,6 +68,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
   const [driverCode, setDriverCode] = useState('');
   const [vehicleSearch, setVehicleSearch] = useState('');
   const [driverSearch, setDriverSearch] = useState('');
+  const [entitySearch, setEntitySearch] = useState('');
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
   const [availableVehicles, setAvailableVehicles] = useState<Row[]>([]);
   const [ownerDirectory, setOwnerDirectory] = useState<Row[]>([]);
@@ -421,7 +422,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     actual: snapshot?.actual_loading_records ?? [],
   };
   const rows = lists[active] ?? [];
-  const visibleRows = active === 'drivers' ? rows.filter(row => String(row.name ?? row.driver_name ?? '').toLocaleLowerCase().includes(driverSearch.trim().toLocaleLowerCase())) : rows;
+  const visibleRows = active === 'drivers' ? rows.filter(row => String(row.name ?? row.driver_name ?? '').toLocaleLowerCase().includes(driverSearch.trim().toLocaleLowerCase())) : ['factories', 'quarries'].includes(active) ? rows.filter(row => [liveName(row), row.code, row.address, row.phone].some(value => String(value ?? '').toLocaleLowerCase().includes(entitySearch.trim().toLocaleLowerCase()))) : rows;
   const filteredAvailableVehicles = availableVehicles.filter((vehicle: Row) => [vehicle.plate_number, vehicle.vehicle_code].some(value => String(value ?? '').toLowerCase().includes(vehicleSearch.trim().toLowerCase())));
   const selectedVehicle = availableVehicles.find((vehicle: Row) => String(vehicle.vehicle_id) === selectedVehicleId);
   const ActiveIcon = tabs.find(tab => tab.key === active)?.icon ?? ClipboardList;
@@ -520,6 +521,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
         </form>
       </section>}
 
+      {['factories', 'quarries'].includes(active) && <div className="rounded-2xl border border-slate-200 bg-white p-3"><label className="block text-sm font-bold text-slate-700">البحث بالاسم أو الكود أو العنوان أو التليفون<input value={entitySearch} onChange={e => setEntitySearch(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 p-3 font-normal" placeholder={active === 'factories' ? 'ابحث عن مصنع أو عميل...' : 'ابحث عن محجر أو مورد...'} /></label></div>}
       {active === 'drivers' && <div className="rounded-2xl border border-slate-200 bg-white p-3"><label className="block text-sm font-bold text-slate-700">البحث عن سائق بالاسم<input value={driverSearch} onChange={e => setDriverSearch(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 p-3 font-normal" placeholder="اكتب اسم السائق..." /></label></div>}
       <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white">
         <div className={`flex flex-wrap items-center justify-between gap-4 border-b p-4 sm:p-5 ${sectionPalette[active].border} ${sectionPalette[active].wash}`}>
