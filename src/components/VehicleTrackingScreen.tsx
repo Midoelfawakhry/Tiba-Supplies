@@ -64,9 +64,9 @@ export const VehicleTrackingScreen: React.FC = () => {
   useEffect(() => {
     if (!mapElement.current || mapRef.current) return;
     const map = L.map(mapElement.current, { zoomControl: true, preferCanvas: true }).setView([29.59, 32.72], 8);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-      maxZoom: 20,
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      maxZoom: 19,
     }).addTo(map);
     mapRef.current = map;
     const invalidate = window.setTimeout(() => map.invalidateSize(), 250);
