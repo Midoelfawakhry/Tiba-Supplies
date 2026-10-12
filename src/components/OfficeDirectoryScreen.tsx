@@ -447,6 +447,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
         INSUFFICIENT_ROLE: 'إضافة وتعديل المصانع والمحاجر متاحان للمكتب الرئيسي فقط.',
         INVALID_DIRECTORY_ENTITY_TYPE: 'نوع السجل غير صالح.',
         DIRECTORY_NAME_REQUIRED: 'اكتب اسم المصنع أو المحجر.',
+        DIRECTORY_NAME_EXISTS: 'اسم المصنع أو المحجر مستخدم بالفعل في هذا الدليل.',
         DIRECTORY_CODE_EXISTS: 'الكود مستخدم بالفعل في هذا الدليل. راجع السجلات قبل الحفظ.',
         DIRECTORY_ENTRY_NOT_FOUND: 'السجل المراد تعديله لم يعد موجودًا.',
       };
