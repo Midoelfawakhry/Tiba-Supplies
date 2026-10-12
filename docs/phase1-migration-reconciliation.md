@@ -205,3 +205,15 @@ This is a follow-up source investigation, not approval to deploy or replay SQL. 
 5. Only after the source map is reviewed, prepare a clean-bootstrap validation plan and any necessary **new forward-only** correction. No production migration or business-data mutation is authorized by this note.
 
 **Status remains BLOCKED.** This investigation narrowed possible semantic counterparts but did not recover the original three migration sources or prove that a clean bootstrap succeeds.
+
+
+### Read-only production definition check (2026-10-12)
+
+A fresh read-only query of the current production function definitions confirms the following effective behavior is present now:
+
+- `update_driver_live_location(..., p_captured_at timestamptz)` rejects a null captured timestamp and checks stale and future timestamps.
+- `direct_assign_standalone_load(uuid,uuid,uuid)` is HEAD/ADMIN-gated, creates a `BOOKED` pending offer, and does not itself insert an actual-loading row.
+- `accept_direct_assignment(uuid)` verifies the authenticated driver owns the pending booking, locks booking/audit rows, rejects duplicate acceptance/loading rows, and creates the actual-loading record during acceptance.
+- The inspected operational write RPCs (`create_load_order`, both `create_operational_driver` overloads, both `create_operational_vehicle` overloads, `update_operational_driver`, `update_operational_vehicle`, `dispatch_load`, `office_cancel_booking`, and `office_redirect_booking`) currently show HEAD/ADMIN role checks; the simple definition scan did not find BRANCH role gates in these definitions.
+
+These are static observations of current production function definitions only. They do **not** recover the missing historical source files, prove clean-bootstrap replay, or substitute for behavioral authorization/concurrency tests. Therefore the missing-source reconciliation and production-release block remain open.
