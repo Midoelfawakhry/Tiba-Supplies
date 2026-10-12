@@ -245,13 +245,19 @@ export const DriverApp: React.FC = () => {
     throw new Error('أدخل رقم موبايل مصري صحيحًا مثل 01012345678.');
   }
 
+  // The driver enters only their phone digits; this alias is internal to Supabase Auth.
+  function driverLoginEmail(input: string) {
+    const normalized = normalizePhone(input);
+    return `${normalized.replace(/\D/g, '')}@driver-login.tiba.invalid`;
+  }
+
   async function signIn(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError('');
     setAuthBusy(true);
     try {
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        phone: normalizePhone(phone),
+        email: driverLoginEmail(phone),
         password,
       });
       if (signInError) throw signInError;
@@ -368,9 +374,9 @@ export const DriverApp: React.FC = () => {
           <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-100 text-sky-800"><Truck size={28} /></div>
           <p className="text-xs font-black tracking-widest text-red-700">TIBA SUPPLIES · DRIVER</p>
           <h1 className="mt-2 text-2xl font-black text-slate-900">دخول السائق</h1>
-          <p className="mt-2 text-sm leading-6 text-slate-500">استخدم رقم الموبايل وكلمة المرور التي استلمتها من المكتب.</p>
+          <p className="mt-2 text-sm leading-6 text-slate-500">استخدم رقم الموبايل بالأرقام فقط كاسم مستخدم، مع كلمة المرور التي استلمتها من المكتب.</p>
           {error && <div role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
-          <label className="mt-5 block text-sm font-bold text-slate-700">رقم الموبايل</label>
+          <label className="mt-5 block text-sm font-bold text-slate-700">اسم المستخدم (رقم الموبايل بالأرقام فقط)</label>
           <input value={phone} onChange={e => setPhone(e.target.value)} type="tel" inputMode="tel" autoComplete="tel" required className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-slate-900 outline-none focus:border-red-500" />
           <label className="mt-4 block text-sm font-bold text-slate-700">كلمة المرور</label>
           <input value={password} onChange={e => setPassword(e.target.value)} type="password" autoComplete="current-password" required className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-slate-900 outline-none focus:border-red-500" />

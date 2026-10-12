@@ -93,7 +93,17 @@ Deno.serve(async (req: Request) => {
       const { data: authUser, error: authUserError } = await admin.auth.admin.getUserById(driver.auth_user_id);
       if (authUserError) throw authUserError;
       const appMetadata = authUser.user.app_metadata ?? {};
+      const { data: driverPhoneRow, error: driverPhoneError } = await admin
+        .from("drivers")
+        .select("phone")
+        .eq("driver_id", driverId)
+        .maybeSingle();
+      if (driverPhoneError) throw driverPhoneError;
+      const phone = normalizeEgyptianPhone(driverPhoneRow?.phone);
+      if (!phone) return json({ error: "DRIVER_PHONE_INVALID" }, 400);
       const { error: passwordError } = await admin.auth.admin.updateUserById(driver.auth_user_id, {
+        email: driverLoginEmail(phone),
+        email_confirm: true,
         password: temporaryPassword,
         app_metadata: { ...appMetadata, must_change_password: true },
       });
@@ -113,12 +123,13 @@ Deno.serve(async (req: Request) => {
     const phone = normalizeEgyptianPhone(driver.phone);
     if (!phone) return json({ error: "DRIVER_PHONE_INVALID" }, 400);
 
-    // The office confirms the driver's identity in person; no email or SMS is sent.
+    // Phone digits are the visible username. This reserved alias enables password login
+    // without requiring the phone auth provider, SMS, or a real email inbox.
     const { data: created, error: createError } = await admin.auth.admin.createUser({
-      phone,
+      email: driverLoginEmail(phone),
       password: temporaryPassword,
-      phone_confirm: true,
-      user_metadata: { display_name: driver.name },
+      email_confirm: true,
+      user_metadata: { display_name: driver.name, driver_phone: phone },
       app_metadata: { must_change_password: true },
     });
     if (createError) {
@@ -152,6 +163,11 @@ Deno.serve(async (req: Request) => {
     return json({ error: "INTERNAL_ERROR" }, 500);
   }
 });
+
+function driverLoginEmail(normalizedPhone: string): string {
+  const digits = normalizedPhone.replace(/\D/g, "");
+  return `${digits}@driver-login.tiba.invalid`;
+}
 
 function normalizeEgyptianPhone(value: unknown): string | null {
   if (typeof value !== "string") return null;
