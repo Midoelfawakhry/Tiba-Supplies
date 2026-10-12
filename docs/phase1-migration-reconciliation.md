@@ -1,4 +1,6 @@
-# Current audit update (2026-10-12, PR #55)
+# Phase 1 Migration Reconciliation
+
+## Current audit update (2026-10-12, PR #55)
 
 **Status: candidate hardening changes pass GitHub CI; full Phase 1 release remains BLOCKED.**
 
@@ -17,7 +19,6 @@ These are isolated fixture tests, not a clean bootstrap of the entire production
 
 ---
 
-# Phase 1 Migration Reconciliation
 
 ## Current audit update (2026-10-11, after PRs #25–#27)
 
