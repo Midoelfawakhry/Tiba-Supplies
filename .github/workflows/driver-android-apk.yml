@@ -1,4 +1,4 @@
-name: Build Tiba Supplies Main Office Android APK
+name: Build Tiba Supplies Office, Driver, and Branch Android APKs
 
 on:
   workflow_dispatch:
@@ -24,7 +24,7 @@ jobs:
     steps:
       - id: set-matrix
         shell: bash
-        run: echo 'matrix={"app_mode":["office"]}' >> "$GITHUB_OUTPUT"
+        run: echo 'matrix={"app_mode":["office","driver","branch"]}' >> "$GITHUB_OUTPUT"
 
   build-apk:
     needs: select-builds
@@ -116,9 +116,10 @@ jobs:
           const fs = require('node:fs');
           const mode = process.env.TIBA_APP_MODE;
           const office = mode === 'office';
+          const branch = mode === 'branch';
           const config = {
-            appId: office ? 'com.tibasupplies.office' : 'com.tibasupplies.driver',
-            appName: office ? 'Tiba Supplies Office' : 'Tiba Supplies Driver',
+            appId: office ? 'com.tibasupplies.office' : branch ? 'com.tibasupplies.branch' : 'com.tibasupplies.driver',
+            appName: office ? 'Tiba Supplies Office' : branch ? 'Tiba Supplies Ras Sedr' : 'Tiba Supplies Driver',
             webDir: 'dist',
             android: { allowMixedContent: false, useLegacyBridge: mode === 'driver' }
           };
