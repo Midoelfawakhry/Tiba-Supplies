@@ -58,3 +58,7 @@ jobs:
         env:
           PGPASSWORD: postgres
         run: psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -U postgres -d tibasupplies_test -f supabase/tests/available_driver_vehicles_security_test.sql
+      - name: Test internal counter RLS on disposable PostgreSQL
+        env:
+          PGPASSWORD: postgres
+        run: psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -U postgres -d tibasupplies_test -f supabase/tests/internal_counter_rls_test.sql
