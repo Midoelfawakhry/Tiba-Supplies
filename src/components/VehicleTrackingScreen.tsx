@@ -9,6 +9,7 @@ type VehicleLocation = {
   driver_name: string;
   vehicle_id: string;
   plate_number: string;
+  vehicle_code?: string | null;
   latitude: number;
   longitude: number;
   accuracy_m?: number | null;
@@ -34,6 +35,7 @@ export const VehicleTrackingScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [vehicleSearch, setVehicleSearch] = useState('');
 
   const loadLocations = useCallback(async (manual = false) => {
     if (manual) setRefreshing(true);
@@ -76,17 +78,23 @@ export const VehicleTrackingScreen: React.FC = () => {
     };
   }, []);
 
+  const visibleLocations = locations.filter(location => {
+    const query = vehicleSearch.trim().toLocaleLowerCase();
+    if (!query) return true;
+    return [location.plate_number, location.vehicle_code].some(value => String(value ?? '').toLocaleLowerCase().includes(query));
+  });
+
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const activeIds = new Set(locations.map(location => location.driver_id));
+    const activeIds = new Set(visibleLocations.map(location => location.driver_id));
     Object.entries(markersRef.current).forEach(([id, marker]) => {
       if (!activeIds.has(id)) {
         marker.remove();
         delete markersRef.current[id];
       }
     });
-    locations.forEach(location => {
+    visibleLocations.forEach(location => {
       const position: L.LatLngExpression = [location.latitude, location.longitude];
       const markerIcon = L.divIcon({
         className: '',
@@ -102,7 +110,7 @@ export const VehicleTrackingScreen: React.FC = () => {
         markersRef.current[location.driver_id] = L.marker(position, { icon: markerIcon }).addTo(map).bindPopup(popup);
       }
     });
-  }, [locations]);
+  }, [visibleLocations]);
 
   const recentCount = locations.filter(location => !location.is_stale).length;
 
@@ -123,23 +131,31 @@ export const VehicleTrackingScreen: React.FC = () => {
         <div className="rounded-2xl border border-slate-200 bg-white p-4"><MapPin className="text-emerald-600" size={20}/><div className="mt-2 text-2xl font-black">{recentCount}</div><div className="text-xs text-slate-500">موقع حديث (أقل من 10 دقائق)</div></div>
         <div className="col-span-2 rounded-2xl border border-slate-200 bg-white p-4 sm:col-span-1"><Clock3 className="text-amber-600" size={20}/><div className="mt-2 text-sm font-bold">{loading ? 'جاري التحميل...' : 'تحديث تلقائي كل 30 ثانية'}</div><div className="text-xs text-slate-500">الموقع يحتاج إذن السائق</div></div>
       </div>
+      <div className="rounded-3xl border border-slate-200 bg-white p-4">
+        <label className="flex items-center gap-2 rounded-xl border border-slate-300 px-3 py-2.5">
+          <Search size={18} className="shrink-0 text-slate-500" />
+          <input value={vehicleSearch} onChange={e => setVehicleSearch(e.target.value)} className="min-w-0 flex-1 bg-transparent text-sm outline-none" placeholder="ابحث برقم اللوحة أو كود العربية لعرض سيارة واحدة" aria-label="البحث عن سيارة في الخريطة" />
+          {vehicleSearch && <button type="button" onClick={() => setVehicleSearch('')} className="rounded-lg p-1 text-slate-500 hover:bg-slate-100" aria-label="مسح البحث"><X size={17}/></button>}
+        </label>
+        <p className="mt-2 text-xs text-slate-500">{vehicleSearch.trim() ? `نتائج البحث على الخريطة: ${visibleLocations.length}` : 'الخريطة تعرض كل السيارات ذات المواقع المسجلة.'}</p>
+      </div>
       <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white">
         <div ref={mapElement} className="h-[55vh] min-h-[340px] w-full" aria-label="خريطة مواقع السيارات"/>
-        {!loading && locations.length === 0 && !error && <div className="border-t border-slate-200 p-5 text-center text-sm leading-6 text-slate-500">لا توجد مواقع سيارات مسجلة حتى الآن. عند تسجيل دخول سائق مع تفعيل إذن الموقع وربط حسابه بعربية، سيظهر موقعه هنا.</div>}
+        {!loading && visibleLocations.length === 0 && !error && <div className="border-t border-slate-200 p-5 text-center text-sm leading-6 text-slate-500">{vehicleSearch.trim() ? 'مفيش عربية مطابقة للبحث ضمن السيارات التي لها موقع مسجل.' : 'لا توجد مواقع سيارات مسجلة حتى الآن. عند تسجيل دخول سائق مع تفعيل إذن الموقع وربط حسابه بعربية، سيظهر موقعه هنا.'}</div>}
       </div>
       <div className="rounded-3xl border border-slate-200 bg-white p-4 sm:p-5">
         <h3 className="font-black">قائمة السيارات</h3>
         <div className="mt-3 divide-y divide-slate-100">
-          {locations.map(location => (
+          {visibleLocations.map(location => (
             <button key={location.driver_id} type="button" onClick={() => {
               mapRef.current?.setView([location.latitude, location.longitude], 15);
               markersRef.current[location.driver_id]?.openPopup();
             }} className="flex w-full items-center justify-between gap-3 py-3 text-right">
-              <div className="min-w-0"><div className="font-bold">{location.plate_number} · {location.driver_name}</div><div className="mt-1 text-xs text-slate-500">آخر تحديث: {timeLabel(location.updated_at)}{location.accuracy_m != null ? ` · دقة ±${Math.round(location.accuracy_m)} م` : ''}</div></div>
+              <div className="min-w-0"><div className="font-bold">{location.plate_number}{location.vehicle_code ? ` · ${location.vehicle_code}` : ''} · {location.driver_name}</div><div className="mt-1 text-xs text-slate-500">آخر تحديث: {timeLabel(location.updated_at)}{location.accuracy_m != null ? ` · دقة ±${Math.round(location.accuracy_m)} م` : ''}</div></div>
               <span className={location.is_stale ? 'shrink-0 rounded-full bg-amber-50 px-2 py-1 text-xs font-bold text-amber-700' : 'shrink-0 rounded-full bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-700'}>{location.is_stale ? 'موقع قديم' : 'حديث'}</span>
             </button>
           ))}
-          {!locations.length && <p className="py-4 text-sm text-slate-500">لا توجد سيارات لعرضها بعد.</p>}
+          {!visibleLocations.length && <p className="py-4 text-sm text-slate-500">{vehicleSearch.trim() ? 'لا توجد نتيجة مطابقة.' : 'لا توجد سيارات لعرضها بعد.'}</p>}
         </div>
       </div>
     </section>
