@@ -48,6 +48,7 @@ function rowDetails(row: Row, key: ScreenKey) {
 export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showSectionTabs?: boolean }> = ({ initialSection = 'factories', showSectionTabs = true }) => {
   const [active, setActive] = useState<ScreenKey>(initialSection);
   useEffect(() => { setActive(initialSection); }, [initialSection]);
+  useEffect(() => { setShowMasterForm(false); setEditingMasterEntry(null); }, [active]);
   const [snapshot, setSnapshot] = useState<LiveSnapshot | null>(null);
   const [waiting, setWaiting] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
