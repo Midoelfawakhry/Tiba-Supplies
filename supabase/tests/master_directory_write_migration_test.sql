@@ -149,6 +149,14 @@ BEGIN
     IF SQLERRM <> 'DIRECTORY_NAME_EXISTS' THEN RAISE; END IF;
   END;
 
+  -- Name uniqueness is normalized for case and surrounding whitespace too.
+  BEGIN
+    PERFORM public.save_master_directory_entry('factory', NULL, '  test factory  ', 'FX-03');
+    RAISE EXCEPTION 'TEST_FAILED_EXPECTED_NORMALIZED_DUPLICATE_NAME';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM <> 'DIRECTORY_NAME_EXISTS' THEN RAISE; END IF;
+  END;
+
   -- Updating the same row may retain its current name/code; old and new data are audited.
   v_result := public.save_master_directory_entry(
     'factory', v_factory_id, 'Test Factory', 'fx-01', 'Updated address', NULL, false
