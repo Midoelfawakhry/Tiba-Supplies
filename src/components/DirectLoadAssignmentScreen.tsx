@@ -117,7 +117,7 @@ export const DirectLoadAssignmentScreen: React.FC = () => {
             <option value="">اختار العربية</option>
             {filteredVehicles.map(vehicle => <option key={vehicle.vehicle_id} value={vehicle.vehicle_id}>{vehicle.plate_number ?? 'بدون رقم لوحة'}{vehicle.vehicle_code ? ` · كود ${vehicle.vehicle_code}` : ''}</option>)}
           </select>
-          {normalizedVehicleSearch && filteredVehicles.length === 0 && <p className="mt-2 text-sm text-amber-700">مفيش عربية مطابقة للبحث. جرّب رقم اللوحة أو كود العربية.</p>
+          {normalizedVehicleSearch && filteredVehicles.length === 0 && <p className="mt-2 text-sm text-amber-700">مفيش عربية مطابقة للبحث. جرّب رقم اللوحة أو كود العربية.</p>}
           <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-900">
             <b>شروط التأكيد:</b> السائق مرتبط بالعربية، وموقع GPS حديث (آخر 10 دقائق)، والعربية داخل النطاق الجغرافي المضبوط لفرع رأس سدر. لا يمكن إسناد نقلة نشطة ثانية لنفس السائق أو العربية.
           </div>
