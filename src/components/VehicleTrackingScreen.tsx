@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { MapPin, RefreshCw, Truck, Clock3, AlertTriangle } from 'lucide-react';
+import { MapPin, RefreshCw, Truck, Clock3, AlertTriangle, Search, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 type VehicleLocation = {
