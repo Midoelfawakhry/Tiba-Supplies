@@ -1,6 +1,11 @@
 -- Phase 1: head-office-only create/update for the master data directory.
 -- This migration is a candidate and must be reviewed/tested before production application.
 -- No existing rows are changed by this migration.
+-- The live schema currently has no address/phone columns on these two tables.
+ALTER TABLE public.factories ADD COLUMN IF NOT EXISTS address text;
+ALTER TABLE public.factories ADD COLUMN IF NOT EXISTS phone text;
+ALTER TABLE public.quarries ADD COLUMN IF NOT EXISTS address text;
+ALTER TABLE public.quarries ADD COLUMN IF NOT EXISTS phone text;
 CREATE OR REPLACE FUNCTION public.save_master_directory_entry(
   p_entity_type text,
   p_entity_id uuid,
@@ -35,7 +40,7 @@ BEGIN
       AND r.name IN ('ADMIN', 'HEAD_OFFICE')
   ) THEN RAISE EXCEPTION 'INSUFFICIENT_ROLE'; END IF;
 
-  IF p_entity_type NOT IN ('factory', 'quarry') THEN
+  IF p_entity_type IS NULL OR p_entity_type NOT IN ('factory', 'quarry') THEN
     RAISE EXCEPTION 'INVALID_DIRECTORY_ENTITY_TYPE';
   END IF;
   IF v_name IS NULL THEN RAISE EXCEPTION 'DIRECTORY_NAME_REQUIRED'; END IF;
