@@ -78,6 +78,11 @@ export const VehicleTrackingScreen: React.FC = () => {
     };
   }, []);
 
+  const visibleLocations = locations.filter(location => {
+    const query = vehicleSearch.trim().toLocaleLowerCase('ar-EG');
+    return !query || [location.plate_number, location.vehicle_code, location.driver_name].some(value => String(value ?? '').toLocaleLowerCase('ar-EG').includes(query));
+  });
+
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -106,10 +111,6 @@ export const VehicleTrackingScreen: React.FC = () => {
     });
   }, [visibleLocations]);
 
-  const visibleLocations = locations.filter(location => {
-    const query = vehicleSearch.trim().toLocaleLowerCase('ar-EG');
-    return !query || [location.plate_number, location.vehicle_code, location.driver_name].some(value => String(value ?? '').toLocaleLowerCase('ar-EG').includes(query));
-  });
   const recentCount = locations.filter(location => !location.is_stale).length;
 
   return (
