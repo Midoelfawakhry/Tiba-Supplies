@@ -69,6 +69,10 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
   const [vehicleSearch, setVehicleSearch] = useState('');
   const [driverSearch, setDriverSearch] = useState('');
   const [entitySearch, setEntitySearch] = useState('');
+  const [showMasterForm, setShowMasterForm] = useState(false);
+  const [editingMasterEntry, setEditingMasterEntry] = useState<Row | null>(null);
+  const [masterForm, setMasterForm] = useState({ name: '', code: '', address: '', phone: '', is_active: true });
+  const [savingMaster, setSavingMaster] = useState(false);
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
   const [availableVehicles, setAvailableVehicles] = useState<Row[]>([]);
   const [ownerDirectory, setOwnerDirectory] = useState<Row[]>([]);
@@ -412,6 +416,45 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     }
   }
 
+  function beginMasterEntryEdit(row?: Row) {
+    setEditingMasterEntry(row ?? null);
+    setMasterForm({ name: String(row?.name ?? ''), code: String(row?.code ?? ''), address: String(row?.address ?? ''), phone: String(row?.phone ?? ''), is_active: row?.is_active !== false });
+    setShowMasterForm(true); setError(''); setSuccess('');
+  }
+
+  async function saveMasterEntry(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!['factories', 'quarries'].includes(active)) return;
+    setSavingMaster(true); setError(''); setSuccess('');
+    try {
+      const { data, error: rpcError } = await supabase.rpc('save_master_directory_entry', {
+        p_entity_type: active === 'factories' ? 'factory' : 'quarry',
+        p_entity_id: editingMasterEntry ? (active === 'factories' ? editingMasterEntry.factory_id : editingMasterEntry.quarry_id) : null,
+        p_name: masterForm.name.trim(), p_code: masterForm.code.trim() || null,
+        p_address: masterForm.address.trim() || null, p_phone: masterForm.phone.trim() || null,
+        p_is_active: masterForm.is_active,
+      });
+      if (rpcError) throw rpcError;
+      if (!data?.success) throw new Error('تعذر تأكيد حفظ بيانات الدليل.');
+      setShowMasterForm(false); setEditingMasterEntry(null);
+      setMasterForm({ name: '', code: '', address: '', phone: '', is_active: true });
+      setSuccess(editingMasterEntry ? 'تم تحديث بيانات الدليل بنجاح.' : 'تمت إضافة البيانات إلى دليل المكتب.');
+      await load();
+    } catch (e: any) {
+      const raw = String(e?.message || '');
+      const messages: Record<string, string> = {
+        AUTH_REQUIRED: 'انتهت جلسة المكتب. سجّل الدخول مرة أخرى.',
+        INSUFFICIENT_ROLE: 'إضافة وتعديل المصانع والمحاجر متاحان للمكتب الرئيسي فقط.',
+        INVALID_DIRECTORY_ENTITY_TYPE: 'نوع السجل غير صالح.',
+        DIRECTORY_NAME_REQUIRED: 'اكتب اسم المصنع أو المحجر.',
+        DIRECTORY_CODE_EXISTS: 'الكود مستخدم بالفعل في هذا الدليل. راجع السجلات قبل الحفظ.',
+        DIRECTORY_ENTRY_NOT_FOUND: 'السجل المراد تعديله لم يعد موجودًا.',
+      };
+      const key = Object.keys(messages).find(code => raw.includes(code));
+      setError(key ? messages[key] : raw || 'تعذر حفظ بيانات الدليل. تأكد من نشر Migration المعتمدة أولًا.');
+    } finally { setSavingMaster(false); }
+  }
+
   const lists: Record<ScreenKey, Row[]> = {
     factories: snapshot?.factories ?? [],
     quarries: snapshot?.quarries ?? [],
@@ -521,7 +564,21 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
         </form>
       </section>}
 
-      {['factories', 'quarries'].includes(active) && <div className="rounded-2xl border border-slate-200 bg-white p-3"><label className="block text-sm font-bold text-slate-700">البحث بالاسم أو الكود أو العنوان أو التليفون<input value={entitySearch} onChange={e => setEntitySearch(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 p-3 font-normal" placeholder={active === 'factories' ? 'ابحث عن مصنع أو عميل...' : 'ابحث عن محجر أو مورد...'} /></label></div>}
+      {['factories', 'quarries'].includes(active) && <>
+        <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3 sm:flex-row sm:items-end sm:justify-between">
+          <label className="block flex-1 text-sm font-bold text-slate-700">البحث بالاسم أو الكود أو العنوان أو التليفون<input value={entitySearch} onChange={e => setEntitySearch(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 p-3 font-normal" placeholder={active === 'factories' ? 'ابحث عن مصنع أو عميل...' : 'ابحث عن محجر أو مورد...'} /></label>
+          <button type="button" onClick={() => beginMasterEntryEdit()} className={`rounded-xl px-4 py-3 text-sm font-black text-white ${sectionPalette[active].action}`}>إضافة {active === 'factories' ? 'مصنع / عميل' : 'محجر / مورد'}</button>
+        </div>
+        {showMasterForm && <form onSubmit={saveMasterEntry} className={`grid gap-3 rounded-3xl border bg-white p-4 shadow-sm sm:grid-cols-2 sm:p-5 ${sectionPalette[active].border}`}>
+          <div className="sm:col-span-2"><h3 className="font-black">{editingMasterEntry ? 'تعديل بيانات' : 'إضافة'} {active === 'factories' ? 'مصنع / عميل' : 'محجر / مورد'}</h3><p className="mt-1 text-xs text-slate-500">الحفظ يتم في Supabase بصلاحيات المكتب الرئيسي، مع التحقق من عدم تكرار الكود.</p></div>
+          <label className="text-sm font-bold text-slate-700">الاسم *<input required maxLength={200} value={masterForm.name} onChange={e => setMasterForm(v => ({...v, name:e.target.value}))} className="mt-1.5 w-full rounded-xl border border-slate-300 p-3 font-normal" /></label>
+          <label className="text-sm font-bold text-slate-700">الكود<input maxLength={80} value={masterForm.code} onChange={e => setMasterForm(v => ({...v, code:e.target.value}))} className="mt-1.5 w-full rounded-xl border border-slate-300 p-3 font-normal" /></label>
+          <label className="text-sm font-bold text-slate-700">العنوان / المنطقة<input maxLength={300} value={masterForm.address} onChange={e => setMasterForm(v => ({...v, address:e.target.value}))} className="mt-1.5 w-full rounded-xl border border-slate-300 p-3 font-normal" /></label>
+          <label className="text-sm font-bold text-slate-700">رقم التليفون<input type="tel" maxLength={40} value={masterForm.phone} onChange={e => setMasterForm(v => ({...v, phone:e.target.value}))} className="mt-1.5 w-full rounded-xl border border-slate-300 p-3 font-normal" /></label>
+          <label className="flex items-center gap-2 text-sm font-bold text-slate-700"><input type="checkbox" checked={masterForm.is_active} onChange={e => setMasterForm(v => ({...v, is_active:e.target.checked}))} /> سجل نشط</label>
+          <div className="sm:col-span-2 flex flex-wrap gap-3"><button disabled={savingMaster} type="submit" className={`rounded-xl px-5 py-3 text-sm font-black text-white disabled:opacity-60 ${sectionPalette[active].action}`}>{savingMaster ? 'جاري الحفظ...' : 'حفظ البيانات'}</button><button type="button" onClick={() => {setShowMasterForm(false);setEditingMasterEntry(null);}} className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-bold">إلغاء</button></div>
+        </form>}
+      </>}
       {active === 'drivers' && <div className="rounded-2xl border border-slate-200 bg-white p-3"><label className="block text-sm font-bold text-slate-700">البحث عن سائق بالاسم<input value={driverSearch} onChange={e => setDriverSearch(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 p-3 font-normal" placeholder="اكتب اسم السائق..." /></label></div>}
       <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white">
         <div className={`flex flex-wrap items-center justify-between gap-4 border-b p-4 sm:p-5 ${sectionPalette[active].border} ${sectionPalette[active].wash}`}>
@@ -539,7 +596,8 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
                 {active !== 'waiting' && <span className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${sectionPalette[active].wash} ${sectionPalette[active].accent}`}><ActiveIcon size={20} strokeWidth={2.1}/></span>}
                 <div className={active === 'waiting' ? 'flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5' : 'min-w-0 flex-1'}><h4 className={active === 'waiting' ? 'font-semibold text-xs leading-5' : 'font-black leading-6 [overflow-wrap:anywhere]'}>{active === 'waiting' ? `${row.plate_number || 'عربية غير محددة'} · ${row.driver_name || 'سائق غير محدد'} · ${row.arrived_at ? new Date(row.arrived_at).toLocaleDateString('ar-EG') : '—'}` : rowTitle(row, active)}</h4>{active !== 'waiting' && <p className="mt-1 break-words text-sm leading-6 text-slate-500">{rowDetails(active === 'vehicles' ? { ...row, owner_name: ownerDirectory.find(owner => String(owner.owner_id) === String(row.owner_id))?.name } : row, active) || 'لا توجد تفاصيل إضافية في السجل الحالي.'}{active === 'drivers' && row.vehicle_id ? ` · العربية: ${snapshot?.vehicles?.find((vehicle: Row) => String(vehicle.vehicle_id) === String(row.vehicle_id))?.plate_number ?? 'غير محددة'}` : ''}</p>}{active === 'drivers' && row.phone && <a href={`tel:${String(row.phone).replace(/[^+\d]/g, '')}`} onClick={event => event.stopPropagation()} className="mt-2 inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-800"><Phone size={14}/> اتصال {row.phone}</a>}</div>
               </div>
-              <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0">{active === 'waiting' && row.status === 'WAITING' && <button type="button" disabled={savingEdit} onClick={() => void removeWaitingEntry(row)} className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-700 disabled:opacity-50"><UserMinus size={14}/> إزالة من الانتظار</button>}{active === 'drivers' && row.is_active !== false && row.auth_user_id && <button type="button" onClick={() => { setPasswordResetDriver(row); setNewDriverPassword(''); setConfirmDriverPassword(''); setEditingDriver(null); setError(''); setSuccess(''); }} className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-800">كلمة المرور</button>}{active === "drivers" && row.is_active !== false && <button type="button" disabled={savingEdit} onClick={() => void deactivateDriver(row)} aria-label="إيقاف السائق" className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-700 disabled:opacity-50"><UserX size={14}/> إيقاف</button>}{(active === 'drivers' || active === 'vehicles') && <button type="button" onClick={() => active === 'drivers' ? void beginDriverEdit(row) : beginVehicleEdit(row)} aria-label={active === 'drivers' ? 'تعديل بيانات السائق' : 'تعديل بيانات العربية'} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"><Pencil size={14}/> تعديل</button>}
+              <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0">
+              {['factories', 'quarries'].includes(active) && <button type="button" onClick={() => beginMasterEntryEdit(row)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700"><Pencil size={14}/> تعديل</button>}{active === 'waiting' && row.status === 'WAITING' && <button type="button" disabled={savingEdit} onClick={() => void removeWaitingEntry(row)} className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-700 disabled:opacity-50"><UserMinus size={14}/> إزالة من الانتظار</button>}{active === 'drivers' && row.is_active !== false && row.auth_user_id && <button type="button" onClick={() => { setPasswordResetDriver(row); setNewDriverPassword(''); setConfirmDriverPassword(''); setEditingDriver(null); setError(''); setSuccess(''); }} className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-800">كلمة المرور</button>}{active === "drivers" && row.is_active !== false && <button type="button" disabled={savingEdit} onClick={() => void deactivateDriver(row)} aria-label="إيقاف السائق" className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-700 disabled:opacity-50"><UserX size={14}/> إيقاف</button>}{(active === 'drivers' || active === 'vehicles') && <button type="button" onClick={() => active === 'drivers' ? void beginDriverEdit(row) : beginVehicleEdit(row)} aria-label={active === 'drivers' ? 'تعديل بيانات السائق' : 'تعديل بيانات العربية'} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"><Pencil size={14}/> تعديل</button>}
               {active === 'actual' && row.booking_id && !['CANCELLED', 'DELIVERED', 'COMPLETED'].includes(snapshot?.bookings?.find((b: Row) => b.booking_id === row.booking_id)?.status) && !row.delivery_confirmed_at && row.actual_weight == null && <button type="button" onClick={async () => {
                 const reason = window.prompt('اكتب سبب إلغاء النقلة:');
                 if (!reason?.trim()) return;
