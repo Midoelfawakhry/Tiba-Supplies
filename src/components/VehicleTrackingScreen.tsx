@@ -63,10 +63,10 @@ export const VehicleTrackingScreen: React.FC = () => {
 
   useEffect(() => {
     if (!mapElement.current || mapRef.current) return;
-    const map = L.map(mapElement.current, { zoomControl: true }).setView([29.59, 32.72], 8);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors',
-      maxZoom: 19,
+    const map = L.map(mapElement.current, { zoomControl: true, preferCanvas: true }).setView([29.59, 32.72], 8);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+      maxZoom: 20,
     }).addTo(map);
     mapRef.current = map;
     const invalidate = window.setTimeout(() => map.invalidateSize(), 250);
@@ -97,9 +97,9 @@ export const VehicleTrackingScreen: React.FC = () => {
       const position: L.LatLngExpression = [location.latitude, location.longitude];
       const markerIcon = L.divIcon({
         className: '',
-        html: '<div style="background:#2563eb;color:white;border:2px solid white;border-radius:18px;padding:5px 7px;box-shadow:0 2px 8px #0005;font-size:18px">🚚</div>',
-        iconSize: [40, 38],
-        iconAnchor: [20, 19],
+        html: `<div style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;background:${location.is_stale ? '#b45309' : '#1d4ed8'};color:#fff;border:2px solid #fff;border-radius:50%;box-shadow:0 2px 7px #0f172a55;font:16px system-ui">🚚</div>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
       });
       const popup = `<div dir="rtl" style="font-family:system-ui;min-width:160px"><strong>${String(location.plate_number ?? '')}</strong><br/>${String(location.driver_name ?? 'سائق غير محدد')}<br/>آخر تحديث: ${timeLabel(location.updated_at)}<br/>${location.is_stale ? '⚠️ الموقع قديم' : '🟢 موقع حديث'}${location.speed_kmh != null ? '<br/>السرعة: ' + Math.round(location.speed_kmh) + ' كم/س' : ''}</div>`;
       const existing = markersRef.current[location.driver_id];
@@ -109,6 +109,9 @@ export const VehicleTrackingScreen: React.FC = () => {
         markersRef.current[location.driver_id] = L.marker(position, { icon: markerIcon }).addTo(map).bindPopup(popup);
       }
     });
+    const points: L.LatLngExpression[] = visibleLocations.map(x => [x.latitude, x.longitude] as L.LatLngExpression);
+    if (points.length === 1) map.setView(points[0], 13);
+    else if (points.length > 1) map.fitBounds(L.latLngBounds(points), { padding: [36, 36], maxZoom: 13 });
   }, [visibleLocations]);
 
   const recentCount = locations.filter(location => !location.is_stale).length;
