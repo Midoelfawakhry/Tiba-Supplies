@@ -114,6 +114,32 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
   }, []);
   useEffect(() => { void load(); }, [load]);
 
+  async function addDirectoryEntity(kind: 'factories' | 'quarries') {
+    const isFactory = kind === 'factories';
+    const label = isFactory ? 'العميل / المصنع' : 'المحجر';
+    const name = window.prompt(`اكتب اسم ${label}:`);
+    if (!name?.trim()) return;
+    const code = window.prompt(`اكتب كود ${label} (اختياري):`) || '';
+    setError('');
+    setSuccess('');
+    setSavingEdit(true);
+    try {
+      const { error: insertError } = await supabase.from(kind).insert({
+        name: name.trim(),
+        code: code.trim() || null,
+        is_active: true,
+      });
+      if (insertError) throw insertError;
+      setSuccess(`تمت إضافة ${label} بنجاح.`);
+      setEntitySearch('');
+      await load();
+    } catch (e: any) {
+      setError(e?.message || `تعذرت إضافة ${label}. راجع صلاحيات حساب المكتب وسياسة قاعدة البيانات.`);
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
   async function removeWaitingEntry(row: Row) {
     const driverName = String(row.driver_name ?? 'السائق');
     const plate = String(row.plate_number ?? 'العربية غير محددة');
@@ -529,7 +555,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
             <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-black/5 ${sectionPalette[active].accent}`}><ActiveIcon size={25} strokeWidth={2.2}/></span>
             <div><h3 className="font-black">{tabs.find(tab => tab.key === active)?.label}</h3><p className="mt-1 text-xs text-slate-500">بيانات التشغيل الفعلية · محدثة من النظام</p></div>
           </div>
-          <span className={`inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-sm font-black shadow-sm ring-1 ring-black/5 ${sectionPalette[active].accent}`}><ClipboardList size={15}/>{visibleRows.length} سجل</span>
+          <div className="flex flex-wrap items-center gap-2">{active === 'factories' && <button type="button" disabled={savingEdit} onClick={() => void addDirectoryEntity('factories')} className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-xs font-black text-white hover:bg-blue-700 disabled:opacity-50"><Building2 size={15}/> إضافة عميل / مصنع</button>}{active === 'quarries' && <button type="button" disabled={savingEdit} onClick={() => void addDirectoryEntity('quarries')} className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-3 py-2 text-xs font-black text-white hover:bg-amber-700 disabled:opacity-50"><Mountain size={15}/> إضافة محجر</button>}<span className={`inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-sm font-black shadow-sm ring-1 ring-black/5 ${sectionPalette[active].accent}`}><ClipboardList size={15}/>{visibleRows.length} سجل</span></div>
         </div>
         <div className="divide-y divide-slate-100">
           {visibleRows.map((row, index) => <article key={String(row.factory_id ?? row.quarry_id ?? row.driver_id ?? row.vehicle_id ?? row.entry_id ?? row.load_order_id ?? row.booking_id ?? row.actual_loading_record_id ?? index)} className={active === 'waiting' ? 'border-r-2 border-r-violet-400 px-2 py-1.5 transition-colors hover:bg-violet-50/60' : `border-r-4 p-4 transition-colors hover:bg-slate-50/70 sm:p-5 ${sectionPalette[active].row}`}>
