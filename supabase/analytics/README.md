@@ -1,7 +1,7 @@
 # Tiba Intelligence — Analysis Data Contract
 
 ## Purpose
-A read-only analytics module for Tiba-Supplies. It must not change operational workflows, office UI, branch UI, or DriverApp. Initial operating context is Ras Sedr office; do not use head-office coordinates as the distance reference.
+A read-only analytics module for Tiba-Supplies. It is exclusively for the MAIN OFFICE (مكتب طيبة الرئيسي بالإسماعيلية). It must not serve Ras Sedr branch operations, and must not change operational workflows, office UI, branch UI, or DriverApp. Analytics access and filters must be scoped to the main office only.
 
 ## Source of truth
 Supabase production schema and generated database types are canonical structural references. See `database.types.ts`. This is schema/type documentation, not a dump of personal or operational records.
@@ -17,7 +17,7 @@ Supabase production schema and generated database types are canonical structural
 - Analytics are read-only and permission-scoped. Never expose auth secrets, passwords, tokens, or service-role keys.
 - Avoid copying raw personal data into analytics artifacts. Prefer IDs/aggregates; expose driver-identifying details only to authorized users for legitimate operational purposes.
 
-## First analysis: direct assignment confirmation latency
+## First analysis: main-office direct assignment confirmation latency
 For direct assignments only:
 `latency = confirmed_at - assigned_at`
 First verify the canonical assignment table/event and timestamp columns from the live schema and SQL functions. Do not assume names from UI labels. Track confirmed, pending, cancelled, reassigned and invalid/missing timestamp cases separately.
@@ -26,16 +26,16 @@ Metrics: count, mean, median, P90, percent within configurable SLA thresholds, o
 ## Separate analytics domains
 1. Direct assignments: assignment-to-confirmation and acceptance outcomes.
 2. Load distribution: distribution/booking/loading counts and transitions, with no Confirm metric.
-3. Ras Sedr waiting list: waiting duration and queue throughput from real arrival/start/end timestamps.
+3. Main-office queues and workflow stages: analyze only queue records and workflow stages owned by the main office, using their real arrival/start/end timestamps. Exclude Ras Sedr branch waiting-list operations.
 4. Actual loading: recorded weight, factory, quarry, vehicle, trip code, sequence, load date, delivery confirmation timestamp and available delivery coordinates.
-5. Fleet and movement: location freshness, GPS accuracy, distance from Ras Sedr office using configured coordinates, and address resolution only if a suitable geocoding service exists.
+5. Fleet and movement: include only if explicitly needed by the main office's analytics and authorized by its data scope; never calculate or present branch-specific Ras Sedr operational analytics in this tool.
 6. Data quality: missing timestamps, orphaned references, duplicate lifecycle events, impossible chronology and stale GPS.
 
 ## Data discovery checklist
 - Inspect tables, views, functions/RPCs, foreign keys, enums, indexes, RLS and grants.
 - Inspect operational RPC definitions before relying on UI labels.
 - Identify event timestamp semantics and state transitions.
-- Verify Ras Sedr office latitude/longitude is populated before distance calculations.
+- Verify office ownership and row-level access for every source; do not include Ras Sedr branch operational records.
 - Build aggregate queries/views with explicit permissions; no unrestricted data export.
 - Test zero records, null timestamps, duplicate events, cancelled/reassigned trips and timezone boundaries.
 
