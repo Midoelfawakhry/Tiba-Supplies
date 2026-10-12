@@ -1,3 +1,22 @@
+# Current audit update (2026-10-12, PR #55)
+
+**Status: candidate hardening changes pass GitHub CI; full Phase 1 release remains BLOCKED.**
+
+PR #55 adds these forward-only candidate migrations:
+- `20261012160000_head_office_master_directory_write.sql`: head-office-only factory/quarry create/update, normalized duplicate-code checks, duplicate-name checks, and audit-log entries.
+- `20261012170000_harden_available_driver_vehicles.sql`: restricts the vehicle picker RPC to authenticated, active driver accounts; direct anonymous execution is revoked.
+- `20261012180000_enable_counter_rls.sql`: enables RLS on internal daily loading/trip counters and explicitly revokes direct client privileges. Existing SECURITY DEFINER trigger functions are expected to continue allocation as the table owner; validate that behavior in full staging before production.
+
+CI at head `8a1f385d58daac41ce76ba0257ad039f8d584e51` passed:
+- Phase 1 build workflow: lint, Phase 1 authorization tests, web build, existing SQL smoke checks, and new disposable-PostgreSQL tests for all three candidate hardening areas.
+- Migration integrity workflow: passed.
+
+These are isolated fixture tests, not a clean bootstrap of the entire production schema and not full app-to-Supabase E2E tests. PR #55 is still unmerged. None of these migrations has been applied to production, and no production business data was changed.
+
+**Still release-blocking:** reconcile the production migration ledger against repository SQL filenames and effective order; create/authorize an isolated staging branch only after confirming any cost; validate trigger-based counter allocation with RLS enabled; exercise actual role-specific flows and direct assignment/GPS/concurrency/cancellation/redirect/delivery scenarios; and run Android/device smoke tests. Do not treat PR #55 CI success as Phase 1 release approval.
+
+---
+
 # Phase 1 Migration Reconciliation
 
 ## Current audit update (2026-10-11, after PRs #25–#27)
