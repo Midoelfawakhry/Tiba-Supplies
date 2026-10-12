@@ -124,12 +124,13 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     setSuccess('');
     setSavingEdit(true);
     try {
-      const { error: insertError } = await supabase.from(kind).insert({
-        name: name.trim(),
-        code: code.trim() || null,
-        is_active: true,
+      const { data, error: insertError } = await supabase.rpc('office_create_directory_entity', {
+        p_entity_type: kind === 'factories' ? 'FACTORY' : 'QUARRY',
+        p_name: name.trim(),
+        p_code: code.trim() || null,
       });
       if (insertError) throw insertError;
+      if (!data?.success) throw new Error('تعذر تأكيد إضافة السجل.');
       setSuccess(`تمت إضافة ${label} بنجاح.`);
       setEntitySearch('');
       await load();
