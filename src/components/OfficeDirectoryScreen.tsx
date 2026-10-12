@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Building2, Users, UserX, Truck, ClipboardCheck, ClipboardList, Clock3, RefreshCw, AlertTriangle, Pencil, UserMinus, Phone } from 'lucide-react';
+import { Building2, Mountain, Users, UserX, Truck, ClipboardCheck, ClipboardList, Clock3, RefreshCw, AlertTriangle, Pencil, UserMinus, Phone } from 'lucide-react';
 import { getLiveSnapshot, LiveSnapshot, liveName } from '../services/liveData';
 import { supabase } from '../lib/supabase';
 import { AddVehicleForm } from './AddVehicleForm';
 
-type ScreenKey = 'factories' | 'drivers' | 'vehicles' | 'waiting' | 'loads' | 'actual';
+type ScreenKey = 'factories' | 'quarries' | 'drivers' | 'vehicles' | 'waiting' | 'loads' | 'actual';
 type Row = Record<string, any>;
 const tabs: { key: ScreenKey; label: string; icon: React.ElementType }[] = [
-  { key: 'factories', label: 'المصانع', icon: Building2 },
+  { key: 'factories', label: 'المصانع والعملاء', icon: Building2 },
+  { key: 'quarries', label: 'المحاجر والموردون', icon: Mountain },
   { key: 'drivers', label: 'السائقون', icon: Users },
   { key: 'vehicles', label: 'أسطول السيارات', icon: Truck },
   { key: 'waiting', label: 'قائمة انتظار رأس سدر', icon: Clock3 },
@@ -17,6 +18,7 @@ const tabs: { key: ScreenKey; label: string; icon: React.ElementType }[] = [
 
 const sectionPalette: Record<ScreenKey, { selected: string; accent: string; border: string; action: string; row: string; wash: string }> = {
   factories: { selected: 'border-sky-600 bg-sky-600', accent: 'text-sky-700', border: 'border-sky-200', action: 'bg-sky-600 hover:bg-sky-700', row: 'border-r-sky-400', wash: 'bg-sky-50/50' },
+  quarries: { selected: 'border-amber-600 bg-amber-600', accent: 'text-amber-700', border: 'border-amber-200', action: 'bg-amber-600 hover:bg-amber-700', row: 'border-r-amber-400', wash: 'bg-amber-50/50' },
   drivers: { selected: 'border-red-600 bg-red-600', accent: 'text-red-700', border: 'border-red-200', action: 'bg-red-600 hover:bg-red-700', row: 'border-r-red-400', wash: 'bg-red-50/50' },
   vehicles: { selected: 'border-blue-600 bg-blue-600', accent: 'text-blue-700', border: 'border-blue-200', action: 'bg-blue-600 hover:bg-blue-700', row: 'border-r-blue-400', wash: 'bg-blue-50/50' },
   waiting: { selected: 'border-violet-600 bg-violet-600', accent: 'text-violet-700', border: 'border-violet-200', action: 'bg-violet-600 hover:bg-violet-700', row: 'border-r-violet-400', wash: 'bg-violet-50/50' },
@@ -26,6 +28,7 @@ const sectionPalette: Record<ScreenKey, { selected: string; accent: string; bord
 
 function rowTitle(row: Row, key: ScreenKey) {
   if (key === 'factories') return liveName(row);
+  if (key === 'quarries') return liveName(row);
   if (key === 'drivers') return row.name ?? row.driver_name ?? 'سائق بدون اسم';
   if (key === 'vehicles') return row.plate_number ?? row.vehicle_code ?? 'عربية بدون لوحة';
   if (key === 'waiting') return row.plate_number ?? row.driver_name ?? 'عنصر انتظار';
@@ -33,7 +36,8 @@ function rowTitle(row: Row, key: ScreenKey) {
   return row.trip_code ?? row.ticket_number ?? row.record_number ?? row.actual_loading_record_id ?? 'سجل تحميل فعلي';
 }
 function rowDetails(row: Row, key: ScreenKey) {
-  if (key === 'factories') return [row.address, row.phone].filter(Boolean).join(' · ');
+  if (key === 'factories') return [row.code, row.address, row.phone, row.is_active === false ? 'غير نشط' : 'نشط'].filter(Boolean).join(' · ');
+  if (key === 'quarries') return [row.code, row.address, row.phone, row.is_active === false ? 'غير نشط' : 'نشط'].filter(Boolean).join(' · ');
   if (key === 'drivers') return [row.phone, row.driver_code, row.is_active === false ? 'غير نشط' : 'نشط'].filter(Boolean).join(' · ');
   if (key === 'vehicles') return [row.owner_name ? 'المالك: ' + row.owner_name : '', row.truck_type ?? row.vehicle_type, row.capacity_tons ? row.capacity_tons + ' طن' : '', row.is_active === false ? 'غير نشطة' : 'نشطة'].filter(Boolean).join(' · ');
   if (key === 'waiting') return [row.driver_name, row.status, row.arrived_at ? new Date(row.arrived_at).toLocaleString('ar-EG') : ''].filter(Boolean).join(' · ');
@@ -409,6 +413,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
 
   const lists: Record<ScreenKey, Row[]> = {
     factories: snapshot?.factories ?? [],
+    quarries: snapshot?.quarries ?? [],
     drivers: snapshot?.drivers ?? [],
     vehicles: snapshot?.vehicles ?? [],
     waiting,
