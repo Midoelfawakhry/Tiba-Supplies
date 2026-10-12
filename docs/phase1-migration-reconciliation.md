@@ -184,3 +184,24 @@ For regular load orders, preserve their operational owner as HEAD and ensure `ch
 Staging tests must verify: (a) every operational action/audit points to HEAD, (b) BRANCH is read only as a location reference, (c) cancellation and redirect work without selecting BRANCH as transaction office, and (d) geofence checks still use the Ras Sedr coordinates.
 
 This correction supersedes the earlier suggestion that enforcing a single active BRANCH would resolve cancellation queue routing. The invariant is not “one active BRANCH”; it is “BRANCH is not an operational transaction office.”
+
+
+## Migration-source recovery investigation (2026-10-12)
+
+This is a follow-up source investigation, not approval to deploy or replay SQL. The live production ledger was re-read read-only; it still contains the three historical versions below without exact same-version source files on `main`. A search of the current branch and selected historical/reconciliation branches did not recover exact files under those paths. The candidates below are semantic leads only; they are **not** proof that the original migration source has been recovered.
+
+| Production ledger entry | Candidate source found in repository history | What the candidate supports | Remaining gap / disposition |
+| --- | --- | --- | --- |
+| `20261011004642_require_captured_driver_location_time` | `20261011004304_validate_captured_driver_location_time.sql`; later checks also appear in `20261011012000_direct_assignment_acceptance.sql` and `20261011012500_direct_assignment_driver_snapshot.sql` | Stale/future captured timestamps are checked in geofence/assignment/snapshot paths. | No exact source recovered. In `20261011004304`, the `update_driver_live_location` guard is conditional on `p_captured_at IS NOT NULL`, so it does not itself prove that a missing captured timestamp is rejected. Verify the live function and intended contract before deciding whether a forward correction is needed. |
+| `20261011020800_phase1_direct_assignment_acceptance_head_owned` | `20261011012000_direct_assignment_acceptance.sql` plus `20261011013000_enforce_head_office_direct_assignment.sql` (found on `phase1-direct-assignment-acceptance`) | The former implements pending direct-assignment offers and driver acceptance; the latter restricts direct assignment to ADMIN/HEAD_OFFICE and writes the audit to HEAD. | These are separate candidate files with different version prefixes, not the original recorded migration. Compare their effective definitions to production and recover original commit/blob if possible; otherwise document a reviewed baseline/recovery plan rather than relabeling them as the original. |
+| `20261011022028_enforce_head_office_write_permissions_fail_closed` | `20261011014000_enforce_head_office_write_permissions.sql` (found on `phase1-direct-assignment-acceptance`) | The candidate targets operational write RPCs and attempts to fail closed if expected functions are absent or BRANCH role gates remain. | Not an exact source recovery. The candidate rewrites function definitions with text replacements; validate every overload/signature and replacement outcome. Do not assume the word “fail_closed” in the ledger proves the current candidate is safe. |
+
+### Next reconciliation actions
+
+1. Preserve the production migration ledger exactly as recorded; do not delete ledger rows or replay historical SQL on production.
+2. Continue source recovery through Git history/PRs for the exact blobs and commit ancestry of the three entries.
+3. Compare the current live definitions with the candidate migrations by function signature and behavior, especially required `p_captured_at`, direct assignment status before acceptance, audit ownership, and all HEAD-only mutation gates.
+4. Inventory every repository migration filename/version and check for duplicate or non-deterministic prefixes before attempting a clean bootstrap.
+5. Only after the source map is reviewed, prepare a clean-bootstrap validation plan and any necessary **new forward-only** correction. No production migration or business-data mutation is authorized by this note.
+
+**Status remains BLOCKED.** This investigation narrowed possible semantic counterparts but did not recover the original three migration sources or prove that a clean bootstrap succeeds.
