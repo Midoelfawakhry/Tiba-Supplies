@@ -8,6 +8,7 @@ export const DirectLoadAssignmentScreen: React.FC = () => {
   const [factoryId, setFactoryId] = useState('');
   const [quarryId, setQuarryId] = useState('');
   const [vehicleId, setVehicleId] = useState('');
+  const [vehicleSearch, setVehicleSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -30,6 +31,19 @@ export const DirectLoadAssignmentScreen: React.FC = () => {
   const factories = snapshot?.factories ?? [];
   const quarries = snapshot?.quarries ?? [];
   const availableVehicles = snapshot?.vehicles ?? [];
+  const normalizedVehicleSearch = vehicleSearch.trim().toLocaleLowerCase('ar-EG');
+  const filteredVehicles = availableVehicles.filter(vehicle => {
+    const driver = (snapshot?.drivers ?? []).find(d => d.vehicle_id === vehicle.vehicle_id);
+    const searchable = [
+      vehicle.plate_number,
+      vehicle.vehicle_code,
+      driver?.name,
+      driver?.phone,
+    ].filter(Boolean).join(' ').toLocaleLowerCase('ar-EG');
+    return !normalizedVehicleSearch || searchable.includes(normalizedVehicleSearch);
+  });
+  const selectedVehicle = availableVehicles.find(v => v.vehicle_id === vehicleId);
+  const selectedDriver = (snapshot?.drivers ?? []).find(d => d.vehicle_id === vehicleId);
 
 
   async function assign() {
@@ -54,6 +68,7 @@ export const DirectLoadAssignmentScreen: React.FC = () => {
       if (identityError) throw identityError;
       setSuccess(`تم إسناد النقلة للسائق وهي في انتظار قبوله. كود النقلة: ${identity?.trip_code ?? 'تم الإسناد'} · رقم الإسناد اليومي: ${identity?.assignment_daily_number ?? '—'} · المسافة من المكتب: ${result.distance_m} متر.`);
       setVehicleId('');
+      setVehicleSearch('');
       await refresh();
     } catch (e: any) {
       const raw = String(e?.message || '');
@@ -102,11 +117,27 @@ export const DirectLoadAssignmentScreen: React.FC = () => {
             <option value="">اختار المحجر</option>
             {quarries.map(quarry => <option key={quarry.quarry_id} value={quarry.quarry_id}>{liveName(quarry)}</option>)}
           </select>
-          <label className="mt-5 block text-sm font-bold text-slate-700">العربية</label>
+          <label className="mt-5 block text-sm font-bold text-slate-700">ابحث عن العربية</label>
+          <input
+            type="search"
+            value={vehicleSearch}
+            onChange={e => { setVehicleSearch(e.target.value); setError(''); setSuccess(''); }}
+            placeholder="اكتب رقم اللوحة أو كود العربية أو اسم السائق"
+            aria-label="البحث عن العربية برقم اللوحة أو الكود أو اسم السائق"
+            className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900 placeholder:text-slate-400"
+          />
+          <label className="mt-3 block text-sm font-bold text-slate-700">اختار العربية من النتائج ({filteredVehicles.length})</label>
           <select value={vehicleId} onChange={e => { setVehicleId(e.target.value); setError(''); setSuccess(''); }} className="mt-2 w-full rounded-xl border border-slate-300 bg-slate-50 p-3 text-sm text-slate-900">
             <option value="">اختار العربية</option>
-            {availableVehicles.map(vehicle => <option key={vehicle.vehicle_id} value={vehicle.vehicle_id}>{vehicle.plate_number ?? vehicle.vehicle_code ?? vehicle.vehicle_id}</option>)}
+            {filteredVehicles.map(vehicle => {
+              const driver = (snapshot?.drivers ?? []).find(d => d.vehicle_id === vehicle.vehicle_id);
+              const plate = vehicle.plate_number ?? 'بدون رقم لوحة';
+              const code = vehicle.vehicle_code ? ` · كود ${vehicle.vehicle_code}` : '';
+              const driverLabel = driver?.name ? ` · السائق: ${driver.name}` : ' · غير مرتبطة بسائق';
+              return <option key={vehicle.vehicle_id} value={vehicle.vehicle_id}>{plate}{code}{driverLabel}</option>;
+            })}
           </select>
+          {normalizedVehicleSearch && filteredVehicles.length === 0 && <p className="mt-2 text-sm text-amber-700">مفيش عربية مطابقة للبحث. جرّب رقم اللوحة أو الكود أو جزء من اسم السائق.</p>}
           <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-900">
             <b>شروط التأكيد:</b> السائق مرتبط بالعربية، وموقع GPS حديث (آخر 10 دقائق)، والعربية داخل النطاق الجغرافي المضبوط لفرع رأس سدر. لا يمكن إسناد نقلة نشطة ثانية لنفس السائق أو العربية.
           </div>
@@ -119,7 +150,7 @@ export const DirectLoadAssignmentScreen: React.FC = () => {
             <div className="mt-4 space-y-3 text-sm">
               <div><span className="text-slate-500">المصنع</span><div className="mt-1 font-bold">{liveName(factories.find(f => f.factory_id === factoryId))}</div></div>
               <div><span className="text-slate-500">المحجر</span><div className="mt-1 font-bold">{liveName(quarries.find(q => q.quarry_id === quarryId))}</div></div>
-              <div><span className="text-slate-500">العربية</span><div className="mt-1 font-bold">{String(availableVehicles.find(v => v.vehicle_id === vehicleId)?.plate_number ?? availableVehicles.find(v => v.vehicle_id === vehicleId)?.vehicle_code ?? 'لم يتم الاختيار')}</div></div>
+              <div><span className="text-slate-500">العربية</span><div className="mt-1 font-bold">{String(selectedVehicle?.plate_number ?? selectedVehicle?.vehicle_code ?? 'لم يتم الاختيار')}</div>{selectedVehicle?.vehicle_code && <div className="mt-1 text-xs text-slate-500">كود العربية: {selectedVehicle.vehicle_code}</div>}{selectedDriver?.name && <div className="mt-1 text-sm text-slate-600">السائق: {selectedDriver.name}</div>}</div>
             </div>
           </section>
           <section className="rounded-3xl border border-slate-200 bg-slate-50 p-5"><h3 className="font-black">حالة البيانات</h3><div className="mt-3 text-sm leading-7 text-slate-600">{loading ? 'جاري تحميل البيانات...' : `مصانع: ${factories.length} · محاجر: ${quarries.length} · عربيات: ${availableVehicles.length}`}</div></section>
