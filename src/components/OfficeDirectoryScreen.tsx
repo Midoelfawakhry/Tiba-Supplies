@@ -340,7 +340,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
       setPasswordResetDriver(null);
       setNewDriverPassword('');
       setConfirmDriverPassword('');
-      setSuccess('تم تحديث كلمة المرور. سيُطلب من السائق تغييرها عند أول دخول.');
+      setSuccess('تم تحديث كلمة المرور. سيستخدم السائق كلمة المرور الجديدة مباشرة.');
     } catch (e: any) {
       setError(e?.message || 'تعذر تحديث كلمة مرور السائق.');
     } finally {
@@ -459,7 +459,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
           <label className="text-sm font-bold text-slate-700">رقم الموبايل — اسم المستخدم<div className="relative mt-1.5"><Phone size={18} className="absolute right-3 top-3.5 text-slate-400"/><input required type="tel" inputMode="tel" value={driverPhone} onChange={e => setDriverPhone(e.target.value)} className="w-full rounded-xl border border-slate-300 bg-white p-3 pr-10 font-normal" placeholder="01012345678"/></div><span className="mt-1 block text-xs font-normal text-slate-500">السائق سيدخل بهذا الرقم وكلمة المرور التي تحددها.</span></label>
           <label className="text-sm font-bold text-slate-700">كلمة مرور السائق<input required type="password" autoComplete="new-password" minLength={8} value={driverTemporaryPassword} onChange={e => setDriverTemporaryPassword(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal" /><span className="mt-1 block text-xs font-normal text-slate-500">دي كلمة المرور التي ستنشئ بها حساب السائق. سلّمها له مباشرة.</span></label>
           <label className="text-sm font-bold text-slate-700">تأكيد كلمة المرور<input required type="password" autoComplete="new-password" minLength={8} value={driverTemporaryPasswordConfirmation} onChange={e => setDriverTemporaryPasswordConfirmation(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal" /></label>
-          <div className="text-sm font-bold text-slate-700">اختيار العربية
+          <div className="text-sm font-bold text-slate-700">اختيار رقم العربية المرتبطة بالسائق
             <label className="relative mt-1.5 block"><span className="sr-only">ابحث برقم العربية</span><input value={vehicleSearch} onChange={e => { setVehicleSearch(e.target.value); setSelectedVehicleId(''); }} className="w-full rounded-xl border border-slate-300 bg-white p-3 pr-10 font-normal" placeholder="ابحث برقم اللوحة أو كود العربية..."/><span className="absolute right-3 top-3 text-slate-400"><Truck size={18}/></span></label>
             <select required value={selectedVehicleId} onChange={e => setSelectedVehicleId(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal">
               <option value="">اختار عربية متاحة</option>
