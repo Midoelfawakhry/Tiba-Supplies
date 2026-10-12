@@ -61,12 +61,12 @@ BEGIN
     PERFORM pg_advisory_xact_lock(hashtext('master-directory:' || p_entity_type || ':code:' || v_code));
   END IF;
   -- Names are unique in each directory table. Lock by exact name to improve concurrent-write feedback.
-  PERFORM pg_advisory_xact_lock(hashtext('master-directory:' || p_entity_type || ':name:' || v_name));
+  PERFORM pg_advisory_xact_lock(hashtext('master-directory:' || p_entity_type || ':name:' || lower(v_name)));
 
   IF p_entity_type = 'factory' THEN
     IF EXISTS (
       SELECT 1 FROM public.factories f
-      WHERE f.name = v_name
+      WHERE lower(btrim(f.name)) = lower(v_name)
         AND (p_entity_id IS NULL OR f.factory_id <> p_entity_id)
     ) THEN
       RAISE EXCEPTION 'DIRECTORY_NAME_EXISTS';
@@ -108,7 +108,7 @@ BEGIN
   ELSE
     IF EXISTS (
       SELECT 1 FROM public.quarries q
-      WHERE q.name = v_name
+      WHERE lower(btrim(q.name)) = lower(v_name)
         AND (p_entity_id IS NULL OR q.quarry_id <> p_entity_id)
     ) THEN
       RAISE EXCEPTION 'DIRECTORY_NAME_EXISTS';
