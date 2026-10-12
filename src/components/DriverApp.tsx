@@ -345,13 +345,51 @@ export const DriverApp: React.FC = () => {
           accuracy: coords.accuracy,
           capturedAt: new Date(timestamp).toLocaleString('ar-EG'),
         });
-        const { error: saveError } = await supabase.rpc('update_driver_live_location', {
-          p_latitude: coords.latitude, p_longitude: coords.longitude, p_accuracy_m: coords.accuracy,
-          p_heading: null, p_speed_kmh: null, p_captured_at: new Date(timestamp).toISOString(),
-        });
-        if (saveError) setError(saveError.message || 'تعذر حفظ الموقع. فعّل مشاركة الموقع وتأكد من ربط حسابك بالعربية.');
-        else { setError(''); await refreshPortal(); }
-        setLocating(false);
+        try {
+          const { error: saveError } = await supabase.rpc('update_driver_live_location', {
+            p_latitude: coords.latitude, p_longitude: coords.longitude, p_accuracy_m: coords.accuracy,
+            p_heading: null, p_speed_kmh: null, p_captured_at: new Date(timestamp).toISOString(),
+          });
+          if (saveError) throw new Error(saveError.message || 'تعذر حفظ الموقع. فعّل مشاركة الموقع وتأكد من ربط حسابك بالعربية.');
+
+          // Saving a live GPS point is not a check-in. This RPC validates the
+          // office geofence and atomically records arrival + waiting-list entry.
+          const { data: arrival, error: arrivalError } = await supabase.rpc('driver_arrive', {
+            p_latitude: coords.latitude,
+            p_longitude: coords.longitude,
+          });
+          if (arrivalError) {
+            const raw = String(arrivalError.message || '');
+            const known: Record<string, string> = {
+              UNAUTHENTICATED: 'انتهت جلسة الدخول. سجّل الدخول مرة أخرى.',
+              DRIVER_NOT_FOUND: 'حسابك غير مرتبط بسائق نشط. راجع المكتب.',
+              NO_ACTIVE_OFFICE_ASSIGNMENT: 'حسابك غير مربوط بمكتب نشط. راجع المكتب.',
+              NO_ACTIVE_VEHICLE_ASSIGNMENT: 'لا توجد عربية مرتبطة بحسابك حاليًا. راجع المكتب.',
+              OFFICE_LOCATION_NOT_CONFIGURED: 'إحداثيات مكتب رأس سدر غير مكتملة في النظام.',
+              DRIVER_ALREADY_WAITING: 'أنت مسجل بالفعل في قائمة الانتظار.',
+            };
+            const code = Object.keys(known).find(key => raw.includes(key));
+            if (code === 'DRIVER_ALREADY_WAITING') {
+              await refreshPortal();
+              setError(known[code]);
+            } else if (code) {
+              throw new Error(known[code]);
+            } else if (raw.includes('OUTSIDE_GEOFENCE')) {
+              throw new Error('الموقع المسجل خارج نطاق مكتب رأس سدر. راجع دقة GPS وإحداثيات المكتب.');
+            } else {
+              throw new Error(raw || 'تعذر تسجيل الوصول في قائمة الانتظار.');
+            }
+          } else {
+            await refreshPortal();
+            setError(arrival?.success
+              ? `تم تسجيل وصولك وإضافتك لقائمة الانتظار. المسافة من المكتب: ${Math.round(Number(arrival.distance_meters || 0))} متر.`
+              : 'تم تحديد الموقع، لكن النظام لم يؤكد تسجيل الوصول. حاول مرة أخرى أو راجع المكتب.');
+          }
+        } catch (checkInError: any) {
+          setError(checkInError?.message || 'تعذر تسجيل الوصول. حاول مرة أخرى.');
+        } finally {
+          setLocating(false);
+        }
       },
       (locationError) => {
         const message = locationError.code === 1 ? 'تم رفض إذن الموقع. ' + locationPermissionInstructions() + ' ثم جرّب مرة أخرى.' : locationError.code === 2 ? 'الهاتف لم يستطع تحديد موقعك. فعّل خدمات الموقع وحاول في مكان مفتوح.' : 'انتهت مهلة تحديد الموقع. تأكد من تشغيل خدمات الموقع وحاول مرة أخرى.';
