@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - fix/driver-arrival-waiting-checkin
     paths:
       - 'src/**'
       - 'package.json'
