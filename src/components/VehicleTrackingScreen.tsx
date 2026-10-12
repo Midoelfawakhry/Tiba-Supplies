@@ -31,11 +31,23 @@ export const VehicleTrackingScreen: React.FC = () => {
   const mapElement = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<Record<string, L.Marker>>({});
+  const officeMarkersRef = useRef<Record<string, L.Marker>>({});
+  const [offices, setOffices] = useState<Array<{ name: string; latitude: number; longitude: number; office_type?: string }>>([]);
   const [locations, setLocations] = useState<VehicleLocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [vehicleSearch, setVehicleSearch] = useState('');
+
+  const loadOffices = useCallback(async () => {
+    try {
+      const { data, error: officeError } = await supabase.from('offices').select('name, latitude, longitude, office_type').eq('is_active', true);
+      if (officeError) throw officeError;
+      setOffices((data ?? []).filter((office: any) => Number.isFinite(Number(office.latitude)) && Number.isFinite(Number(office.longitude))) as Array<{ name: string; latitude: number; longitude: number; office_type?: string }>);
+    } catch {
+      setOffices([]);
+    }
+  }, []);
 
   const loadLocations = useCallback(async (manual = false) => {
     if (manual) setRefreshing(true);
@@ -57,16 +69,17 @@ export const VehicleTrackingScreen: React.FC = () => {
 
   useEffect(() => {
     void loadLocations();
+    void loadOffices();
     const timer = window.setInterval(() => void loadLocations(), 30000);
     return () => window.clearInterval(timer);
-  }, [loadLocations]);
+  }, [loadLocations, loadOffices]);
 
   useEffect(() => {
     if (!mapElement.current || mapRef.current) return;
-    const map = L.map(mapElement.current, { zoomControl: true }).setView([29.59, 32.72], 8);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors',
-      maxZoom: 19,
+    const map = L.map(mapElement.current, { zoomControl: true, preferCanvas: true }).setView([29.59, 32.72], 8);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+      maxZoom: 20,
     }).addTo(map);
     mapRef.current = map;
     const invalidate = window.setTimeout(() => map.invalidateSize(), 250);
@@ -75,6 +88,7 @@ export const VehicleTrackingScreen: React.FC = () => {
       map.remove();
       mapRef.current = null;
       markersRef.current = {};
+      officeMarkersRef.current = {};
     };
   }, []);
 
@@ -97,9 +111,9 @@ export const VehicleTrackingScreen: React.FC = () => {
       const position: L.LatLngExpression = [location.latitude, location.longitude];
       const markerIcon = L.divIcon({
         className: '',
-        html: '<div style="background:#2563eb;color:white;border:2px solid white;border-radius:18px;padding:5px 7px;box-shadow:0 2px 8px #0005;font-size:18px">🚚</div>',
-        iconSize: [40, 38],
-        iconAnchor: [20, 19],
+        html: `<div style="display:flex;align-items:center;gap:5px;background:${location.is_stale ? '#b45309' : '#1d4ed8'};color:#fff;border:2px solid #fff;border-radius:24px;padding:7px 10px;box-shadow:0 3px 12px #0f172a55;font:800 15px system-ui;white-space:nowrap"><span style="font-size:24px;line-height:1">🚚</span><span>${String(location.plate_number ?? '').replace(/[&<>\"']/g, '')}</span></div>`,
+        iconSize: [130, 48],
+        iconAnchor: [65, 24],
       });
       const popup = `<div dir="rtl" style="font-family:system-ui;min-width:160px"><strong>${String(location.plate_number ?? '')}</strong><br/>${String(location.driver_name ?? 'سائق غير محدد')}<br/>آخر تحديث: ${timeLabel(location.updated_at)}<br/>${location.is_stale ? '⚠️ الموقع قديم' : '🟢 موقع حديث'}${location.speed_kmh != null ? '<br/>السرعة: ' + Math.round(location.speed_kmh) + ' كم/س' : ''}</div>`;
       const existing = markersRef.current[location.driver_id];
@@ -109,7 +123,17 @@ export const VehicleTrackingScreen: React.FC = () => {
         markersRef.current[location.driver_id] = L.marker(position, { icon: markerIcon }).addTo(map).bindPopup(popup);
       }
     });
-  }, [visibleLocations]);
+    offices.forEach((office, index) => {
+      const id = `${office.office_type ?? 'office'}-${office.name}`;
+      const icon = L.divIcon({ className: '', html: `<div style="display:flex;align-items:center;gap:5px;background:#0f172a;color:white;border:2px solid white;border-radius:10px;padding:7px 10px;box-shadow:0 2px 8px #0005;font:800 13px system-ui;white-space:nowrap">🏢 ${String(office.name).replace(/[&<>\"']/g, '')}</div>`, iconSize: [160, 38], iconAnchor: [80, 19] });
+      const existing = officeMarkersRef.current[id];
+      if (existing) existing.setLatLng([office.latitude, office.longitude]).setIcon(icon);
+      else officeMarkersRef.current[id] = L.marker([office.latitude, office.longitude], { icon, zIndexOffset: 1000 + index }).addTo(map);
+    });
+    const points: L.LatLngExpression[] = [...visibleLocations.map(x => [x.latitude, x.longitude] as L.LatLngExpression), ...offices.map(x => [x.latitude, x.longitude] as L.LatLngExpression)];
+    if (points.length === 1) map.setView(points[0], 13);
+    else if (points.length > 1) map.fitBounds(L.latLngBounds(points), { padding: [36, 36], maxZoom: 13 });
+  }, [visibleLocations, offices]);
 
   const recentCount = locations.filter(location => !location.is_stale).length;
 
