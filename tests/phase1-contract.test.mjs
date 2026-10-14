@@ -3,13 +3,14 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
-const [baseline, mainOffice, assignmentSql, lifecycle, driverLocation, delivery, branchSql, driverPortal, assignmentUi, driverUi, branchUi, dashboardUi, directoryUi] = await Promise.all([
+const [baseline, mainOffice, assignmentSql, lifecycle, driverLocation, delivery, deactivationGuard, branchSql, driverPortal, assignmentUi, driverUi, branchUi, dashboardUi, directoryUi] = await Promise.all([
   read("../supabase/migrations/20261014190000_phase1_clean_baseline.sql"),
   read("../supabase/migrations/20261014200000_phase1_main_office_rpcs.sql"),
   read("../supabase/migrations/20261014210000_phase1_direct_assignment.sql"),
   read("../supabase/migrations/20261014230000_phase1_directory_and_booking_lifecycle.sql"),
   read("../supabase/migrations/20261014240000_phase1_driver_location_and_arrival.sql"),
   read("../supabase/migrations/20261014300000_phase1_harden_driver_delivery_confirmation.sql"),
+  read("../supabase/migrations/20261014310000_phase1_guard_active_directory_deactivation.sql"),
   read("../supabase/migrations/20261014280000_phase1_branch_read_only_snapshot.sql"),
   read("../supabase/migrations/20261014290000_phase1_driver_portal_snapshot.sql"),
   read("../src/components/DirectLoadAssignmentScreen.tsx"),
@@ -76,4 +77,12 @@ test("directory screen reads and mutates through Phase 1 directory RPCs", () => 
   assert.match(directoryUi, /قائمة الانتظار غير موجودة في نموذج Phase 1 الحالي/);
   assert.match(directoryUi, /إنشاء حساب سائق وربطه بالعربية لم يُنقل بعد/);
   assert.match(directoryUi, /حفظ تعديل العربية أو تغيير مالكها يحتاج RPC Phase 1 مخصصًا/);
+});
+
+test("directory deactivation rejects drivers and vehicles with active trips server-side", () => {
+  assert.match(deactivationGuard, /DRIVER_HAS_ACTIVE_BOOKING/);
+  assert.match(deactivationGuard, /VEHICLE_HAS_ACTIVE_BOOKING/);
+  assert.match(deactivationGuard, /status in \('ASSIGNED','ARRIVED','LOADING','LOADED','IN_TRANSIT'\)/);
+  assert.match(deactivationGuard, /current_main_office_user\(\)/);
+  assert.match(deactivationGuard, /security definer/i);
 });
