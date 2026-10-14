@@ -129,6 +129,8 @@ test("driver and vehicle edits use authorized, audited Phase 1 RPCs", () => {
   assert.match(directoryUi, /main_office_create_driver/);
   assert.match(directoryUi, /main_office_update_driver/);
   assert.match(directoryUi, /main_office_update_vehicle/);
+  assert.match(directoryUi, /p_entity_type: 'VEHICLE'/);
+  assert.match(directoryUi, /VEHICLE_HAS_ACTIVE_BOOKING/);
   assert.doesNotMatch(directoryUi, /create_operational_driver/);
   assert.doesNotMatch(directoryUi, /update_operational_driver/);
   assert.doesNotMatch(directoryUi, /update_operational_vehicle/);
