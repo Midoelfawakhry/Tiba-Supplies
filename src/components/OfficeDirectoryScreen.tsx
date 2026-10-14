@@ -231,39 +231,25 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     }
   }
 
-  async function beginDriverEdit(_row: Row) {
-    setError('تعديل بيانات السائق وربط العربية يحتاج RPC Phase 1 مخصصًا؛ تم تعطيل مسار التعديل القديم مؤقتًا لحماية البيانات.');
-    setSuccess('');
-    return;
-    const row = _row;
+  async function beginDriverEdit(row: Row) {
     setEditingDriver(row);
     setDriverEditName(String(row.name ?? row.driver_name ?? ''));
     setDriverEditPhone(String(row.phone ?? ''));
     setDriverEditCode(String(row.driver_code ?? ''));
     setDriverEditVehicleId('');
     setDriverEditVehicles([]);
-    setDriverEditOptionsLoaded(false);
-    try {
-      const { data, error: optionsError } = await supabase.rpc('get_driver_edit_options', { p_driver_id: row.driver_id });
-      if (optionsError) throw optionsError;
-      setDriverEditVehicles(Array.isArray(data?.vehicles) ? data.vehicles : []);
-      setDriverEditVehicleId(String(data?.current_vehicle_id ?? ''));
-      setDriverEditOptionsLoaded(true);
-    } catch (e: any) {
-      setError(e?.message || 'تعذر تحميل العربيات المتاحة لتعديل السائق.');
-    }
+    setDriverEditOptionsLoaded(true);
+    setError(''); setSuccess('');
   }
 
   function beginVehicleEdit(row: Row) {
-    setError('');
-    setSuccess('');
+    setError(''); setSuccess('');
     setEditingVehicle(row);
     setVehicleEditPlate(String(row.plate_number ?? ''));
     setVehicleEditCode(String(row.vehicle_code ?? ''));
     setVehicleEditOwnerId(String(row.owner_id ?? ''));
     setVehicleOwnerMode('existing');
-    setNewOwnerName('');
-    setNewOwnerPhone('');
+    setNewOwnerName(''); setNewOwnerPhone('');
   }
 
   async function deactivateDriver(row: Row) {
@@ -272,11 +258,8 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
       String(booking.driver_id) === String(row.driver_id) &&
       ['ASSIGNED', 'ARRIVED', 'LOADING', 'LOADED', 'IN_TRANSIT'].includes(String(booking.status).toUpperCase())
     );
-    if (hasActiveBooking) {
-      setError('لا يمكن إيقاف السائق لأن عليه نقلة نشطة. أنهِ النقلة أو ألغها أولًا.');
-      return;
-    }
-    if (!window.confirm('تأكيد إيقاف ' + name + '؟ سيتم منعه من الاختيارات الجديدة مع الاحتفاظ بكل سجلات التحميل والربط السابقة. لن يتم الإيقاف لو عليه نقلة نشطة.')) return;
+    if (hasActiveBooking) { setError('لا يمكن إيقاف السائق لأن عليه نقلة نشطة. أنهِ النقلة أو ألغها أولًا.'); return; }
+    if (!window.confirm('تأكيد إيقاف ' + name + '؟ سيتم الاحتفاظ بكل سجلات التحميل والربط السابقة.')) return;
     setError(''); setSuccess(''); setSavingEdit(true);
     try {
       const { data, error: rpcError } = await supabase.rpc('main_office_set_directory_active', { p_entity_type: 'DRIVER', p_entity_id: row.driver_id, p_is_active: false });
@@ -284,90 +267,63 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
       setEditingDriver(null); setSuccess('تم إيقاف السائق مع الاحتفاظ بالسجلات التاريخية.'); await load();
     } catch (e: any) {
       const raw = String(e?.message || '');
-      const messages: Record<string,string> = { AUTH_REQUIRED: 'انتهت جلسة المكتب. سجّل الدخول مرة أخرى.', INSUFFICIENT_ROLE: 'إيقاف السائق متاح للمكتب الرئيسي فقط.', DRIVER_NOT_FOUND: 'السائق غير موجود.', DRIVER_HAS_ACTIVE_BOOKING: 'لا يمكن إيقاف السائق لأن عليه نقلة نشطة. أنهِ النقلة أو ألغها أولًا.' };
+      const messages: Record<string,string> = { AUTH_REQUIRED: 'انتهت جلسة المكتب. سجّل الدخول مرة أخرى.', MAIN_OFFICE_ACCESS_REQUIRED: 'إيقاف السائق متاح للمكتب الرئيسي فقط.', DRIVER_NOT_FOUND: 'السائق غير موجود.', DRIVER_HAS_ACTIVE_BOOKING: 'لا يمكن إيقاف السائق لأن عليه نقلة نشطة.' };
       const key = Object.keys(messages).find(code => raw.includes(code)); setError(key ? messages[key] : raw || 'تعذر إيقاف السائق.');
     } finally { setSavingEdit(false); }
   }
+
   async function saveDriverEdit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError('حفظ تعديل السائق غير متاح عبر عقد Phase 1 الحالي. لم يتم إرسال أي تغيير.');
-    return;
     if (!editingDriver) return;
-    setSavingEdit(true);
-    setError('');
-    setSuccess('');
+    setSavingEdit(true); setError(''); setSuccess('');
     try {
-      const { data, error: updateError } = await supabase.rpc('update_operational_driver', {
-        p_driver_id: editingDriver.driver_id,
-        p_name: driverEditName.trim(),
-        p_phone: driverEditPhone.trim(),
-        p_driver_code: driverEditCode.trim() || null,
-        p_vehicle_id: driverEditVehicleId || null,
+      const { data, error: rpcError } = await supabase.rpc('main_office_update_driver', {
+        p_driver_id: editingDriver.driver_id, p_name: driverEditName.trim(),
+        p_phone: driverEditPhone.trim(), p_driver_code: driverEditCode.trim() || null,
       });
-      if (updateError) throw updateError;
+      if (rpcError) throw rpcError;
       if (!data?.success) throw new Error('تعذر تأكيد تعديل السائق.');
-      setEditingDriver(null);
-      setSuccess('تم تحديث بيانات السائق وربط العربية. احتفظ النظام بسجل الربط السابق.');
-      await load();
+      setEditingDriver(null); setSuccess('تم تحديث بيانات السائق. ربط النقلة بالعربية يتم من خلال أمر التحميل.'); await load();
     } catch (e: any) {
-      const raw = String(e?.message || '');
-      const messages: Record<string, string> = {
-        AUTH_REQUIRED: 'انتهت جلسة المكتب. سجّل الدخول مرة أخرى.',
-        INSUFFICIENT_ROLE: 'حسابك لا يملك صلاحية تعديل السائقين.',
-        DRIVER_NOT_FOUND_OR_INACTIVE: 'السائق غير موجود أو غير نشط.',
-        DRIVER_PHONE_EXISTS: 'رقم الموبايل مستخدم لسائق آخر.',
-        DRIVER_PHONE_INVALID: 'أدخل رقم موبايل صحيحًا.',
-        DRIVER_CODE_EXISTS: 'كود السائق مستخدم بالفعل.',
-        VEHICLE_ALREADY_ASSIGNED: 'العربية مرتبطة بسائق آخر. اختر عربية متاحة.',
-        VEHICLE_NOT_AVAILABLE: 'العربية غير متاحة أو غير نشطة.',
-        DRIVER_LOGIN_PHONE_CHANGE_REQUIRES_ACCOUNT_UPDATE: 'رقم دخول السائق مرتبط بحسابه. لا يمكن تغييره من شاشة البيانات.',
+      const raw=String(e?.message||'');
+      const messages: Record<string,string> = {
+        DRIVER_ID_NAME_PHONE_REQUIRED:'أكمل اسم السائق ورقم الموبايل.',
+        DRIVER_PHONE_INVALID:'أدخل رقم موبايل مصري صحيحًا.',
+        DRIVER_PHONE_EXISTS:'رقم الموبايل مسجل لسائق آخر.',
+        DRIVER_NOT_FOUND:'السائق غير موجود.',
+        DRIVER_LOGIN_PHONE_CHANGE_REQUIRES_ACCOUNT_UPDATE:'لا يمكن تغيير رقم دخول سائق مرتبط بحساب من هنا. استخدم تدفق تحديث الحساب الآمن.',
+        DRIVER_CODE_EXISTS:'كود السائق مستخدم بالفعل.',
+        MAIN_OFFICE_ACCESS_REQUIRED:'تعديل بيانات السائق متاح للمكتب الرئيسي فقط.',
       };
-      const key = Object.keys(messages).find(code => raw.includes(code));
-      setError(key ? messages[key] : raw || 'تعذر تعديل بيانات السائق.');
-    } finally {
-      setSavingEdit(false);
-    }
+      const key=Object.keys(messages).find(code=>raw.includes(code)); setError(key?messages[key]:raw||'تعذر تعديل بيانات السائق.');
+    } finally { setSavingEdit(false); }
   }
 
   async function saveVehicleEdit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError('حفظ تعديل العربية أو تغيير مالكها يحتاج RPC Phase 1 مخصصًا. لم يتم إرسال أي تغيير.');
-    return;
     if (!editingVehicle) return;
-    setSavingEdit(true);
-    setError('');
-    setSuccess('');
+    if (!vehicleEditOwnerId) { setError('اختار مالكًا مسجلًا ونشطًا للعربية.'); return; }
+    setSavingEdit(true); setError(''); setSuccess('');
     try {
-      const { data, error: updateError } = await supabase.rpc('update_operational_vehicle', {
-        p_vehicle_id: editingVehicle.vehicle_id,
-        p_plate_number: vehicleEditPlate.trim(),
-        p_vehicle_code: vehicleEditCode.trim() || null,
-        p_owner_id: vehicleOwnerMode === 'existing' ? (vehicleEditOwnerId || null) : null,
-        p_new_owner_name: vehicleOwnerMode === 'new' ? newOwnerName.trim() : null,
-        p_new_owner_phone: vehicleOwnerMode === 'new' ? newOwnerPhone.trim() || null : null,
+      const { data, error: rpcError } = await supabase.rpc('main_office_update_vehicle', {
+        p_vehicle_id: editingVehicle.vehicle_id, p_plate_number: vehicleEditPlate.trim(),
+        p_owner_id: vehicleEditOwnerId, p_notes: editingVehicle.notes ?? null,
       });
-      if (updateError) throw updateError;
+      if (rpcError) throw rpcError;
       if (!data?.success) throw new Error('تعذر تأكيد تعديل العربية.');
-      setEditingVehicle(null);
-      setSuccess('تم تحديث بيانات العربية وربطها بالمالك المحدد.');
-      await load();
+      setEditingVehicle(null); setSuccess('تم تحديث بيانات العربية ومالكها.'); await load();
     } catch (e: any) {
-      const raw = String(e?.message || '');
-      const messages: Record<string, string> = {
-        AUTH_REQUIRED: 'انتهت جلسة المكتب. سجّل الدخول مرة أخرى.',
-        INSUFFICIENT_ROLE: 'حسابك لا يملك صلاحية تعديل العربيات.',
-        VEHICLE_NOT_FOUND_OR_INACTIVE: 'العربية غير موجودة أو غير نشطة.',
-        VEHICLE_PLATE_REQUIRED: 'اكتب رقم اللوحة.',
-        VEHICLE_PLATE_EXISTS: 'رقم اللوحة مستخدم لعربية أخرى.',
-        VEHICLE_CODE_EXISTS: 'كود العربية مستخدم بالفعل.',
-        OWNER_REQUIRED: 'اختر مالكًا موجودًا أو اكتب بيانات المالك الجديد.',
-        OWNER_NOT_FOUND_OR_INACTIVE: 'المالك غير موجود أو غير نشط. اختر مالكًا نشطًا.',
+      const raw=String(e?.message||'');
+      const messages: Record<string,string> = {
+        VEHICLE_ID_PLATE_OWNER_REQUIRED:'أكمل رقم اللوحة واختار المالك.',
+        VEHICLE_HAS_ACTIVE_BOOKING:'لا يمكن تعديل بيانات العربية أثناء وجود نقلة نشطة عليها.',
+        OWNER_NOT_ACTIVE:'المالك المحدد غير نشط.',
+        VEHICLE_PLATE_EXISTS:'رقم اللوحة مسجل لعربية أخرى.',
+        VEHICLE_NOT_FOUND:'العربية غير موجودة.',
+        MAIN_OFFICE_ACCESS_REQUIRED:'تعديل العربيات متاح للمكتب الرئيسي فقط.',
       };
-      const key = Object.keys(messages).find(code => raw.includes(code));
-      setError(key ? messages[key] : raw || 'تعذر تعديل بيانات العربية.');
-    } finally {
-      setSavingEdit(false);
-    }
+      const key=Object.keys(messages).find(code=>raw.includes(code)); setError(key?messages[key]:raw||'تعذر تعديل بيانات العربية.');
+    } finally { setSavingEdit(false); }
   }
 
   async function createDriverAccount(driverId: string, temporaryPassword: string) {
@@ -452,63 +408,40 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
   }
 
   async function createDriver(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError('إنشاء حساب سائق وربطه بالعربية لم يُنقل بعد إلى تدفق Phase 1 الآمن. لم يتم إنشاء أي حساب.');
-    return;
-    setError('');
-    setSuccess('');
-    if (driverTemporaryPassword.length < 8) {
-      setError('كلمة المرور يجب ألا تقل عن 8 أحرف.');
-      return;
-    }
-    if (driverTemporaryPassword !== driverTemporaryPasswordConfirmation) {
-      setError('تأكيد كلمة المرور غير مطابق.');
-      return;
-    }
+    event.preventDefault(); setError(''); setSuccess('');
+    if (driverTemporaryPassword.length < 8) { setError('كلمة المرور يجب ألا تقل عن 8 أحرف.'); return; }
+    if (driverTemporaryPassword !== driverTemporaryPasswordConfirmation) { setError('تأكيد كلمة المرور غير مطابق.'); return; }
     setSavingDriver(true);
     try {
-      const { data: result, error: createError } = await supabase.rpc('create_operational_driver', {
-        p_name: driverName.trim(),
-        p_phone: driverPhone.trim(),
-        p_vehicle_id: selectedVehicleId,
-        p_driver_code: driverCode.trim() || null,
+      const { data: result, error: createError } = await supabase.rpc('main_office_create_driver', {
+        p_name: driverName.trim(), p_phone: driverPhone.trim(), p_driver_code: driverCode.trim() || null,
       });
       if (createError) throw createError;
-      if (!result?.success || !result?.driver_id) throw new Error('تعذر تأكيد حفظ السواق في النظام.');
+      if (!result?.success || !result?.driver_id) throw new Error('تعذر تأكيد حفظ السائق.');
       const savedDriver = { driverId: String(result.driver_id), name: driverName.trim() };
-      setDriverName('');
-      setDriverPhone('');
-      setDriverCode('');
-      setVehicleSearch('');
-      setSelectedVehicleId('');
-      setShowDriverForm(false);
-      setPendingAccount(savedDriver);
+      setDriverName(''); setDriverPhone(''); setDriverCode(''); setShowDriverForm(false);
       try {
         await createDriverAccount(savedDriver.driverId, driverTemporaryPassword);
-        setSuccess('تم حفظ السائق وربط العربية وإنشاء الحساب. اسم المستخدم هو رقم الموبايل، وكلمة المرور هي التي حددتها.');
-        setPendingAccount(null);
-        setDriverTemporaryPassword('');
+        setSuccess(`تم إنشاء السائق ${result.driver_code} وحساب الدخول. ربط العربية يتم عند إسناد أمر تحميل.`);
+        setDriverTemporaryPassword(''); setDriverTemporaryPasswordConfirmation('');
+      } catch (accountError: any) {
+        setPendingAccount(savedDriver);
         setDriverTemporaryPasswordConfirmation('');
-      } catch (inviteError: any) {
-        setError(`تم حفظ بيانات السواق وربط العربية، لكن إنشاء حساب الدخول لم يكتمل: ${inviteError?.message || 'تعذر إنشاء الحساب'}`);
+        setError(`تم حفظ سجل السائق ${result.driver_code}، لكن إنشاء حساب الدخول لم يكتمل: ${accountError?.message || 'تعذر إنشاء الحساب'}. أعد المحاولة من بطاقة السائق.`);
       }
       await load();
     } catch (e: any) {
-      const raw = String(e?.message || '');
-      const messages: Record<string, string> = {
-        DRIVER_PHONE_EXISTS: 'رقم الموبايل مسجل لسواق بالفعل.',
-        VEHICLE_PLATE_EXISTS: 'رقم العربية مسجل بالفعل.',
-        VEHICLE_NOT_AVAILABLE: 'العربية دي مش متاحة أو اتربطت بسواق آخر. حدّث القائمة واختار عربية تانية.',
-        DRIVER_CODE_EXISTS: 'كود السواق مستخدم بالفعل.',
-        REQUIRED_FIELDS_MISSING: 'اكتب اسم السواق ورقم الموبايل ورقم العربية.',
-        INSUFFICIENT_ROLE: 'حسابك مش عنده صلاحية إضافة سواقين.',
-        AUTH_REQUIRED: 'سجّل دخولك بحساب المكتب الأول.',
+      const raw=String(e?.message||'');
+      const messages: Record<string,string> = {
+        DRIVER_NAME_AND_PHONE_REQUIRED:'أكمل اسم السائق ورقم الموبايل.',
+        DRIVER_PHONE_INVALID:'أدخل رقم موبايل مصري صحيحًا.',
+        DRIVER_PHONE_EXISTS:'رقم الموبايل مسجل لسائق بالفعل.',
+        DRIVER_CODE_EXISTS:'كود السائق مستخدم بالفعل.',
+        MAIN_OFFICE_ACCESS_REQUIRED:'إنشاء السائقين متاح للمكتب الرئيسي فقط.',
+        RAS_SEDR_BRANCH_CONFIGURATION_INVALID:'إعداد مكتب رأس سدر غير صحيح.',
       };
-      const key = Object.keys(messages).find(k => raw.includes(k));
-      setError(key ? messages[key] : raw || 'تعذر حفظ بيانات السواق. تأكد من تطبيق تحديث قاعدة البيانات أولًا.');
-    } finally {
-      setSavingDriver(false);
-    }
+      const key=Object.keys(messages).find(code=>raw.includes(code)); setError(key?messages[key]:raw||'تعذر حفظ بيانات السائق.');
+    } finally { setSavingDriver(false); }
   }
 
   function beginMasterEntryEdit(row?: Row) {
