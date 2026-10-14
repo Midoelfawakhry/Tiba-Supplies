@@ -1,0 +1,68 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+
+const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
+const [baseline, mainOffice, lifecycle, driverLocation, delivery, branchSql, driverPortal, assignmentUi, driverUi, branchUi, dashboardUi] = await Promise.all([
+  read("../supabase/migrations/20261014190000_phase1_clean_baseline.sql"),
+  read("../supabase/migrations/20261014200000_phase1_main_office_rpcs.sql"),
+  read("../supabase/migrations/20261014230000_phase1_directory_and_booking_lifecycle.sql"),
+  read("../supabase/migrations/20261014240000_phase1_driver_location_and_arrival.sql"),
+  read("../supabase/migrations/20261014300000_phase1_harden_driver_delivery_confirmation.sql"),
+  read("../supabase/migrations/20261014280000_phase1_branch_read_only_snapshot.sql"),
+  read("../supabase/migrations/20261014290000_phase1_driver_portal_snapshot.sql"),
+  read("../src/components/DirectLoadAssignmentScreen.tsx"),
+  read("../src/components/DriverApp.tsx"),
+  read("../src/components/BranchOfficeApp.tsx"),
+  read("../src/components/LiveOperationsBoard.tsx"),
+]);
+
+test("clean baseline revokes direct client table access and seeds only office reference rows", () => {
+  assert.match(baseline, /revoke all on table public\.%I from anon, authenticated/);
+  assert.match(baseline, /'MAIN','المكتب الرئيسي','HEAD_OFFICE'/);
+  assert.match(baseline, /'RAS_SEDR','مكتب رأس سدر','BRANCH',true,29\.556864,32\.761699,10000/);
+  assert.doesNotMatch(baseline, /insert into public\.(factories|quarries|drivers|vehicles|bookings|load_orders)/i);
+});
+
+test("Main Office assignment is connected to a published order, driver, and vehicle", () => {
+  assert.match(mainOffice, /main_office_direct_assign/);
+  assert.match(assignmentUi, /main_office_direct_assign/);
+  assert.match(assignmentUi, /p_load_order_id:\s*orderId/);
+  assert.match(assignmentUi, /p_driver_id:\s*driverId/);
+  assert.match(assignmentUi, /p_vehicle_id:\s*vehicleId/);
+  assert.match(assignmentUi, /o\.status === 'PUBLISHED'/);
+});
+
+test("driver portal hides available loads without a fresh in-geofence location", () => {
+  assert.match(driverPortal, /interval '10 minutes'/);
+  assert.match(driverPortal, /v_distance<=v_office\.geofence_radius_m/);
+  assert.match(driverPortal, /'available_loads',case when v_inside then/);
+  assert.match(driverUi, /driver_get_portal_snapshot/);
+  assert.match(driverUi, /driver_update_live_location/);
+  assert.match(driverUi, /driver_confirm_arrival/);
+  assert.doesNotMatch(driverUi, /supabase\.rpc\(['"]driver_arrive['"]/);
+});
+
+test("delivery confirmation validates ownership, trip state, timestamp, and accuracy", () => {
+  assert.match(delivery, /p_accuracy_m double precision/);
+  assert.match(delivery, /p_captured_at timestamptz/);
+  assert.match(delivery, /p_accuracy_m>100/);
+  assert.match(delivery, /interval '10 minutes'/);
+  assert.match(delivery, /v_booking\.status<>'IN_TRANSIT'/);
+  assert.match(delivery, /where booking_id=p_booking_id and driver_id=v_driver\.driver_id/);
+  assert.match(driverUi, /driver_confirm_delivery/);
+});
+
+test("branch interface uses only the Phase 1 read-only branch snapshot RPC", () => {
+  assert.match(branchSql, /current_ras_sedr_branch_user/);
+  assert.match(branchSql, /branch_get_snapshot/);
+  assert.match(branchUi, /branch_get_snapshot/);
+  assert.doesNotMatch(branchUi, /supabase\.rpc\(['"]get_branch_office_snapshot['"]/);
+});
+
+test("operations dashboard uses Phase 1 booking statuses", () => {
+  for (const status of ["ASSIGNED", "ARRIVED", "LOADING", "LOADED", "IN_TRANSIT", "DELIVERED", "CANCELLED"]) {
+    assert.match(dashboardUi, new RegExp(status));
+  }
+  assert.doesNotMatch(dashboardUi, /\['BOOKED', 'LOADING_STATEMENT', 'IN_TRANSIT'\]/);
+});
