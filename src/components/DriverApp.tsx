@@ -130,30 +130,11 @@ export const DriverApp: React.FC = () => {
     setPortalLoading(false);
   }
 
-  async function acceptDirectAssignment(bookingId: string) {
-    if (acceptingBookingId) return;
-    setAcceptingBookingId(bookingId);
-    setError('');
-    try {
-      const { data, error: acceptError } = await supabase.rpc('accept_direct_assignment', {
-        p_booking_id: bookingId,
-      });
-      if (acceptError) throw acceptError;
-      if (!data?.success) throw new Error('تعذر تأكيد قبول الإسناد المباشر.');
-      await refreshPortal();
-    } catch (e: any) {
-      const raw = String(e?.message || '');
-      const messages: Record<string, string> = {
-        DIRECT_ASSIGNMENT_NOT_YOURS: 'الأمر ده مش مسند لحسابك.',
-        DIRECT_ASSIGNMENT_NOT_PENDING: 'الأمر لم يعد في انتظار القبول.',
-        DIRECT_ASSIGNMENT_ALREADY_ACCEPTED: 'تم قبول الأمر بالفعل.',
-        DIRECT_ASSIGNMENT_NOT_FOUND: 'أمر الإسناد غير موجود.',
-      };
-      const key = Object.keys(messages).find(k => raw.includes(k));
-      setError(key ? messages[key] : raw || 'تعذر قبول الإسناد المباشر.');
-    } finally {
-      setAcceptingBookingId(null);
-    }
+  async function acceptDirectAssignment(_bookingId: string) {
+    // Phase 1 assignments are active when the Main Office creates the booking.
+    // The legacy second-step acceptance RPC is intentionally not called.
+    setError('الإسناد في المرحلة الأولى بيظهر ضمن نقلاتك مباشرة، ومش محتاج قبول منفصل. حدّث حالة التشغيل لو مش ظاهر.');
+    await refreshPortal();
   }
 
   useEffect(() => {
