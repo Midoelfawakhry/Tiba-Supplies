@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
-const [baseline, mainOffice, assignmentSql, lifecycle, driverLocation, delivery, deactivationGuard, masterUpdate, directoryNotes, vehicleOwnerSql, ownerDeactivationGuard, branchSql, driverPortal, assignmentUi, driverUi, branchUi, dashboardUi, directoryUi] = await Promise.all([
+const [baseline, mainOffice, assignmentSql, lifecycle, driverLocation, delivery, deactivationGuard, masterUpdate, directoryNotes, vehicleOwnerSql, ownerDeactivationGuard, driverVehicleLifecycle, driverAccountEdge, branchSql, driverPortal, assignmentUi, driverUi, branchUi, dashboardUi, directoryUi] = await Promise.all([
   read("../supabase/migrations/20261014190000_phase1_clean_baseline.sql"),
   read("../supabase/migrations/20261014200000_phase1_main_office_rpcs.sql"),
   read("../supabase/migrations/20261014210000_phase1_direct_assignment.sql"),
@@ -15,6 +15,8 @@ const [baseline, mainOffice, assignmentSql, lifecycle, driverLocation, delivery,
   read("../supabase/migrations/20261014330000_phase1_directory_include_notes.sql"),
   read("../supabase/migrations/20261014340000_phase1_vehicle_owner_and_vehicle_creation.sql"),
   read("../supabase/migrations/20261014350000_phase1_guard_owner_active_vehicles.sql"),
+  read("../supabase/migrations/20261014360000_phase1_driver_vehicle_directory_lifecycle.sql"),
+  read("../supabase/functions/create-driver-account/index.ts"),
   read("../supabase/migrations/20261014280000_phase1_branch_read_only_snapshot.sql"),
   read("../supabase/migrations/20261014290000_phase1_driver_portal_snapshot.sql"),
   read("../src/components/DirectLoadAssignmentScreen.tsx"),
@@ -115,4 +117,24 @@ test("owners cannot be deactivated while they still own active vehicles", () => 
   assert.match(ownerDeactivationGuard, /OWNER_HAS_ACTIVE_VEHICLES/);
   assert.match(ownerDeactivationGuard, /from public\.vehicles where owner_id=p_entity_id and is_active=true/);
   assert.match(directoryUi, /main_office_set_directory_active/);
+});
+
+test("driver and vehicle edits use authorized, audited Phase 1 RPCs", () => {
+  assert.match(driverVehicleLifecycle, /main_office_create_driver/);
+  assert.match(driverVehicleLifecycle, /main_office_update_driver/);
+  assert.match(driverVehicleLifecycle, /main_office_update_vehicle/);
+  assert.match(driverVehicleLifecycle, /write_audit_event/);
+  assert.match(driverVehicleLifecycle, /DRIVER_LOGIN_PHONE_CHANGE_REQUIRES_ACCOUNT_UPDATE/);
+  assert.match(driverVehicleLifecycle, /VEHICLE_HAS_ACTIVE_BOOKING/);
+  assert.match(directoryUi, /main_office_create_driver/);
+  assert.match(directoryUi, /main_office_update_driver/);
+  assert.match(directoryUi, /main_office_update_vehicle/);
+  assert.doesNotMatch(directoryUi, /create_operational_driver/);
+  assert.doesNotMatch(directoryUi, /update_operational_driver/);
+  assert.doesNotMatch(directoryUi, /update_operational_vehicle/);
+});
+
+test("driver account edge function authorizes using Phase 1 Main Office guard", () => {
+  assert.match(driverAccountEdge, /callerClient\.rpc\("main_office_get_directory"\)/);
+  assert.doesNotMatch(driverAccountEdge, /from\("user_roles"\)/);
 });
