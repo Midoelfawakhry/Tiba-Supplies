@@ -238,7 +238,7 @@ export const DriverApp: React.FC = () => {
             if (Capacitor.isNativePlatform() && import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) {
               try {
                 const response = await CapacitorHttp.post({
-                  url: `${String(import.meta.env.VITE_SUPABASE_URL).replace(/\\/$/, '')}/rest/v1/rpc/update_driver_live_location`,
+                  url: `${String(import.meta.env.VITE_SUPABASE_URL).replace(/\/$/, '')}/rest/v1/rpc/update_driver_live_location`,
                   headers: {
                     apikey: String(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY),
                     Authorization: `Bearer ${session.access_token}`,
