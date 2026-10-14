@@ -6,6 +6,7 @@ on:
       - shadow/phase1-hardening
     paths:
       - 'src/**'
+      - 'native/android/**'
       - 'package.json'
       - 'package-lock.json'
       - 'capacitor.config.json'
