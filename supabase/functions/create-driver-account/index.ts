@@ -56,24 +56,14 @@ Deno.serve(async (req: Request) => {
       return json({ success: true });
     }
 
-    const { data: appUser, error: appUserError } = await admin
-      .from("app_users")
-      .select("user_id")
-      .eq("auth_user_id", callerId)
-      .eq("is_active", true)
-      .maybeSingle();
-    if (appUserError) throw appUserError;
-    if (!appUser) return json({ error: "INSUFFICIENT_ROLE" }, 403);
-
-    const { data: roleLinks, error: rolesError } = await admin
-      .from("user_roles")
-      .select("roles!inner(name)")
-      .eq("user_id", appUser.user_id);
-    if (rolesError) throw rolesError;
-    const allowed = (roleLinks ?? []).some((link: any) =>
-      ["ADMIN", "HEAD_OFFICE"].includes(link.roles?.name)
-    );
-    if (!allowed) return json({ error: "INSUFFICIENT_ROLE" }, 403);
+    // Phase 1 authorization contract: use the authenticated caller's current
+    // Main Office RPC guard instead of legacy app_users/user_roles schema.
+    const { error: officeAccessError } = await callerClient.rpc("main_office_get_directory");
+    if (officeAccessError) {
+      const message = String(officeAccessError.message ?? "");
+      const denied = /MAIN_OFFICE_ACCESS_REQUIRED|AUTH_REQUIRED|permission denied|42501|28000/i.test(message);
+      return json({ error: denied ? "INSUFFICIENT_ROLE" : "AUTHORIZATION_CHECK_FAILED" }, denied ? 403 : 500);
+    }
 
     const driverId = String(body.driver_id ?? "").trim();
     const temporaryPassword = String(body.temporary_password ?? "");
