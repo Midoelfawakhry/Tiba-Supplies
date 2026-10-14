@@ -204,6 +204,7 @@ export const DriverApp: React.FC = () => {
     let lastAttemptAt = 0;
     let lastUploadFailed = false;
     let nativeServiceStarted = false;
+    let nativeStartPending = false;
 
     // Android uses a native foreground service for ongoing collection and upload.
     // The community watcher is used only to obtain its permission flow, then removed.
@@ -222,7 +223,12 @@ export const DriverApp: React.FC = () => {
               setError(watcherError.message || 'تعذر طلب أذونات تتبع الموقع.');
               return;
             }
-            if (!location) return;
+            if (!location || nativeServiceStarted || nativeStartPending) return;
+            if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) {
+              setError('إعدادات الاتصال الآمن بقاعدة البيانات غير مكتملة.');
+              return;
+            }
+            nativeStartPending = true;
             if (watcherId) {
               const oldWatcherId = watcherId;
               watcherId = undefined;
@@ -238,6 +244,7 @@ export const DriverApp: React.FC = () => {
                 expiresAt: (session.expires_at || 0) * 1000,
               });
               nativeServiceStarted = result.started;
+              nativeStartPending = false;
               if (!active) {
                 await NativeDriverTracking.stop();
                 nativeServiceStarted = false;
@@ -251,6 +258,7 @@ export const DriverApp: React.FC = () => {
               });
               setError('');
             } catch (nativeError: any) {
+              nativeStartPending = false;
               if (active) setError(nativeError?.message || 'تعذر تشغيل خدمة تتبّع Android المستقلة.');
             }
           });
