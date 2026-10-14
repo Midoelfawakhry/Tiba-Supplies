@@ -162,3 +162,19 @@ test("tracking-session tokens are stored only as hashes and not exposed to clien
   assert.match(trackingMigration, /ENABLE ROW LEVEL SECURITY/);
   assert.match(trackingMigration, /REVOKE ALL ON public\.driver_location_tracking_sessions FROM PUBLIC, anon, authenticated/);
 });
+
+
+const nativeServiceSource = await readFile(
+  new URL("../native/android/NativeDriverTrackingService.java", import.meta.url),
+  "utf8",
+);
+
+test("native Android tracking uses the deployed Phase 1 live-location RPC contract", () => {
+  assert.match(nativeServiceSource, /\/rest\/v1\/rpc\/driver_update_live_location/);
+  assert.doesNotMatch(nativeServiceSource, /\/rest\/v1\/rpc\/update_driver_live_location/);
+  assert.match(nativeServiceSource, /body\.put\("p_latitude"/);
+  assert.match(nativeServiceSource, /body\.put\("p_longitude"/);
+  assert.match(nativeServiceSource, /body\.put\("p_accuracy_m"/);
+  assert.match(nativeServiceSource, /body\.put\("p_captured_at"/);
+  assert.doesNotMatch(nativeServiceSource, /body\.put\("p_heading"|body\.put\("p_speed_kmh"/);
+});
