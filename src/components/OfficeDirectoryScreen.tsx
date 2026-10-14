@@ -460,6 +460,11 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     setSavingMaster(true); setError(''); setSuccess('');
     try {
       if (editingMasterEntry) {
+        const currentName = String(editingMasterEntry.name ?? '');
+        const currentCode = String(editingMasterEntry.code ?? editingMasterEntry.factory_code ?? editingMasterEntry.quarry_code ?? '');
+        if (masterForm.name.trim() !== currentName || masterForm.code.trim() !== currentCode) {
+          throw new Error('تعديل الاسم أو الكود غير متاح في عقد Phase 1 الحالي. ألغِ التعديل واترك الاسم والكود كما هما لتغيير حالة النشاط فقط.');
+        }
         const entityId = active === 'factories' ? editingMasterEntry.factory_id : editingMasterEntry.quarry_id;
         const { data, error: rpcError } = await supabase.rpc('main_office_set_directory_active', {
           p_entity_type: active === 'factories' ? 'FACTORY' : 'QUARRY',
@@ -468,9 +473,6 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
         });
         if (rpcError) throw rpcError;
         if (!data?.id) throw new Error('تعذر تأكيد تحديث حالة السجل.');
-        if (masterForm.name.trim() !== String(editingMasterEntry.name ?? '') || masterForm.code.trim() !== String(editingMasterEntry.code ?? editingMasterEntry.factory_code ?? editingMasterEntry.quarry_code ?? '')) {
-          throw new Error('تعديل الاسم أو الكود غير متاح في عقد Phase 1 الحالي؛ تم تحديث الحالة فقط. لم يتم حفظ الاسم أو الكود.');
-        }
       } else {
         if (!masterForm.code.trim() || !masterForm.name.trim()) throw new Error('الكود والاسم مطلوبان.');
         const { data, error: rpcError } = await supabase.rpc('main_office_upsert_directory', {
