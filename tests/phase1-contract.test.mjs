@@ -43,6 +43,9 @@ test("Main Office assignment is connected to a published order, driver, and vehi
   assert.match(assignmentUi, /p_driver_id:\s*driverId/);
   assert.match(assignmentUi, /p_vehicle_id:\s*vehicleId/);
   assert.match(assignmentUi, /o\.status === 'PUBLISHED'/);
+  assert.match(assignmentUi, /d\.is_active&&d\.vehicle_id&&!busyDrivers\.has\(d\.driver_id\)/);
+  assert.match(assignmentUi, /v\.vehicle_id===selectedDriver\?\.vehicle_id/);
+  assert.match(assignmentUi, /setVehicleId\(drivers\.find\(d=>d\.driver_id===next\)\?\.vehicle_id\?\?''\)/);
 });
 
 test("driver portal hides available loads without a fresh in-geofence location", () => {
