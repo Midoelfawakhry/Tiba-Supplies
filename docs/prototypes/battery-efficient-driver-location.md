@@ -8,8 +8,9 @@ This prototype is isolated on `prototype/battery-efficient-driver-location`. It 
 
 - Native background-geolocation watcher remains enabled only for an authenticated, linked driver.
 - Android watcher distance filter: 25 metres (previously 10 metres).
-- Upload throttle while moving at 2 m/s or faster: at most one upload every 30 seconds.
-- Upload throttle while stopped or moving slower than 2 m/s: at most one upload every 90 seconds.
+- Upload throttle while moving at 2 m/s or faster: at most one upload every 10 minutes.
+- Upload throttle while moving slowly (0.5 m/s to below 2 m/s): at most one upload every 15 minutes.
+- Upload throttle while stationary or below 0.5 m/s: at most one upload every 30 minutes.
 - Skip sending a location fix when reported GPS accuracy is worse than 100 metres.
 - Do not refresh the full driver portal snapshot after every location upload; the existing 15-second portal refresh remains responsible for portal data.
 - Existing RPC contract `update_driver_live_location` and existing fields remain unchanged.
