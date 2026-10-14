@@ -8,6 +8,7 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.pm.ServiceInfo;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
@@ -81,7 +82,11 @@ public final class NativeDriverTrackingService extends Service implements Locati
             catch (Exception e) { stopAndClear(); return START_NOT_STICKY; }
         }
         stopped = false;
-        startForeground(4207, buildNotification());
+        if (Build.VERSION.SDK_INT >= 29) {
+            startForeground(4207, buildNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
+        } else {
+            startForeground(4207, buildNotification());
+        }
         startLocationUpdates();
         return START_STICKY;
     }
