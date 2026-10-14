@@ -109,14 +109,15 @@ test("both office interfaces expose the shared AI assistant with separate role c
 });
 
 
-test("driver passwords are set by Main Office and are not forcibly changed at first login", () => {
-  assert.match(source, /app_metadata: \{ must_change_password: false \}/);
-  assert.match(source, /app_metadata: \{ \.\.\.appMetadata, must_change_password: false \}/);
-  assert.doesNotMatch(source, /must_change_password: true/);
+test("temporary driver passwords require a first-login password change", () => {
+  assert.match(source, /app_metadata: \{ must_change_password: true \}/);
+  assert.match(source, /app_metadata: \{ \.\.\.appMetadata, must_change_password: true \}/);
+  assert.match(source, /must_change_password: true/);
+  assert.match(source, /body\.action === "complete_password_setup"/);
 });
 
 
-test("legacy password setup action does not force first-login password changes", () => {
+test("completing first-login password setup clears the forced-change flag", () => {
   const setupStart = source.indexOf('if (body.action === "complete_password_setup")');
   const createStart = source.indexOf('// Phase 1 authorization contract', setupStart);
   const setup = source.slice(setupStart, createStart);
@@ -132,8 +133,8 @@ test("administrative password reset must require a change at next login", () => 
   const resetStart = source.indexOf('if (body.action === "reset_password")');
   const resetEnd = source.indexOf('    const { data: driver, error: driverError }', resetStart + 80);
   const reset = source.slice(resetStart, resetEnd);
-  assert.match(reset, /app_metadata: \{ \.\.\.appMetadata, must_change_password: false \}/);
-  assert.doesNotMatch(reset, /must_change_password: true/);
+  assert.match(reset, /app_metadata: \{ \.\.\.appMetadata, must_change_password: true \}/);
+  assert.match(reset, /must_change_password: true/);
 });
 
 
