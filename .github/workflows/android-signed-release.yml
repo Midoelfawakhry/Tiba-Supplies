@@ -3,8 +3,7 @@ name: Build Signed Tiba Supplies Office, Ras Sedr Branch, and Driver Android APK
 on:
   push:
     branches:
-      - main
-      - fix/driver-arrival-waiting-checkin
+      - shadow/phase1-hardening
     paths:
       - 'src/**'
       - 'package.json'
