@@ -1,11 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { MapPin, Truck, Clock3, ShieldCheck, LogOut, Navigation, CircleAlert, FileText } from 'lucide-react';
 import { supabase, supabaseDiagnostics } from '../lib/supabase';
-import { Capacitor, CapacitorHttp, registerPlugin } from '@capacitor/core';
-import type { BackgroundGeolocationPlugin } from '@capacitor-community/background-geolocation';
+import { Capacitor } from '@capacitor/core';
+import { BackgroundGeolocation } from '@capgo/background-geolocation';
 import { Geolocation } from '@capacitor/geolocation';
-
-const BackgroundGeolocation = registerPlugin<BackgroundGeolocationPlugin>('BackgroundGeolocation');
 
 // Battery-efficient live-location prototype. Keep office/business workflows unchanged.
 const LOCATION_DISTANCE_FILTER_METERS = 25;
@@ -184,114 +182,96 @@ export const DriverApp: React.FC = () => {
   useEffect(() => {
     if (!session || !driverAuthorized || mustChangePassword) return;
     let active = true;
-    let watcherId: string | undefined;
-    // Throttle successful uploads, not failed attempts. Retry failures after 60s.
-    let lastSentAt = 0;
-    let lastAttemptAt = 0;
-    let lastUploadFailed = false;
+    let nativeTrackingToken: string | null = null;
+    const apiBase = String(import.meta.env.VITE_SUPABASE_URL || '').replace(/\\/$/, '');
+    const publishableKey = String(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '');
+
+    const getAccessToken = async () => {
+      let { data, error } = await supabase.auth.getSession();
+      if (!error && data.session && (data.session.expires_at ?? 0) * 1000 <= Date.now() + 120_000) {
+        const refreshed = await supabase.auth.refreshSession();
+        data = refreshed.data;
+        error = refreshed.error;
+      }
+      if (error || !data.session?.access_token) throw new Error(error?.message || 'انتهت جلسة السائق؛ سجّل الدخول من جديد.');
+      return data.session.access_token;
+    };
 
     void (async () => {
       try {
-        watcherId = await BackgroundGeolocation.addWatcher(
-          {
-            backgroundMessage: 'مشاركة موقعك مع طيبة مفعّلة أثناء العمل. أوقف التتبع بتسجيل الخروج.',
-            backgroundTitle: 'Tiba Supplies — تتبع موقع السائق',
-            requestPermissions: true,
-            stale: false,
-            distanceFilter: LOCATION_DISTANCE_FILTER_METERS,
-          },
-          async (location, watcherError) => {
-            if (!active) return;
-            if (watcherError) {
-              setError(watcherError.message || 'تعذر تشغيل تتبع الموقع في الخلفية.');
-              return;
-            }
-            if (!location) return;
+        let nativeUrl: string | undefined;
+        let nativeHeaders: Record<string, string> | undefined;
+        if (Capacitor.isNativePlatform()) {
+          if (!apiBase || !publishableKey) throw new Error('إعدادات خدمة الموقع غير مكتملة.');
+          const accessToken = await getAccessToken();
+          const sessionResponse = await fetch(`${apiBase}/functions/v1/driver-native-location`, {
+            method: 'POST',
+            headers: {
+              apikey: publishableKey,
+              Authorization: `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ action: 'start' }),
+          });
+          const sessionPayload = await sessionResponse.json().catch(() => ({}));
+          if (!sessionResponse.ok || typeof sessionPayload.trackingToken !== 'string') {
+            throw new Error(sessionPayload.error || 'تعذر إنشاء جلسة تتبّع آمنة.');
+          }
+          nativeTrackingToken = sessionPayload.trackingToken;
+          nativeUrl = `${apiBase}/functions/v1/driver-native-location`;
+          nativeHeaders = {
+            apikey: publishableKey,
+            Authorization: `Bearer ${nativeTrackingToken}`,
+            'Content-Type': 'application/json',
+          };
+        }
 
-            const locationTimestamp = location.time ?? Date.now();
-            const capturedAt = new Date(locationTimestamp).toISOString();
-            setPosition({
-              latitude: location.latitude,
-              longitude: location.longitude,
-              accuracy: location.accuracy,
-              capturedAt: new Date(locationTimestamp).toLocaleString('ar-EG'),
-            });
+        await BackgroundGeolocation.start({
+          backgroundMessage: 'مشاركة موقعك مع طيبة مفعّلة أثناء العمل. أوقف التتبع بتسجيل الخروج.',
+          backgroundTitle: 'Tiba Supplies — تتبع موقع السائق',
+          requestPermissions: true,
+          stale: false,
+          distanceFilter: LOCATION_DISTANCE_FILTER_METERS,
+          ...(nativeUrl ? {
+            url: nativeUrl,
+            headers: nativeHeaders,
+            minIntervalMs: MOVING_LOCATION_UPLOAD_INTERVAL_MS,
+          } : {}),
+        }, async (location, watcherError) => {
+          if (!active) return;
+          if (watcherError) {
+            setError(watcherError.message || 'تعذر تشغيل تتبع الموقع في الخلفية.');
+            return;
+          }
+          if (!location) return;
+          const locationTimestamp = location.time ?? Date.now();
+          const capturedAt = new Date(locationTimestamp).toISOString();
+          setPosition({
+            latitude: location.latitude,
+            longitude: location.longitude,
+            accuracy: location.accuracy,
+            capturedAt: new Date(locationTimestamp).toLocaleString('ar-EG'),
+          });
+          if (location.accuracy > MAX_LOCATION_UPLOAD_ACCURACY_METERS) return;
 
-            // Ignore poor GPS fixes and reduce uploads while stopped or moving slowly.
-            if (location.accuracy > MAX_LOCATION_UPLOAD_ACCURACY_METERS) return;
-            const speedMps = location.speed ?? 0;
-            const minUploadInterval = speedMps >= 2
-              ? MOVING_LOCATION_UPLOAD_INTERVAL_MS
-              : speedMps >= STATIONARY_SPEED_THRESHOLD_MPS
-                ? SLOW_LOCATION_UPLOAD_INTERVAL_MS
-                : STATIONARY_LOCATION_UPLOAD_INTERVAL_MS;
-            const now = Date.now();
-            if (!lastUploadFailed && now - lastSentAt < minUploadInterval) return;
-            if (lastUploadFailed && now - lastAttemptAt < 60_000) return;
-            lastAttemptAt = now;
-            const locationPayload = {
+          // On Android/iOS, native POST is the authoritative upload path and does not
+          // depend on the WebView callback. Keep the authenticated RPC fallback for web.
+          if (Capacitor.isNativePlatform()) return;
+          try {
+            const result = await supabase.rpc('update_driver_live_location', {
               p_latitude: location.latitude,
               p_longitude: location.longitude,
               p_accuracy_m: location.accuracy,
               p_heading: location.bearing ?? null,
               p_speed_kmh: location.speed == null ? null : location.speed * 3.6,
               p_captured_at: capturedAt,
-            };
-
-            // Refresh the session for each upload; a captured access token can expire
-            // during a long-running background work session.
-            let locationError: { message?: string } | null = null;
-            try {
-              let { data: authData, error: authError } = await supabase.auth.getSession();
-              // Background callbacks can resume after the normal foreground token-refresh
-              // timer has been suspended. Refresh proactively if the access token is near expiry.
-              if (!authError && authData.session && (authData.session.expires_at ?? 0) * 1000 <= Date.now() + 120_000) {
-                const refreshed = await supabase.auth.refreshSession();
-                authData = refreshed.data;
-                authError = refreshed.error;
-              }
-              const accessToken = authData.session?.access_token;
-              if (authError || !accessToken) {
-                locationError = { message: authError?.message || 'انتهت جلسة السائق؛ افتح التطبيق وسجّل الدخول من جديد.' };
-              } else if (Capacitor.isNativePlatform() && import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) {
-                // Native HTTP avoids WebView throttling with the screen off.
-                const response = await CapacitorHttp.post({
-                  url: `${String(import.meta.env.VITE_SUPABASE_URL).replace(/\/$/, '')}/rest/v1/rpc/update_driver_live_location`,
-                  headers: {
-                    apikey: String(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY),
-                    Authorization: `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json',
-                  },
-                  data: locationPayload,
-                  connectTimeout: 15000,
-                  readTimeout: 15000,
-                });
-                if (response.status < 200 || response.status >= 300) {
-                  const detail = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
-                  locationError = { message: `HTTP ${response.status}: ${detail}` };
-                }
-              } else {
-                const result = await supabase.rpc('update_driver_live_location', locationPayload);
-                locationError = result.error;
-              }
-            } catch (uploadError: any) {
-              locationError = { message: uploadError?.message || 'فشل إرسال الموقع في الخلفية.' };
-            }
-
-            if (locationError) {
-              lastUploadFailed = true;
-            } else {
-              lastSentAt = Date.now();
-              lastUploadFailed = false;
-            }
+            });
             if (!active) return;
-            if (locationError) {
-              setError(locationError.message || 'تعذر حفظ الموقع. تأكد من إعدادات السائق في النظام.');
-            } else {
-              setError('');
-            }
-          },
-        );
+            setError(result.error?.message || '');
+          } catch (uploadError: any) {
+            if (active) setError(uploadError?.message || 'فشل إرسال الموقع.');
+          }
+        });
       } catch (trackingError: any) {
         if (active) setError(trackingError?.message || 'تعذر تشغيل خدمة تتبع الموقع. راجع أذونات الموقع والإشعارات.');
       }
@@ -299,7 +279,25 @@ export const DriverApp: React.FC = () => {
 
     return () => {
       active = false;
-      if (watcherId) void BackgroundGeolocation.removeWatcher({ id: watcherId });
+      void BackgroundGeolocation.stop().catch(() => undefined);
+      if (nativeTrackingToken && apiBase && publishableKey) {
+        void (async () => {
+          try {
+            const accessToken = await getAccessToken();
+            await fetch(`${apiBase}/functions/v1/driver-native-location`, {
+              method: 'POST',
+              headers: {
+                apikey: publishableKey,
+                Authorization: `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ action: 'revoke' }),
+            });
+          } catch {
+            // Expiring the scoped token is the fallback if revocation cannot reach the server.
+          }
+        })();
+      }
     };
   }, [session?.user?.id, driverAuthorized, mustChangePassword]);
 
