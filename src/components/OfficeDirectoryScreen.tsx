@@ -1,16 +1,17 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Building2, Mountain, Users, UserX, Truck, ClipboardCheck, ClipboardList, Clock3, RefreshCw, AlertTriangle, Pencil, UserMinus, Phone, MoreHorizontal } from 'lucide-react';
+import { Building2, Mountain, Users, UserX, Truck, ClipboardCheck, UserRound, ClipboardList, Clock3, RefreshCw, AlertTriangle, Pencil, UserMinus, Phone, MoreHorizontal } from 'lucide-react';
 import { getLiveSnapshot, LiveSnapshot, liveName } from '../services/liveData';
 import { supabase } from '../lib/supabase';
 import { AddVehicleForm } from './AddVehicleForm';
 
-type ScreenKey = 'factories' | 'quarries' | 'drivers' | 'vehicles' | 'waiting' | 'loads' | 'actual';
+type ScreenKey = 'factories' | 'quarries' | 'drivers' | 'vehicles' | 'owners' | 'waiting' | 'loads' | 'actual';
 type Row = Record<string, any>;
 const tabs: { key: ScreenKey; label: string; icon: React.ElementType }[] = [
   { key: 'factories', label: 'المصانع والعملاء', icon: Building2 },
   { key: 'quarries', label: 'المحاجر والموردون', icon: Mountain },
   { key: 'drivers', label: 'السائقون', icon: Users },
   { key: 'vehicles', label: 'أسطول السيارات', icon: Truck },
+  { key: 'owners', label: 'ملاك العربيات', icon: UserRound },
   { key: 'waiting', label: 'قائمة انتظار رأس سدر', icon: Clock3 },
   { key: 'loads', label: 'أوامر التحميل', icon: ClipboardList },
   { key: 'actual', label: 'التحميل الفعلي', icon: ClipboardCheck },
@@ -21,6 +22,7 @@ const sectionPalette: Record<ScreenKey, { selected: string; accent: string; bord
   quarries: { selected: 'border-amber-600 bg-amber-600', accent: 'text-amber-700', border: 'border-amber-200', action: 'bg-amber-600 hover:bg-amber-700', row: 'border-r-amber-400', wash: 'bg-amber-50/50' },
   drivers: { selected: 'border-red-600 bg-red-600', accent: 'text-red-700', border: 'border-red-200', action: 'bg-red-600 hover:bg-red-700', row: 'border-r-red-400', wash: 'bg-red-50/50' },
   vehicles: { selected: 'border-blue-600 bg-blue-600', accent: 'text-blue-700', border: 'border-blue-200', action: 'bg-blue-600 hover:bg-blue-700', row: 'border-r-blue-400', wash: 'bg-blue-50/50' },
+  owners: { selected: 'border-teal-600 bg-teal-600', accent: 'text-teal-700', border: 'border-teal-200', action: 'bg-teal-600 hover:bg-teal-700', row: 'border-r-teal-400', wash: 'bg-teal-50/50' },
   waiting: { selected: 'border-violet-600 bg-violet-600', accent: 'text-violet-700', border: 'border-violet-200', action: 'bg-violet-600 hover:bg-violet-700', row: 'border-r-violet-400', wash: 'bg-violet-50/50' },
   loads: { selected: 'border-orange-600 bg-orange-600', accent: 'text-orange-700', border: 'border-orange-200', action: 'bg-orange-600 hover:bg-orange-700', row: 'border-r-orange-400', wash: 'bg-orange-50/50' },
   actual: { selected: 'border-emerald-600 bg-emerald-600', accent: 'text-emerald-700', border: 'border-emerald-200', action: 'bg-emerald-600 hover:bg-emerald-700', row: 'border-r-emerald-400', wash: 'bg-emerald-50/50' },
@@ -31,6 +33,7 @@ function rowTitle(row: Row, key: ScreenKey) {
   if (key === 'quarries') return liveName(row);
   if (key === 'drivers') return row.name ?? row.driver_name ?? 'سائق بدون اسم';
   if (key === 'vehicles') return row.plate_number ?? row.vehicle_code ?? 'عربية بدون لوحة';
+  if (key === 'owners') return row.name ?? 'مالك بدون اسم';
   if (key === 'waiting') return row.plate_number ?? row.driver_name ?? 'عنصر انتظار';
   if (key === 'loads') return liveName(row, row.load_order_id ?? 'أمر تحميل');
   return row.trip_code ?? row.ticket_number ?? row.record_number ?? row.actual_loading_record_id ?? 'سجل تحميل فعلي';
@@ -148,6 +151,24 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     } finally {
       setSavingEdit(false);
     }
+  }
+
+  async function addVehicleOwner() {
+    const name = window.prompt('اكتب اسم مالك العربية:');
+    if (!name?.trim()) return;
+    const phone = window.prompt('رقم موبايل المالك (اختياري):') || '';
+    setError(''); setSuccess(''); setSavingEdit(true);
+    try {
+      const { data, error: rpcError } = await supabase.rpc('main_office_create_vehicle_owner', {
+        p_name: name.trim(), p_phone: phone.trim() || null, p_notes: null,
+      });
+      if (rpcError) throw rpcError;
+      if (!data?.success || !data?.owner_id) throw new Error('تعذر تأكيد إضافة المالك.');
+      setSuccess(`تمت إضافة المالك ${name.trim()} بالكود ${data.owner_code}.`);
+      await load();
+    } catch (e: any) {
+      setError(e?.message || 'تعذرت إضافة مالك العربية.');
+    } finally { setSavingEdit(false); }
   }
 
   async function removeWaitingEntry(_row: Row) {
@@ -526,12 +547,13 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     quarries: snapshot?.quarries ?? [],
     drivers: snapshot?.drivers ?? [],
     vehicles: snapshot?.vehicles ?? [],
+    owners: ownerDirectory,
     waiting,
     loads: snapshot?.load_orders ?? [],
     actual: snapshot?.actual_loading_records ?? [],
   };
   const rows = lists[active] ?? [];
-  const visibleRows = active === 'drivers' ? rows.filter(row => String(row.name ?? row.driver_name ?? '').toLocaleLowerCase().includes(driverSearch.trim().toLocaleLowerCase())) : ['factories', 'quarries'].includes(active) ? rows.filter(row => [liveName(row), row.code, row.address, row.phone].some(value => String(value ?? '').toLocaleLowerCase().includes(entitySearch.trim().toLocaleLowerCase()))) : rows;
+  const visibleRows = active === 'drivers' ? rows.filter(row => String(row.name ?? row.driver_name ?? '').toLocaleLowerCase().includes(driverSearch.trim().toLocaleLowerCase())) : ['factories', 'quarries', 'owners'].includes(active) ? rows.filter(row => [liveName(row), row.code, row.owner_code, row.address, row.phone].some(value => String(value ?? '').toLocaleLowerCase().includes(entitySearch.trim().toLocaleLowerCase()))) : rows;
   const filteredAvailableVehicles = availableVehicles.filter((vehicle: Row) => [vehicle.plate_number, vehicle.vehicle_code].some(value => String(value ?? '').toLowerCase().includes(vehicleSearch.trim().toLowerCase())));
   const selectedVehicle = availableVehicles.find((vehicle: Row) => String(vehicle.vehicle_id) === selectedVehicleId);
   const ActiveIcon = tabs.find(tab => tab.key === active)?.icon ?? ClipboardList;
@@ -564,7 +586,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
           <div><h3 className="font-black">إضافة عربية جديدة</h3><p className="mt-1 text-sm text-slate-500">تسجيل العربية ومالكها. ربط السواق خطوة منفصلة.</p></div>
           <button type="button" onClick={() => setShowVehicleForm(v => !v)} className={`rounded-xl px-4 py-2.5 text-sm font-black text-white transition ${sectionPalette[active].action}`}>{showVehicleForm ? 'إلغاء' : 'إضافة عربية'}</button>
         </div>
-        {showVehicleForm && <div className="mt-4"><AddVehicleForm onSaved={() => { void load(); setSuccess('تمت إضافة العربية ومالكها.'); }} /></div>}
+        {showVehicleForm && <div className="mt-4"><AddVehicleForm owners={ownerDirectory} onSaved={() => { void load(); setSuccess('تمت إضافة العربية بكود تلقائي وربطها بالمالك المختار.'); }} /></div>}
       </section>}
       {active === 'drivers' && <section className={`rounded-3xl border bg-white p-4 shadow-sm sm:p-5 ${sectionPalette[active].border}`}>
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -652,7 +674,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
             <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-black/5 ${sectionPalette[active].accent}`}><ActiveIcon size={25} strokeWidth={2.2}/></span>
             <div><h3 className="font-black">{tabs.find(tab => tab.key === active)?.label}</h3><p className="mt-1 text-xs text-slate-500">بيانات التشغيل الفعلية · محدثة من النظام</p></div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">{active === 'factories' && <button type="button" disabled={savingEdit} onClick={() => void addDirectoryEntity('factories')} className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-xs font-black text-white hover:bg-blue-700 disabled:opacity-50"><Building2 size={15}/> إضافة عميل / مصنع</button>}{active === 'quarries' && <button type="button" disabled={savingEdit} onClick={() => void addDirectoryEntity('quarries')} className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-3 py-2 text-xs font-black text-white hover:bg-amber-700 disabled:opacity-50"><Mountain size={15}/> إضافة محجر</button>}<span className={`inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-sm font-black shadow-sm ring-1 ring-black/5 ${sectionPalette[active].accent}`}><ClipboardList size={15}/>{visibleRows.length} سجل</span></div>
+          <div className="flex flex-wrap items-center gap-2">{active === 'factories' && <button type="button" disabled={savingEdit} onClick={() => void addDirectoryEntity('factories')} className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-xs font-black text-white hover:bg-blue-700 disabled:opacity-50"><Building2 size={15}/> إضافة عميل / مصنع</button>}{active === 'quarries' && <button type="button" disabled={savingEdit} onClick={() => void addDirectoryEntity('quarries')} className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-3 py-2 text-xs font-black text-white hover:bg-amber-700 disabled:opacity-50"><Mountain size={15}/> إضافة محجر</button>}{active === 'owners' && <button type="button" disabled={savingEdit} onClick={() => void addVehicleOwner()} className="inline-flex items-center gap-1.5 rounded-xl bg-teal-600 px-3 py-2 text-xs font-black text-white hover:bg-teal-700 disabled:opacity-50"><UserRound size={15}/> إضافة مالك</button>}<span className={`inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-sm font-black shadow-sm ring-1 ring-black/5 ${sectionPalette[active].accent}`}><ClipboardList size={15}/>{visibleRows.length} سجل</span></div>
         </div>
         <div className={active === 'waiting' ? 'divide-y divide-violet-100 overflow-x-auto' : active === 'drivers' ? 'min-w-0 divide-y divide-slate-100 overflow-x-hidden' : 'divide-y divide-slate-100'}>
           {visibleRows.map((row, index) => <article key={String(row.factory_id ?? row.quarry_id ?? row.driver_id ?? row.vehicle_id ?? row.entry_id ?? row.load_order_id ?? row.booking_id ?? row.actual_loading_record_id ?? index)} className={active === 'waiting' ? 'flex min-w-0 items-center gap-2 border-r-2 border-r-violet-400 px-2 py-1 transition-colors hover:bg-violet-50/60' : active === 'drivers' ? 'flex w-full min-w-0 flex-col items-stretch gap-2 overflow-hidden border-r-2 border-r-red-400 px-3 py-3 transition-colors hover:bg-red-50/50' : `border-r-4 p-4 transition-colors hover:bg-slate-50/70 sm:p-5 ${sectionPalette[active].row}`}>
