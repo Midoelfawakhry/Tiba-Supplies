@@ -40,11 +40,14 @@ test("the function validates the caller token with Supabase Auth", () => {
   assert.match(source, /if \(callerError \|\| !callerData\.user\)/);
 });
 
-test("Phase 1 Main Office guard precedes privileged account actions", () => {
+test("Phase 1 Main Office guard precedes privileged account creation and reset", () => {
   const gate = source.indexOf('callerClient.rpc("main_office_get_directory")');
-  const create = source.indexOf("admin.auth.admin.createUser");
-  const reset = source.indexOf("admin.auth.admin.updateUserById");
-  assert.ok(gate >= 0 && create > gate && reset > gate);
+  const create = source.indexOf("admin.auth.admin.createUser", gate);
+  const resetBranch = source.indexOf('if (body.action === "reset_password")', gate);
+  const reset = source.indexOf("admin.auth.admin.updateUserById", resetBranch);
+  assert.ok(gate >= 0, "Main Office authorization guard must exist");
+  assert.ok(create > gate, "Account creation must happen after the Main Office guard");
+  assert.ok(resetBranch > gate && reset > resetBranch, "Password reset must happen after the Main Office guard and inside its reset branch");
 });
 
 test("password setup is limited to an active driver linked to the authenticated user", () => {
