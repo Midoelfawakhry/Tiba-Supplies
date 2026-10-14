@@ -150,8 +150,10 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     }
   }
 
-  async function removeWaitingEntry(row: Row) {
-    const driverName = String(row.driver_name ?? 'السائق');
+  async function removeWaitingEntry(_row: Row) {
+    setError('قائمة الانتظار غير موجودة في نموذج Phase 1 الحالي؛ تم إيقاف الإجراء القديم لحماية البيانات.');
+    return;
+    const driverName = String(_row.driver_name ?? 'السائق');
     const plate = String(row.plate_number ?? 'العربية غير محددة');
     const reason = window.prompt(`اكتب سبب إزالة ${driverName} — ${plate} من قائمة الانتظار:`);
     if (!reason?.trim()) return;
@@ -184,9 +186,11 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     }
   }
 
-  async function beginDriverEdit(row: Row) {
-    setError('');
+  async function beginDriverEdit(_row: Row) {
+    setError('تعديل بيانات السائق وربط العربية يحتاج RPC Phase 1 مخصصًا؛ تم تعطيل مسار التعديل القديم مؤقتًا لحماية البيانات.');
     setSuccess('');
+    return;
+    const row = _row;
     setEditingDriver(row);
     setDriverEditName(String(row.name ?? row.driver_name ?? ''));
     setDriverEditPhone(String(row.phone ?? ''));
@@ -233,6 +237,8 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
   }
   async function saveDriverEdit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setError('حفظ تعديل السائق غير متاح عبر عقد Phase 1 الحالي. لم يتم إرسال أي تغيير.');
+    return;
     if (!editingDriver) return;
     setSavingEdit(true);
     setError('');
@@ -272,6 +278,8 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
 
   async function saveVehicleEdit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setError('حفظ تعديل العربية أو تغيير مالكها يحتاج RPC Phase 1 مخصصًا. لم يتم إرسال أي تغيير.');
+    return;
     if (!editingVehicle) return;
     setSavingEdit(true);
     setError('');
@@ -392,6 +400,8 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
 
   async function createDriver(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setError('إنشاء حساب سائق وربطه بالعربية لم يُنقل بعد إلى تدفق Phase 1 الآمن. لم يتم إنشاء أي حساب.');
+    return;
     setError('');
     setSuccess('');
     if (driverTemporaryPassword.length < 8) {
@@ -653,7 +663,8 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
                 const vehicleOut = window.confirm('هل العربية فيها عطل أو لازم تفضل خارج الخدمة؟ اضغط موافق لو خارج الخدمة، أو إلغاء لو ترجع لقائمة الانتظار.');
                 setError(''); setSuccess('');
                 try {
-                  const { data, error: rpcError } = await supabase.rpc('office_cancel_booking', { p_booking_id: row.booking_id, p_reason: reason.trim(), p_vehicle_out_of_service: vehicleOut });
+                  throw new Error('إلغاء الحجز القديم غير مدعوم في Phase 1. استخدم إلغاء أمر التحميل إذا كانت حالته تسمح بذلك.');
+      const { data, error: rpcError } = await supabase.rpc('office_cancel_booking', { p_booking_id: row.booking_id, p_reason: reason.trim(), p_vehicle_out_of_service: vehicleOut });
                   if (rpcError) throw rpcError;
                   if (!data?.success) throw new Error('تعذر تأكيد إلغاء النقلة.');
                   setSuccess(vehicleOut ? 'تم إلغاء النقلة وحفظ سجلها. العربية لم تُرجع لقائمة الانتظار لأنها خارج الخدمة.' : 'تم إلغاء النقلة وحفظ سجلها، وإرجاع العربية إلى آخر قائمة الانتظار كبداية دورة جديدة.');
@@ -671,7 +682,8 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
                 if (!reason?.trim()) return;
                 setError(''); setSuccess('');
                 try {
-                  const { data, error: rpcError } = await supabase.rpc('office_redirect_booking', { p_booking_id: row.booking_id, p_factory_id: match[1], p_reason: reason.trim() });
+                  throw new Error('تحويل الحجز غير متاح في عقد Phase 1 الحالي؛ تم تعطيل الإجراء القديم.');
+      const { data, error: rpcError } = await supabase.rpc('office_redirect_booking', { p_booking_id: row.booking_id, p_factory_id: match[1], p_reason: reason.trim() });
                   if (rpcError) throw rpcError;
                   if (!data?.success) throw new Error('تعذر تأكيد إعادة توجيه النقلة.');
                   setSuccess(row.delivery_confirmed_at || row.actual_weight != null || ['DELIVERED', 'COMPLETED'].includes(snapshot?.bookings?.find((b: Row) => b.booking_id === row.booking_id)?.status) ? 'تم تصحيح وجهة نقلة لها وزن/تسليم مسجل. احتفظ النظام ببيانات الوزن والتسليم وسجل الوجهة السابقة والجديدة وسبب التصحيح.' : 'تم تغيير وجهة النقلة إلى المصنع الجديد، مع حفظ سبب التوجيه وسجل الوجهة السابقة والجديدة.');
