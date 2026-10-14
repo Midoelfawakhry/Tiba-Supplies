@@ -13,17 +13,6 @@ on:
       - 'capacitor.config.json'
       - 'tsconfig.json'
       - '.github/workflows/driver-android-apk.yml'
-  pull_request:
-    paths:
-      - 'src/**'
-      - 'native/android/**'
-      - 'index.html'
-      - 'package.json'
-      - 'capacitor.config.json'
-      - 'tsconfig.json'
-      - 'docs/prototypes/**'
-      - '.github/workflows/driver-android-apk.yml'
-
 permissions:
   contents: read
 
@@ -47,8 +36,8 @@ jobs:
     env:
       VITE_APP_MODE: ${{ matrix.app_mode }}
       TIBA_APP_MODE: ${{ matrix.app_mode }}
-      VITE_SUPABASE_URL: https://tnlcvwtphbunteifoonc.supabase.co
-      VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_69f6sJFpdfPMks3NS5WkFA_v_DqI7Ce
+      VITE_SUPABASE_URL: https://awgppfjxegognuqozldl.supabase.co
+      VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_k78B7hdU7uSnAtvfA18iWQ_BxzVmdmz
     steps:
       - name: Checkout
         uses: actions/checkout@v4
