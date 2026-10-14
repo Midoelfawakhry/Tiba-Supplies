@@ -109,7 +109,7 @@ export const DriverApp: React.FC = () => {
   }, []);
 
   async function refreshPendingDirectAssignments() {
-    const { data, error: pendingError } = await supabase.rpc('get_pending_direct_assignments');
+    const { data, error: pendingError } = await supabase.rpc('driver_get_pending_assignments');
     if (pendingError) {
       setError(pendingError.message || 'تعذر تحميل أوامر الإسناد المباشر.');
       return;
@@ -120,7 +120,7 @@ export const DriverApp: React.FC = () => {
   async function refreshPortal() {
     if (!session) return;
     setPortalLoading(true);
-    const { data, error: portalError } = await supabase.rpc('get_driver_portal_snapshot');
+    const { data, error: portalError } = await supabase.rpc('driver_get_portal_snapshot');
     if (portalError) {
       setError(portalError.message || 'تعذر تحميل حالة التشغيل.');
     } else {
@@ -164,7 +164,7 @@ export const DriverApp: React.FC = () => {
     let active = true;
     setDriverAuthorized(false);
     void (async () => {
-      const { data, error: portalError } = await supabase.rpc('get_driver_portal_snapshot');
+      const { data, error: portalError } = await supabase.rpc('driver_get_portal_snapshot');
       if (!active) return;
       if (portalError || !data?.driver_id) {
         setError('هذا الحساب غير مرتبط بسائق نشط في النظام.');
@@ -173,7 +173,7 @@ export const DriverApp: React.FC = () => {
         return;
       }
       setPortal(data);
-      const { data: pendingData } = await supabase.rpc('get_pending_direct_assignments');
+      const { data: pendingData } = await supabase.rpc('driver_get_pending_assignments');
       if (active) setPendingDirectAssignments(Array.isArray(pendingData) ? pendingData : []);
       setError('');
       setDriverAuthorized(true);
@@ -185,10 +185,10 @@ export const DriverApp: React.FC = () => {
     if (!session || !driverAuthorized || mustChangePassword) return;
     const timer = window.setInterval(() => {
       void (async () => {
-        const { data, error: portalError } = await supabase.rpc('get_driver_portal_snapshot');
+        const { data, error: portalError } = await supabase.rpc('driver_get_portal_snapshot');
         if (portalError) return;
         setPortal(data);
-        const { data: pendingData } = await supabase.rpc('get_pending_direct_assignments');
+        const { data: pendingData } = await supabase.rpc('driver_get_pending_assignments');
         setPendingDirectAssignments(Array.isArray(pendingData) ? pendingData : []);
       })();
     }, 15000);
@@ -317,8 +317,6 @@ export const DriverApp: React.FC = () => {
               p_latitude: location.latitude,
               p_longitude: location.longitude,
               p_accuracy_m: location.accuracy,
-              p_heading: location.bearing ?? null,
-              p_speed_kmh: location.speed == null ? null : location.speed * 3.6,
               p_captured_at: capturedAt,
             };
 
@@ -340,7 +338,7 @@ export const DriverApp: React.FC = () => {
               } else if (Capacitor.isNativePlatform() && import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) {
                 // Native HTTP avoids WebView throttling with the screen off.
                 const response = await CapacitorHttp.post({
-                  url: `${String(import.meta.env.VITE_SUPABASE_URL).replace(/\/$/, '')}/rest/v1/rpc/update_driver_live_location`,
+                  url: `${String(import.meta.env.VITE_SUPABASE_URL).replace(/\/$/, '')}/rest/v1/rpc/driver_update_live_location`,
                   headers: {
                     apikey: String(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY),
                     Authorization: `Bearer ${accessToken}`,
@@ -355,7 +353,7 @@ export const DriverApp: React.FC = () => {
                   locationError = { message: `HTTP ${response.status}: ${detail}` };
                 }
               } else {
-                const result = await supabase.rpc('update_driver_live_location', locationPayload);
+                const result = await supabase.rpc('driver_update_live_location', locationPayload);
                 locationError = result.error;
               }
             } catch (uploadError: any) {
@@ -497,9 +495,9 @@ export const DriverApp: React.FC = () => {
           capturedAt: new Date(timestamp).toLocaleString('ar-EG'),
         });
         try {
-          const { error: saveError } = await supabase.rpc('update_driver_live_location', {
+          const { error: saveError } = await supabase.rpc('driver_update_live_location', {
             p_latitude: coords.latitude, p_longitude: coords.longitude, p_accuracy_m: coords.accuracy,
-            p_heading: null, p_speed_kmh: null, p_captured_at: new Date(timestamp).toISOString(),
+            p_captured_at: new Date(timestamp).toISOString(),
           });
           if (saveError) throw new Error(saveError.message || 'تعذر حفظ الموقع. فعّل مشاركة الموقع وتأكد من ربط حسابك بالعربية.');
 
