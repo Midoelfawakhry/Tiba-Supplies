@@ -24,10 +24,10 @@
     "react-dom": "^19.0.1",
     "vite": "^8.3.0",
     "@supabase/supabase-js": "^2.75.0",
-    "@capacitor/core": "^7.4.3",
-    "@capacitor/geolocation": "^7.1.5",
-    "@capacitor-community/background-geolocation": "^1.2.26",
-    "@capacitor/ios": "^7.4.3",
+    "@capacitor/core": "^8.0.0",
+    "@capacitor/geolocation": "^8.0.0",
+    "@capgo/background-geolocation": "^8.3.3",
+    "@capacitor/ios": "^8.0.0",
     "@capacitor-community/text-to-speech": "^6.1.0"
   },
   "devDependencies": {
@@ -41,7 +41,7 @@
     "tailwindcss": "^4.3.3",
     "tsx": "^4.21.0",
     "typescript": "^7.0.2",
-    "@capacitor/cli": "^7.4.3",
-    "@capacitor/android": "^7.4.3"
+    "@capacitor/cli": "^8.0.0",
+    "@capacitor/android": "^8.0.0"
   }
 }
