@@ -50,7 +50,7 @@ Deno.serve(async (req: Request) => {
       if (appMetadata.must_change_password !== true) return json({ success: true });
 
       const { error: updateError } = await admin.auth.admin.updateUserById(callerId, {
-        app_metadata: { ...appMetadata, must_change_password: false },
+        app_metadata: { ...appMetadata, must_change_password: true },
       });
       if (updateError) throw updateError;
       return json({ success: true });
@@ -98,7 +98,7 @@ Deno.serve(async (req: Request) => {
         app_metadata: { ...appMetadata, must_change_password: false },
       });
       if (passwordError) throw passwordError;
-      return json({ success: true, driver_id: driverId, must_change_password: false });
+      return json({ success: true, driver_id: driverId, must_change_password: true });
     }
 
     const { data: driver, error: driverError } = await admin
@@ -120,7 +120,7 @@ Deno.serve(async (req: Request) => {
       password: temporaryPassword,
       email_confirm: true,
       user_metadata: { display_name: driver.name, driver_phone: phone },
-      app_metadata: { must_change_password: false },
+      app_metadata: { must_change_password: true },
     });
     if (createError) {
       const duplicate = /already|registered|exists/i.test(createError.message);
