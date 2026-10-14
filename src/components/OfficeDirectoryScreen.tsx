@@ -125,7 +125,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     const label = isFactory ? 'العميل / المصنع' : 'المحجر';
     const name = window.prompt(`اكتب اسم ${label}:`);
     if (!name?.trim()) return;
-    const code = window.prompt(`اكتب كود ${label} (اختياري):`) || '';
+    const code = window.prompt(`اكتب كود ${label} (مطلوب وفريد):`) || '';
     setError('');
     setSuccess('');
     setSavingEdit(true);
