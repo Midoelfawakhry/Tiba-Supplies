@@ -571,7 +571,7 @@ export const DriverApp: React.FC = () => {
         {!portal?.inside_geofence ? (
           <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-center gap-2"><ShieldCheck className="text-red-700" size={22}/><h2 className="font-black">الخدمات داخل نطاق المكتب</h2></div>
-            <p className="mt-2 text-sm leading-7 text-slate-600">لن تظهر الكمولات المتاحة أو ترتيب الانتظار أو سجل أوامرك إلا بعد أن يؤكد النظام وجودك داخل نطاق 10 كم من مكتب رأس سدر، مع موقع GPS حديث.</p>
+            <p className="mt-2 text-sm leading-7 text-slate-600">لن تظهر الحمولات المتاحة أو ترتيب الانتظار أو سجل أوامرك إلا بعد أن يؤكد النظام وجودك داخل نطاق 10 كم من مكتب رأس سدر، مع موقع GPS حديث.</p>
             {portal && <p className="mt-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{portal.location_updated_at ? 'آخر موقع محفوظ قد يكون خارج النطاق أو أقدم من 10 دقائق.' : 'لم يصل موقع GPS حديث للنظام حتى الآن.'}</p>}
             <p className="mt-3 text-sm font-bold text-slate-700">استخدم زر «أنا وصلت — فحص الموقع» أعلاه لتحديث موقعك والتحقق من النطاق.</p>
           </section>
