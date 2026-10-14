@@ -184,7 +184,7 @@ export const DriverApp: React.FC = () => {
     let active = true;
     let nativeTrackingToken: string | null = null;
     let nativeUserAccessToken: string | null = null;
-    const apiBase = String(import.meta.env.VITE_SUPABASE_URL || '').replace(/\\/$/, '');
+    const apiBase = String(import.meta.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
     const publishableKey = String(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '');
 
     const getAccessToken = async () => {
