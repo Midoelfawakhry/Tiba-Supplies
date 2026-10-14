@@ -513,9 +513,9 @@ export const DriverApp: React.FC = () => {
             });
             if (arrivalError) {
               const raw = String(arrivalError.message || '');
-              if (raw.includes('OUTSIDE_GEOFENCE')) throw new Error('أنت خارج نطاق مكتب رأس سدر البالغ 10 كم.');
-              if (raw.includes('LOCATION_TOO_OLD') || raw.includes('LOCATION_TIMESTAMP_INVALID')) throw new Error('بيانات GPS قديمة. حدّث الموقع وحاول تاني.');
-              if (raw.includes('BOOKING_NOT_ASSIGNED')) throw new Error('النقلة لم تعد في حالة انتظار الوصول.');
+              if (raw.includes('OUTSIDE_RAS_SEDR_GEOFENCE')) throw new Error('أنت خارج نطاق مكتب رأس سدر البالغ 10 كم.');
+              if (raw.includes('LOCATION_TIMESTAMP_STALE_OR_INVALID')) throw new Error('بيانات GPS قديمة. حدّث الموقع وحاول تاني.');
+              if (raw.includes('BOOKING_NOT_AWAITING_ARRIVAL')) throw new Error('النقلة لم تعد في حالة انتظار الوصول.');
               throw new Error(raw || 'تعذر تأكيد الوصول للنقلة.');
             }
             await refreshPortal();
