@@ -12,6 +12,15 @@ const branchSource = await readFile(
   "utf8",
 );
 
+const trackingSource = await readFile(
+  new URL("../supabase/functions/driver-native-location/index.ts", import.meta.url),
+  "utf8",
+);
+const trackingMigration = await readFile(
+  new URL("../supabase/migrations/20261014_native_driver_tracking_sessions.sql", import.meta.url),
+  "utf8",
+);
+
 const aiFunctionSource = await readFile(
   new URL("../supabase/functions/tiba-ai-assistant/index.ts", import.meta.url),
   "utf8",
@@ -109,4 +118,15 @@ test("both office interfaces expose the shared AI assistant with separate role c
   assert.match(officeUiSource, /\['assistant', 'مساعد النظام AI', Bot\]/);
   assert.match(branchUiSource, /SystemAiAssistant audience="BRANCH"/);
   assert.match(branchUiSource, /key:'assistant',label:'مساعد النظام AI'/);
+});
+
+
+test("native tracking uses the Phase 1 driver-vehicle assignment and live-location schema", () => {
+  assert.match(trackingSource, /\.from\("driver_vehicle_assignments"\)/);
+  assert.match(trackingSource, /\.is\("ended_at", null\)/);
+  assert.match(trackingSource, /\.lte\("assigned_at", new Date\(\)\.toISOString\(\)\)/);
+  assert.match(trackingSource, /\.from\("driver_live_locations"\)\.upsert\([\s\S]*?accuracy_m: accuracy,[\s\S]*?captured_at:[\s\S]*?received_at:/);
+  assert.doesNotMatch(trackingSource, /vehicle_driver_assignments|assigned_to|assigned_from|vehicle_id: assignment\.vehicle_id|speed_kmh:|heading,/);
+  assert.match(trackingMigration, /driver_location_tracking_sessions/);
+  assert.match(trackingMigration, /REVOKE ALL ON public\.driver_location_tracking_sessions FROM PUBLIC, anon, authenticated/);
 });
