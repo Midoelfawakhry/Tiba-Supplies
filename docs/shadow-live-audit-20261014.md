@@ -34,7 +34,7 @@
 **Shadow correction:** enforce a unique configured operational HEAD office or make the office context explicit; document whether master directories are intentionally global. Do not change global directory behavior without confirming the data model.
 
 ### P1 — SECURITY DEFINER function inventory includes empty search_path settings
-The live catalog inventory reports 42 public SECURITY DEFINER functions, with 37 executable by `authenticated` and 0 executable by `anon`. Three functions have an explicitly empty search_path setting: `get_driver_edit_options(uuid)`, `get_vehicle_owner_directory()`, `update_operational_driver(uuid,text,text,text,uuid)`, and `update_operational_vehicle(uuid,text,text,uuid,text,text)` (four functions; the first inventory summary needs to be read by exact signature, not by an assumed count).
+The live catalog inventory reports 42 public SECURITY DEFINER functions, with 37 executable by `authenticated` and 0 executable by `anon`. Four functions have an explicitly empty search_path setting: `get_driver_edit_options(uuid)`, `get_vehicle_owner_directory()`, `update_operational_driver(uuid,text,text,text,uuid)`, and `update_operational_vehicle(uuid,text,text,uuid,text,text)` (four functions; the first inventory summary needs to be read by exact signature, not by an assumed count).
 
 An empty search_path can be an intentional hardening technique **only if all object references are schema-qualified**. Review each full body before changing it. Most other functions set `search_path=public`, which is safer than an implicit path but still deserves a hardened path and qualified references review for privileged functions.
 
