@@ -107,3 +107,11 @@ test("both office interfaces expose the shared AI assistant with separate role c
   assert.match(branchUiSource, /SystemAiAssistant audience="BRANCH"/);
   assert.match(branchUiSource, /key:'assistant',label:'مساعد النظام AI'/);
 });
+
+
+test("temporary driver passwords require a first-login password change", () => {
+  assert.match(source, /app_metadata: \{ must_change_password: true \}/);
+  assert.match(source, /app_metadata: \{ \.\.\.appMetadata, must_change_password: true \}/);
+  assert.match(source, /must_change_password: true/);
+  assert.match(source, /body\.action === "complete_password_setup"/);
+});
