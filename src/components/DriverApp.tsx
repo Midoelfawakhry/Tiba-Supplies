@@ -74,6 +74,7 @@ export const DriverApp: React.FC = () => {
   const [portalLoading, setPortalLoading] = useState(false);
   const [pendingDirectAssignments, setPendingDirectAssignments] = useState<any[]>([]);
   const [acceptingBookingId, setAcceptingBookingId] = useState<string | null>(null);
+  const [deliveryBusyBookingId, setDeliveryBusyBookingId] = useState<string | null>(null);
   const mustChangePassword = session?.user?.app_metadata?.must_change_password === true;
 
   useEffect(() => {
@@ -128,6 +129,39 @@ export const DriverApp: React.FC = () => {
       await refreshPendingDirectAssignments();
     }
     setPortalLoading(false);
+  }
+
+  async function confirmDelivery(bookingId: string) {
+    if (deliveryBusyBookingId) return;
+    setDeliveryBusyBookingId(bookingId);
+    setError('');
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+      });
+      const { latitude, longitude, accuracy } = position.coords;
+      const { data, error: deliveryError } = await supabase.rpc('driver_confirm_delivery', {
+        p_booking_id: bookingId,
+        p_latitude: latitude,
+        p_longitude: longitude,
+        p_accuracy_m: accuracy,
+        p_captured_at: new Date(position.timestamp).toISOString(),
+        p_notes: null,
+      });
+      if (deliveryError) throw deliveryError;
+      if (!data?.confirmed) throw new Error('لم يؤكد النظام تسجيل التسليم.');
+      await refreshPortal();
+      setError('تم تسجيل تأكيد التسليم بنجاح. المكتب الرئيسي هو اللي هيعتمد الحالة النهائية.');
+    } catch (e: any) {
+      const raw = String(e?.message || '');
+      if (raw.includes('LOCATION_ACCURACY_TOO_LOW')) setError('دقة GPS أقل من المطلوب. جرّب في مكان مفتوح وحدّث الموقع.');
+      else if (raw.includes('LOCATION_TIMESTAMP_STALE_OR_INVALID')) setError('قراءة GPS قديمة. حاول تاني مع تحديث الموقع.');
+      else if (raw.includes('BOOKING_NOT_IN_TRANSIT')) setError('تأكيد التسليم متاح بعد ما حالة النقلة تبقى في الطريق.');
+      else if (raw.includes('BOOKING_NOT_YOURS')) setError('النقلة دي مش مرتبطة بحسابك.');
+      else setError(raw || 'تعذر تأكيد التسليم. فعّل GPS وحاول تاني.');
+    } finally {
+      setDeliveryBusyBookingId(null);
+    }
   }
 
   async function acceptDirectAssignment(_bookingId: string) {
@@ -628,7 +662,7 @@ export const DriverApp: React.FC = () => {
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center gap-2"><FileText className="text-red-700" size={22}/><h2 className="font-black">سجل النقلات السابقة</h2></div>
           <p className="mt-2 text-sm leading-6 text-slate-600">السجل ده متاح لك في أي مكان، ومش مرتبط بنطاق الـ 10 كم. النطاق خاص بالحمولات المتاحة وتسجيل الوصول وقائمة الانتظار فقط.</p>
-          {(portal?.my_bookings || []).length ? <div className="mt-4 space-y-3">{portal.my_bookings.map((booking: any) => <article key={booking.booking_id} className="rounded-2xl border border-slate-200 p-4"><div className="font-bold">{booking.factory_name || 'مصنع غير محدد'} ← {booking.quarry_name || 'محجر غير محدد'}</div><p className="mt-2 text-sm text-slate-600">الحالة: {({BOOKED:'محجوزة',LOADING_STATEMENT:'بيان تحميل',IN_TRANSIT:'في الطريق',DELIVERED:'تم التسليم',COMPLETED:'مكتملة',CANCELLED:'ملغاة'} as Record<string,string>)[booking.status] || booking.status}</p><p className="mt-1 text-xs text-slate-400">{booking.booked_at ? new Date(booking.booked_at).toLocaleString('ar-EG') : ''}</p></article>)}</div> : <p className="mt-2 rounded-xl bg-slate-50 p-3 text-sm leading-7 text-slate-500">مفيش نقلات سابقة مسجلة على حسابك حتى الآن.</p>}
+          {(portal?.my_bookings || []).length ? <div className="mt-4 space-y-3">{portal.my_bookings.map((booking: any) => <article key={booking.booking_id} className="rounded-2xl border border-slate-200 p-4"><div className="font-bold">{booking.factory_name || 'مصنع غير محدد'} ← {booking.quarry_name || 'محجر غير محدد'}</div><p className="mt-2 text-sm text-slate-600">الحالة: {({BOOKED:'محجوزة',LOADING_STATEMENT:'بيان تحميل',IN_TRANSIT:'في الطريق',DELIVERED:'تم التسليم',COMPLETED:'مكتملة',CANCELLED:'ملغاة'} as Record<string,string>)[booking.status] || booking.status}</p><p className="mt-1 text-xs text-slate-400">{booking.booked_at ? new Date(booking.booked_at).toLocaleString('ar-EG') : ''}</p>{booking.raw_status === 'IN_TRANSIT' && <button type="button" onClick={() => void confirmDelivery(booking.booking_id)} disabled={deliveryBusyBookingId !== null} className="mt-3 w-full rounded-xl bg-emerald-700 p-3 text-sm font-black text-white disabled:opacity-60">{deliveryBusyBookingId === booking.booking_id ? 'جارٍ تأكيد التسليم...' : 'تأكيد التسليم بالموقع الحالي'}</button>}</article>)}</div> : <p className="mt-2 rounded-xl bg-slate-50 p-3 text-sm leading-7 text-slate-500">مفيش نقلات سابقة مسجلة على حسابك حتى الآن.</p>}
         </section>
         {!portal?.inside_geofence ? (
           <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
