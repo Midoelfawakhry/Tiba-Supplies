@@ -9,8 +9,10 @@ const BackgroundGeolocation = registerPlugin<BackgroundGeolocationPlugin>('Backg
 
 // Battery-efficient live-location prototype. Keep office/business workflows unchanged.
 const LOCATION_DISTANCE_FILTER_METERS = 25;
-const MOVING_LOCATION_UPLOAD_INTERVAL_MS = 30_000;
-const SLOW_LOCATION_UPLOAD_INTERVAL_MS = 90_000;
+const MOVING_LOCATION_UPLOAD_INTERVAL_MS = 10 * 60_000;
+const SLOW_LOCATION_UPLOAD_INTERVAL_MS = 15 * 60_000;
+const STATIONARY_LOCATION_UPLOAD_INTERVAL_MS = 30 * 60_000;
+const STATIONARY_SPEED_THRESHOLD_MPS = 0.5;
 const MAX_LOCATION_UPLOAD_ACCURACY_METERS = 100;
 
 type PositionState = {
@@ -214,9 +216,12 @@ export const DriverApp: React.FC = () => {
 
             // Ignore poor GPS fixes and reduce uploads while stopped or moving slowly.
             if (location.accuracy > MAX_LOCATION_UPLOAD_ACCURACY_METERS) return;
-            const minUploadInterval = (location.speed ?? 0) >= 2
+            const speedMps = location.speed ?? 0;
+            const minUploadInterval = speedMps >= 2
               ? MOVING_LOCATION_UPLOAD_INTERVAL_MS
-              : SLOW_LOCATION_UPLOAD_INTERVAL_MS;
+              : speedMps >= STATIONARY_SPEED_THRESHOLD_MPS
+                ? SLOW_LOCATION_UPLOAD_INTERVAL_MS
+                : STATIONARY_LOCATION_UPLOAD_INTERVAL_MS;
             if (Date.now() - lastSentAt < minUploadInterval) return;
             lastSentAt = Date.now();
             const { error: locationError } = await supabase.rpc('update_driver_live_location', {
