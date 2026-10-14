@@ -136,3 +136,45 @@ test("administrative password reset must require a change at next login", () => 
   assert.match(reset, /app_metadata: \{ \.\.\.appMetadata, must_change_password: true \}/);
   assert.match(reset, /must_change_password: true/);
 });
+
+
+const trackingSource = await readFile(
+  new URL("../supabase/functions/driver-native-location/index.ts", import.meta.url),
+  "utf8",
+);
+const trackingMigration = await readFile(
+  new URL("../supabase/migrations/20261014_native_driver_tracking_sessions.sql", import.meta.url),
+  "utf8",
+);
+
+test("native tracking is scoped to authenticated, active driver sessions", () => {
+  assert.match(trackingSource, /auth\.getUser\(token\)/);
+  assert.match(trackingSource, /DRIVER_ACCOUNT_NOT_LINKED/);
+  assert.match(trackingSource, /TRACKING_TOKEN_INVALID_OR_EXPIRED/);
+  assert.match(trackingSource, /NO_ACTIVE_VEHICLE_ASSIGNMENT/);
+  assert.match(trackingSource, /LOCATION_RATE_LIMITED/);
+  assert.match(trackingSource, /\.from\("driver_live_locations"\)/);
+});
+
+test("tracking-session tokens are stored only as hashes and not exposed to client table access", () => {
+  assert.match(trackingSource, /token_hash: await sha256\(trackingToken\)/);
+  assert.match(trackingMigration, /token_hash text NOT NULL UNIQUE/);
+  assert.match(trackingMigration, /ENABLE ROW LEVEL SECURITY/);
+  assert.match(trackingMigration, /REVOKE ALL ON public\.driver_location_tracking_sessions FROM PUBLIC, anon, authenticated/);
+});
+
+
+const nativeServiceSource = await readFile(
+  new URL("../native/android/NativeDriverTrackingService.java", import.meta.url),
+  "utf8",
+);
+
+test("native Android tracking uses the deployed Phase 1 live-location RPC contract", () => {
+  assert.match(nativeServiceSource, /\/rest\/v1\/rpc\/driver_update_live_location/);
+  assert.doesNotMatch(nativeServiceSource, /\/rest\/v1\/rpc\/update_driver_live_location/);
+  assert.match(nativeServiceSource, /body\.put\("p_latitude"/);
+  assert.match(nativeServiceSource, /body\.put\("p_longitude"/);
+  assert.match(nativeServiceSource, /body\.put\("p_accuracy_m"/);
+  assert.match(nativeServiceSource, /body\.put\("p_captured_at"/);
+  assert.doesNotMatch(nativeServiceSource, /body\.put\("p_heading"|body\.put\("p_speed_kmh"/);
+});
