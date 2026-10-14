@@ -98,8 +98,6 @@ Deno.serve(async (request) => {
   const latitude = Number(body.latitude);
   const longitude = Number(body.longitude);
   const accuracy = body.accuracy == null ? null : Number(body.accuracy);
-  const heading = body.bearing == null ? null : Number(body.bearing);
-  const speedMps = body.speed == null ? null : Number(body.speed);
   const capturedMs = body.time == null ? Date.now() : Number(body.time);
   if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 ||
       !Number.isFinite(longitude) || longitude < -180 || longitude > 180 ||
