@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
-const [baseline, mainOffice, assignmentSql, lifecycle, driverLocation, delivery, deactivationGuard, masterUpdate, directoryNotes, vehicleOwnerSql, ownerDeactivationGuard, driverVehicleLifecycle, driverAccountEdge, branchSql, driverPortal, assignmentUi, driverUi, branchUi, dashboardUi, directoryUi] = await Promise.all([
+const [baseline, mainOffice, assignmentSql, lifecycle, driverLocation, delivery, deactivationGuard, masterUpdate, directoryNotes, vehicleOwnerSql, ownerDeactivationGuard, driverVehicleLifecycle, driverAccountEdge, branchSql, driverPortal, assignmentUi, driverUi, branchUi, dashboardUi, directoryUi, driverVehicleAssignments, driverVehicleBookingGuard, driverCodeSequence] = await Promise.all([
   read("../supabase/migrations/20261014190000_phase1_clean_baseline.sql"),
   read("../supabase/migrations/20261014200000_phase1_main_office_rpcs.sql"),
   read("../supabase/migrations/20261014210000_phase1_direct_assignment.sql"),
@@ -24,6 +24,9 @@ const [baseline, mainOffice, assignmentSql, lifecycle, driverLocation, delivery,
   read("../src/components/BranchOfficeApp.tsx"),
   read("../src/components/LiveOperationsBoard.tsx"),
   read("../src/components/OfficeDirectoryScreen.tsx"),
+  read("../supabase/migrations/20261014370000_phase1_driver_vehicle_assignments.sql"),
+  read("../supabase/migrations/20261014430000_phase1_enforce_assigned_vehicle_on_booking.sql"),
+  read("../supabase/migrations/20261014420000_phase1_driver_code_sequence.sql"),
 ]);
 
 test("clean baseline revokes direct client table access and seeds only office reference rows", () => {
@@ -139,4 +142,17 @@ test("driver and vehicle edits use authorized, audited Phase 1 RPCs", () => {
 test("driver account edge function authorizes using Phase 1 Main Office guard", () => {
   assert.match(driverAccountEdge, /callerClient\.rpc\("main_office_get_directory"\)/);
   assert.doesNotMatch(driverAccountEdge, /from\("user_roles"\)/);
+});
+
+
+test("driver creation requires an active fleet vehicle and preserves assignment history", () => {
+  assert.match(driverVehicleAssignments, /create table if not exists public\.driver_vehicle_assignments/);
+  assert.match(driverVehicleAssignments, /driver_vehicle_one_active_driver/);
+  assert.match(driverVehicleAssignments, /driver_vehicle_one_active_vehicle/);
+  assert.match(driverVehicleAssignments, /main_office_create_driver\(p_name text,p_phone text,p_driver_code text,p_vehicle_id uuid\)/);
+  assert.match(driverVehicleAssignments, /insert into public\.driver_vehicle_assignments\(driver_id,vehicle_id,assigned_by\)/);
+  assert.match(driverVehicleAssignments, /main_office_update_driver\(p_driver_id uuid,p_name text,p_phone text,p_driver_code text,p_vehicle_id uuid\)/);
+  assert.match(driverVehicleBookingGuard, /VEHICLE_NOT_ASSIGNED_TO_DRIVER/);
+  assert.match(driverVehicleBookingGuard, /a\.driver_id=p_driver_id and a\.vehicle_id=p_vehicle_id and a\.ended_at is null/);
+  assert.match(driverCodeSequence, /create sequence if not exists public\.driver_code_seq/);
 });
