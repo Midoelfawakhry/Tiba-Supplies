@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
-const [baseline, mainOffice, assignmentSql, lifecycle, driverLocation, delivery, deactivationGuard, masterUpdate, directoryNotes, vehicleOwnerSql, ownerDeactivationGuard, driverVehicleLifecycle, driverAccountEdge, branchSql, driverPortal, assignmentUi, driverUi, branchUi, dashboardUi, directoryUi, driverVehicleAssignments, driverVehicleBookingGuard, driverCodeSequence] = await Promise.all([
+const [baseline, mainOffice, assignmentSql, lifecycle, driverLocation, delivery, deactivationGuard, masterUpdate, directoryNotes, vehicleOwnerSql, ownerDeactivationGuard, driverVehicleLifecycle, driverAccountEdge, branchSql, driverPortal, assignmentUi, driverUi, branchUi, dashboardUi, directoryUi, driverVehicleAssignments, driverVehicleBookingGuard, driverCodeSequence, idempotentDelivery] = await Promise.all([
   read("../supabase/migrations/20261014190000_phase1_clean_baseline.sql"),
   read("../supabase/migrations/20261014200000_phase1_main_office_rpcs.sql"),
   read("../supabase/migrations/20261014210000_phase1_direct_assignment.sql"),
@@ -27,6 +27,7 @@ const [baseline, mainOffice, assignmentSql, lifecycle, driverLocation, delivery,
   read("../supabase/migrations/20261014370000_phase1_driver_vehicle_assignments.sql"),
   read("../supabase/migrations/20261014430000_phase1_enforce_assigned_vehicle_on_booking.sql"),
   read("../supabase/migrations/20261014420000_phase1_driver_code_sequence.sql"),
+  read("../supabase/migrations/20261014440000_phase1_idempotent_delivery_audit.sql"),
 ]);
 
 test("clean baseline revokes direct client table access and seeds only office reference rows", () => {
@@ -158,4 +159,14 @@ test("driver creation requires an active fleet vehicle and preserves assignment 
   assert.match(driverVehicleBookingGuard, /VEHICLE_NOT_ASSIGNED_TO_DRIVER/);
   assert.match(driverVehicleBookingGuard, /a\.driver_id=p_driver_id and a\.vehicle_id=p_vehicle_id and a\.ended_at is null/);
   assert.match(driverCodeSequence, /create sequence if not exists public\.driver_code_seq/);
+});
+
+
+test("driver delivery confirmation is idempotent in both data and audit trail", () => {
+  assert.match(idempotentDelivery, /on conflict\(booking_id\) do nothing/);
+  assert.match(idempotentDelivery, /get diagnostics v_inserted = row_count/i);
+  assert.match(idempotentDelivery, /if v_inserted then[\s\S]*?insert into public\.audit_log/);
+  assert.match(idempotentDelivery, /'already_confirmed',not v_inserted/);
+  assert.match(idempotentDelivery, /p_accuracy_m>100/);
+  assert.match(idempotentDelivery, /interval '10 minutes'/);
 });
