@@ -5,6 +5,9 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
+    // Relative asset paths are required when Electron loads dist/index.html via file://.
+    // They also work when the web build is hosted at the domain root.
+    base: './',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
