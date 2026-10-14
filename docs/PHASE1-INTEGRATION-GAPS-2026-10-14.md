@@ -9,7 +9,7 @@ Branch: `shadow/phase1-hardening`
 - Read-only catalog query confirmed the relevant Main Office and driver RPCs exist with `SECURITY DEFINER` and authenticated execution grants.
 
 ## Remaining integration blockers
-1. `DirectLoadAssignmentScreen.tsx` still calls legacy `direct_assign_standalone_load` and `get_direct_assignment_trip_identity`. The Phase 1 assignment RPC is `main_office_direct_assign(load_order_id, driver_id, vehicle_id)`. The screen must be redesigned to select a published load order, driver, and vehicle; it must not emulate a standalone load without an order.
+1. `DirectLoadAssignmentScreen.tsx` was updated to use `main_office_direct_assign(load_order_id, driver_id, vehicle_id)` and select a published order, active driver, and active vehicle. Server-side checks remain authoritative. UI build/runtime validation is still pending.
 2. `DriverApp.tsx` still relies on legacy `get_driver_portal_snapshot`, `get_pending_direct_assignments`, and `accept_direct_assignment`. It does not yet call Phase 1 RPCs for portal state/location/arrival/delivery.
 3. `BranchOfficeApp.tsx` still calls legacy `get_branch_office_snapshot`. Replace with a read-only, scoped branch RPC before exposing it to branch users.
 4. Some existing screens expect old status values (`BOOKED`, `LOADING_STATEMENT`) while Phase 1 uses `ASSIGNED`, `ARRIVED`, `LOADING`, `LOADED`, `IN_TRANSIT`, `DELIVERED`, `CANCELLED`.
