@@ -232,7 +232,7 @@ public final class NativeDriverTrackingService extends Service implements Locati
 
     private static boolean empty(String value) { return value == null || value.trim().isEmpty(); }
     private static String trimSlash(String value) { if (value == null) return null; while (value.endsWith("/")) value = value.substring(0, value.length()-1); return value; }
-    @Override public void onDestroy() { if (locationManager != null) locationManager.removeUpdates(this); super.onDestroy(); }
+    @Override public void onDestroy() { if (locationManager != null) locationManager.removeUpdates(this); getSharedPreferences(PREFS, MODE_PRIVATE).edit().remove(SESSION).apply(); super.onDestroy(); }
     @Nullable @Override public IBinder onBind(Intent intent) { return null; }
     @Override public void onProviderEnabled(String provider) {}
     @Override public void onProviderDisabled(String provider) {}
