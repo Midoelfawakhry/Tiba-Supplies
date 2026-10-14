@@ -136,12 +136,12 @@ jobs:
           let java = fs.readFileSync(main, 'utf8');
           if (!java.includes('NativeDriverTrackingPlugin.class')) {
             if (!java.includes('import android.os.Bundle;')) {
-              java = java.replace(/(package [^;]+;\\s*)/, '$1\\nimport android.os.Bundle;');
+              java = java.replace(/(package [^;]+;\s*)/, '$1\nimport android.os.Bundle;');
             }
             if (java.includes('super.onCreate(savedInstanceState);')) {
-              java = java.replace('super.onCreate(savedInstanceState);', 'registerPlugin(NativeDriverTrackingPlugin.class);\\n        super.onCreate(savedInstanceState);');
+              java = java.replace('super.onCreate(savedInstanceState);', 'registerPlugin(NativeDriverTrackingPlugin.class);\n        super.onCreate(savedInstanceState);');
             } else {
-              java = java.replace(/}\\s*$/, '    @Override\\n    public void onCreate(Bundle savedInstanceState) {\\n        registerPlugin(NativeDriverTrackingPlugin.class);\\n        super.onCreate(savedInstanceState);\\n    }\\n}\\n');
+              java = java.replace(/}\s*$/, '    @Override\n    public void onCreate(Bundle savedInstanceState) {\n        registerPlugin(NativeDriverTrackingPlugin.class);\n        super.onCreate(savedInstanceState);\n    }\n}\n');
             }
           }
           fs.writeFileSync(main, java);
@@ -152,7 +152,7 @@ jobs:
           let xml = fs.readFileSync(file, 'utf8');
           const service = '<service android:name="com.tibasupplies.driver.NativeDriverTrackingService" android:enabled="true" android:exported="false" android:stopWithTask="false" android:foregroundServiceType="location" />';
           if (!xml.includes('com.tibasupplies.driver.NativeDriverTrackingService')) {
-            xml = xml.replace('</application>', '    ' + service + '\\n  </application>');
+            xml = xml.replace('</application>', '    ' + service + '\n  </application>');
           }
           fs.writeFileSync(file, xml);
           if (!fs.readFileSync(file, 'utf8').includes(service)) throw new Error('Native tracking service was not registered in AndroidManifest.xml');
