@@ -185,7 +185,10 @@ export const DriverApp: React.FC = () => {
     if (!session || !driverAuthorized || mustChangePassword) return;
     let active = true;
     let watcherId: string | undefined;
+    // Throttle successful uploads, not failed attempts. Retry failures after 60s.
     let lastSentAt = 0;
+    let lastAttemptAt = 0;
+    let lastUploadFailed = false;
 
     void (async () => {
       try {
@@ -222,8 +225,10 @@ export const DriverApp: React.FC = () => {
               : speedMps >= STATIONARY_SPEED_THRESHOLD_MPS
                 ? SLOW_LOCATION_UPLOAD_INTERVAL_MS
                 : STATIONARY_LOCATION_UPLOAD_INTERVAL_MS;
-            if (Date.now() - lastSentAt < minUploadInterval) return;
-            lastSentAt = Date.now();
+            const now = Date.now();
+            if (!lastUploadFailed && now - lastSentAt < minUploadInterval) return;
+            if (lastUploadFailed && now - lastAttemptAt < 60_000) return;
+            lastAttemptAt = now;
             const locationPayload = {
               p_latitude: location.latitude,
               p_longitude: location.longitude,
@@ -233,15 +238,21 @@ export const DriverApp: React.FC = () => {
               p_captured_at: capturedAt,
             };
 
-            // Use native HTTP for Android background uploads: WebView requests can be throttled with the screen off.
+            // Refresh the session for each upload; a captured access token can expire
+            // during a long-running background work session.
             let locationError: { message?: string } | null = null;
-            if (Capacitor.isNativePlatform() && import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) {
-              try {
+            try {
+              const { data: authData, error: authError } = await supabase.auth.getSession();
+              const accessToken = authData.session?.access_token;
+              if (authError || !accessToken) {
+                locationError = { message: authError?.message || 'انتهت جلسة السائق؛ افتح التطبيق وسجّل الدخول من جديد.' };
+              } else if (Capacitor.isNativePlatform() && import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) {
+                // Native HTTP avoids WebView throttling with the screen off.
                 const response = await CapacitorHttp.post({
                   url: `${String(import.meta.env.VITE_SUPABASE_URL).replace(/\/$/, '')}/rest/v1/rpc/update_driver_live_location`,
                   headers: {
                     apikey: String(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY),
-                    Authorization: `Bearer ${session.access_token}`,
+                    Authorization: `Bearer ${accessToken}`,
                     'Content-Type': 'application/json',
                   },
                   data: locationPayload,
@@ -252,12 +263,19 @@ export const DriverApp: React.FC = () => {
                   const detail = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
                   locationError = { message: `HTTP ${response.status}: ${detail}` };
                 }
-              } catch (nativeError: any) {
-                locationError = { message: nativeError?.message || 'فشل إرسال الموقع من خدمة الخلفية.' };
+              } else {
+                const result = await supabase.rpc('update_driver_live_location', locationPayload);
+                locationError = result.error;
               }
+            } catch (uploadError: any) {
+              locationError = { message: uploadError?.message || 'فشل إرسال الموقع في الخلفية.' };
+            }
+
+            if (locationError) {
+              lastUploadFailed = true;
             } else {
-              const result = await supabase.rpc('update_driver_live_location', locationPayload);
-              locationError = result.error;
+              lastSentAt = Date.now();
+              lastUploadFailed = false;
             }
             if (!active) return;
             if (locationError) {
@@ -276,7 +294,7 @@ export const DriverApp: React.FC = () => {
       active = false;
       if (watcherId) void BackgroundGeolocation.removeWatcher({ id: watcherId });
     };
-  }, [session, driverAuthorized, mustChangePassword]);
+  }, [session?.user?.id, driverAuthorized, mustChangePassword]);
 
   function normalizePhone(input: string) {
     let value = input.trim().replace(/[\s()-]/g, '');
