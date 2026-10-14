@@ -89,14 +89,25 @@ export const LiveOperationsBoard: React.FC = () => {
 
     setSavingOrder(true);
     try {
-      const { data: result, error: rpcError } = await supabase.rpc('create_load_order', {
+      const { data: draft, error: createError } = await supabase.rpc('main_office_create_load_order', {
         p_factory_id: factoryId,
         p_quarry_id: quarryId,
         p_requested_quantity: requestedQuantity,
         p_priority: orderPriority,
+        p_notes: null,
       });
-      if (rpcError) throw rpcError;
-      if (!result?.success) throw new Error('تعذر تأكيد إنشاء أمر التحميل.');
+      if (createError) throw createError;
+      if (!draft?.load_order_id || draft?.status !== 'DRAFT') {
+        throw new Error('لم يتم تأكيد إنشاء مسودة أمر التحميل.');
+      }
+
+      const { data: published, error: publishError } = await supabase.rpc('main_office_publish_load_order', {
+        p_load_order_id: draft.load_order_id,
+      });
+      if (publishError) throw publishError;
+      if (published?.status !== 'PUBLISHED') {
+        throw new Error('تم إنشاء المسودة لكن لم يتم تأكيد نشر أمر التحميل.');
+      }
 
       setSuccessMessage('تم إنشاء أمر التحميل ونشره بنجاح.');
       setQuantity('1');
