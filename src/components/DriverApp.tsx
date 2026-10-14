@@ -7,6 +7,14 @@ import { Geolocation } from '@capacitor/geolocation';
 
 const BackgroundGeolocation = registerPlugin<BackgroundGeolocationPlugin>('BackgroundGeolocation');
 
+// Battery-efficient live-location prototype. Keep office/business workflows unchanged.
+const LOCATION_DISTANCE_FILTER_METERS = 25;
+const MOVING_LOCATION_UPLOAD_INTERVAL_MS = 10 * 60_000;
+const SLOW_LOCATION_UPLOAD_INTERVAL_MS = 15 * 60_000;
+const STATIONARY_LOCATION_UPLOAD_INTERVAL_MS = 30 * 60_000;
+const STATIONARY_SPEED_THRESHOLD_MPS = 0.5;
+const MAX_LOCATION_UPLOAD_ACCURACY_METERS = 100;
+
 type PositionState = {
   latitude: number;
   longitude: number;
@@ -187,7 +195,7 @@ export const DriverApp: React.FC = () => {
             backgroundTitle: 'Tiba Supplies — تتبع موقع السائق',
             requestPermissions: true,
             stale: false,
-            distanceFilter: 10,
+            distanceFilter: LOCATION_DISTANCE_FILTER_METERS,
           },
           async (location, watcherError) => {
             if (!active) return;
@@ -206,7 +214,15 @@ export const DriverApp: React.FC = () => {
               capturedAt: new Date(locationTimestamp).toLocaleString('ar-EG'),
             });
 
-            if (Date.now() - lastSentAt < 20000) return;
+            // Ignore poor GPS fixes and reduce uploads while stopped or moving slowly.
+            if (location.accuracy > MAX_LOCATION_UPLOAD_ACCURACY_METERS) return;
+            const speedMps = location.speed ?? 0;
+            const minUploadInterval = speedMps >= 2
+              ? MOVING_LOCATION_UPLOAD_INTERVAL_MS
+              : speedMps >= STATIONARY_SPEED_THRESHOLD_MPS
+                ? SLOW_LOCATION_UPLOAD_INTERVAL_MS
+                : STATIONARY_LOCATION_UPLOAD_INTERVAL_MS;
+            if (Date.now() - lastSentAt < minUploadInterval) return;
             lastSentAt = Date.now();
             const { error: locationError } = await supabase.rpc('update_driver_live_location', {
               p_latitude: location.latitude,
@@ -221,7 +237,6 @@ export const DriverApp: React.FC = () => {
               setError(locationError.message || 'تعذر حفظ الموقع. تأكد من إعدادات السائق في النظام.');
             } else {
               setError('');
-              void refreshPortal();
             }
           },
         );
