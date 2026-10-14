@@ -223,6 +223,14 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
 
   async function deactivateDriver(row: Row) {
     const name = String(row.name ?? row.driver_name ?? 'السائق');
+    const hasActiveBooking = (snapshot?.bookings ?? []).some((booking: Row) =>
+      String(booking.driver_id) === String(row.driver_id) &&
+      ['ASSIGNED', 'ARRIVED', 'LOADING', 'LOADED', 'IN_TRANSIT'].includes(String(booking.status).toUpperCase())
+    );
+    if (hasActiveBooking) {
+      setError('لا يمكن إيقاف السائق لأن عليه نقلة نشطة. أنهِ النقلة أو ألغها أولًا.');
+      return;
+    }
     if (!window.confirm('تأكيد إيقاف ' + name + '؟ سيتم منعه من الاختيارات الجديدة مع الاحتفاظ بكل سجلات التحميل والربط السابقة. لن يتم الإيقاف لو عليه نقلة نشطة.')) return;
     setError(''); setSuccess(''); setSavingEdit(true);
     try {
