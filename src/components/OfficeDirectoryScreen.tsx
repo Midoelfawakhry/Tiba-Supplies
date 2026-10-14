@@ -104,8 +104,8 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
       ]);
       if (directoryResult.error) throw directoryResult.error;
       const directory = directoryResult.data ?? {};
-      const factories = (directory.factories ?? []).map((r: Row) => ({ factory_id: r.id, code: r.code, factory_code: r.code, name: r.name, is_active: r.is_active }));
-      const quarries = (directory.quarries ?? []).map((r: Row) => ({ quarry_id: r.id, code: r.code, quarry_code: r.code, name: r.name, is_active: r.is_active, latitude: r.latitude, longitude: r.longitude }));
+      const factories = (directory.factories ?? []).map((r: Row) => ({ factory_id: r.id, code: r.code, factory_code: r.code, name: r.name, notes: r.notes, is_active: r.is_active }));
+      const quarries = (directory.quarries ?? []).map((r: Row) => ({ quarry_id: r.id, code: r.code, quarry_code: r.code, name: r.name, notes: r.notes, is_active: r.is_active, latitude: r.latitude, longitude: r.longitude }));
       const drivers = (directory.drivers ?? []).map((r: Row) => ({ driver_id: r.id, driver_code: r.code, code: r.code, name: r.name, phone: r.phone, office_id: r.office_id, is_active: r.is_active }));
       const vehicles = (directory.vehicles ?? []).map((r: Row) => ({ vehicle_id: r.id, vehicle_code: r.code, plate_number: r.plate_number, owner_id: r.owner_id, office_id: r.office_id, is_active: r.is_active }));
       setSnapshot({ ...data, factories, quarries, drivers, vehicles });
@@ -468,7 +468,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
 
   function beginMasterEntryEdit(row?: Row) {
     setEditingMasterEntry(row ?? null);
-    setMasterForm({ name: String(row?.name ?? ''), code: String(row?.code ?? ''), address: String(row?.address ?? ''), phone: String(row?.phone ?? ''), is_active: row?.is_active !== false });
+    setMasterForm({ name: String(row?.name ?? ''), code: String(row?.code ?? ''), address: String(row?.notes ?? row?.address ?? ''), phone: String(row?.phone ?? ''), is_active: row?.is_active !== false });
     setShowMasterForm(true); setError(''); setSuccess('');
   }
 
@@ -478,19 +478,17 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     setSavingMaster(true); setError(''); setSuccess('');
     try {
       if (editingMasterEntry) {
-        const currentName = String(editingMasterEntry.name ?? '');
-        const currentCode = String(editingMasterEntry.code ?? editingMasterEntry.factory_code ?? editingMasterEntry.quarry_code ?? '');
-        if (masterForm.name.trim() !== currentName || masterForm.code.trim() !== currentCode) {
-          throw new Error('تعديل الاسم أو الكود غير متاح في عقد Phase 1 الحالي. ألغِ التعديل واترك الاسم والكود كما هما لتغيير حالة النشاط فقط.');
-        }
         const entityId = active === 'factories' ? editingMasterEntry.factory_id : editingMasterEntry.quarry_id;
-        const { data, error: rpcError } = await supabase.rpc('main_office_set_directory_active', {
+        const { data, error: rpcError } = await supabase.rpc('main_office_update_master_directory', {
           p_entity_type: active === 'factories' ? 'FACTORY' : 'QUARRY',
           p_entity_id: entityId,
+          p_code: masterForm.code.trim(),
+          p_name: masterForm.name.trim(),
+          p_notes: masterForm.address.trim() || null,
           p_is_active: masterForm.is_active,
         });
         if (rpcError) throw rpcError;
-        if (!data?.id) throw new Error('تعذر تأكيد تحديث حالة السجل.');
+        if (!data?.success) throw new Error('تعذر تأكيد تحديث بيانات الدليل.');
       } else {
         if (!masterForm.code.trim() || !masterForm.name.trim()) throw new Error('الكود والاسم مطلوبان.');
         const { data, error: rpcError } = await supabase.rpc('main_office_upsert_directory', {
