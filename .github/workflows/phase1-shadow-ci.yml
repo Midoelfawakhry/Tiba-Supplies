@@ -1,0 +1,28 @@
+name: Phase 1 Shadow CI
+
+on:
+  push:
+    branches:
+      - shadow/phase1-hardening
+  pull_request:
+    branches:
+      - shadow/phase1-hardening
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Phase 1 contract and authorization tests
+        run: npm run test:phase1
+      - name: TypeScript check
+        run: npm run lint
+      - name: Production build
+        run: npm run build
