@@ -144,11 +144,9 @@ public final class NativeDriverTrackingService extends Service implements Locati
                 body.put("p_latitude", location.getLatitude());
                 body.put("p_longitude", location.getLongitude());
                 body.put("p_accuracy_m", location.hasAccuracy() ? location.getAccuracy() : JSONObject.NULL);
-                body.put("p_heading", location.hasBearing() ? location.getBearing() : JSONObject.NULL);
-                body.put("p_speed_kmh", location.hasSpeed() ? location.getSpeed() * 3.6f : JSONObject.NULL);
                 body.put("p_captured_at", new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US)
                     .format(new java.util.Date(location.getTime())));
-                JSONObject result = postJson(projectUrl + "/rest/v1/rpc/update_driver_live_location", body, accessToken);
+                JSONObject result = postJson(projectUrl + "/rest/v1/rpc/driver_update_live_location", body, accessToken);
                 if (result != null) { lastSentAt = System.currentTimeMillis(); persistEncryptedSession(); }
             } catch (Exception ignored) {
                 // Keep the service running; retry only on the next eligible location fix.
