@@ -1,141 +1,45 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, CheckCircle2, HandCoins, RefreshCw, Truck } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { AlertTriangle, CheckCircle2, RefreshCw, Truck, ClipboardList } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { getLiveSnapshot, LiveSnapshot, liveName } from '../services/liveData';
+import { getLiveSnapshot, LiveSnapshot } from '../services/liveData';
 
 export const DirectLoadAssignmentScreen: React.FC = () => {
-  const [snapshot, setSnapshot] = useState<LiveSnapshot | null>(null);
-  const [factoryId, setFactoryId] = useState('');
-  const [quarryId, setQuarryId] = useState('');
-  const [vehicleId, setVehicleId] = useState('');
-  const [vehicleSearch, setVehicleSearch] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      setSnapshot(await getLiveSnapshot());
-    } catch (e: any) {
-      setError(e?.message || 'تعذر تحميل بيانات الإسناد والسيارات.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { void refresh(); }, [refresh]);
-
-  const factories = snapshot?.factories ?? [];
-  const quarries = snapshot?.quarries ?? [];
-  const availableVehicles = snapshot?.vehicles ?? [];
-  const normalizedVehicleSearch = vehicleSearch.trim().toLocaleLowerCase('ar-EG');
-  const filteredVehicles = availableVehicles.filter(vehicle => {
-    const searchable = [vehicle.plate_number, vehicle.vehicle_code].filter(Boolean).join(' ').toLocaleLowerCase('ar-EG');
-    return !normalizedVehicleSearch || searchable.includes(normalizedVehicleSearch);
-  });
-  const selectedVehicle = availableVehicles.find(v => v.vehicle_id === vehicleId);
-
-
-  async function assign() {
-    if (!factoryId || !quarryId || !vehicleId) {
-      setError('اختار المصنع والمحجر والعربية الأول.');
-      return;
-    }
-    setSaving(true);
-    setError('');
-    setSuccess('');
-    try {
-      const { data: result, error: rpcError } = await supabase.rpc('direct_assign_standalone_load', {
-        p_factory_id: factoryId,
-        p_quarry_id: quarryId,
-        p_vehicle_id: vehicleId,
-      });
-      if (rpcError) throw rpcError;
-      if (!result?.success) throw new Error('تعذر تأكيد الإسناد المباشر.');
-      const { data: identity, error: identityError } = await supabase.rpc('get_direct_assignment_trip_identity', {
-        p_booking_id: result.booking_id,
-      });
-      if (identityError) throw identityError;
-      setSuccess(`تم إسناد النقلة للسائق وهي في انتظار قبوله. كود النقلة: ${identity?.trip_code ?? 'تم الإسناد'} · رقم الإسناد اليومي: ${identity?.assignment_daily_number ?? '—'} · المسافة من المكتب: ${result.distance_m} متر.`);
-      setVehicleId('');
-      setVehicleSearch('');
-      await refresh();
-    } catch (e: any) {
-      const raw = String(e?.message || '');
-      const messages: Record<string, string> = {
-        VEHICLE_LOCATION_MISSING_OR_STALE: 'لا يمكن الإسناد: موقع العربية غير متاح أو أقدم من 10 دقائق.',
-        VEHICLE_OUTSIDE_GEOFENCE: 'لا يمكن الإسناد: العربية خارج نطاق الموقع الجغرافي المعتمد لفرع رأس سدر.',
-        NO_ACTIVE_DRIVER_FOR_VEHICLE: 'العربية غير مرتبطة بسائق نشط حاليًا.',
-        DRIVER_HAS_ACTIVE_BOOKING: 'السائق لديه نقلة نشطة بالفعل.',
-        VEHICLE_HAS_ACTIVE_BOOKING: 'العربية عليها نقلة نشطة بالفعل.',
-        OFFICE_GEOFENCE_NOT_CONFIGURED: 'إحداثيات فرع رأس سدر أو نطاقه غير مضبوط في قاعدة البيانات.',
-      };
-      const key = Object.keys(messages).find(k => raw.includes(k));
-      setError(key ? messages[key] : raw || 'تعذر تنفيذ الإسناد المباشر.');
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <section className="space-y-5">
-      <header className="rounded-3xl border border-emerald-200 bg-white p-5 sm:p-6">
-        <div className="flex items-start gap-3">
-          <div className="rounded-2xl bg-emerald-100 p-3 text-emerald-800"><HandCoins size={26}/></div>
-          <div>
-            <h2 className="text-xl font-black sm:text-2xl">التحميل بالأمر المباشر</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">إسناد نقلة مستقلة من المكتب الرئيسي (HEAD) إلى عربية محددة، من غير ارتباط بكميات مركز التشغيل أو أوامر التحميل المنشورة. فرع رأس سدر (BRANCH) يُستخدم للموقع الجغرافي والتحقق من نطاق الـ Geofence فقط.</p>
-          </div>
-          <button type="button" onClick={() => void refresh()} disabled={loading} className="mr-auto inline-flex shrink-0 items-center gap-2 rounded-xl border border-slate-300 px-3 py-2 text-sm font-bold text-slate-700 disabled:opacity-60"><RefreshCw size={16} className={loading ? 'animate-spin' : ''}/><span className="hidden sm:inline">تحديث</span></button>
-        </div>
-      </header>
-
-      {error && <div role="alert" className="flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-800"><AlertTriangle size={18} className="mt-1 shrink-0"/><span>{error}</span></div>}
-      {success && <div role="status" className="flex items-start gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-800"><CheckCircle2 size={18} className="mt-1 shrink-0"/><span>{success}</span></div>}
-
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
-        <section className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-6">
-          <h3 className="text-lg font-black">بيانات الإسناد</h3>
-          <p className="mt-1 text-sm text-slate-500">المكتب الرئيسي فقط ينفّذ الإسناد. فرع رأس سدر مرجع الموقع الجغرافي وليس جهة إدخال التحميل.</p>
-          <label className="mt-5 block text-sm font-bold text-slate-700">المصنع</label>
-          <select value={factoryId} onChange={e => { setFactoryId(e.target.value); setError(''); setSuccess(''); }} className="mt-2 w-full rounded-xl border border-slate-300 bg-slate-50 p-3 text-sm text-slate-900">
-            <option value="">اختار المصنع</option>
-            {factories.map(factory => <option key={factory.factory_id} value={factory.factory_id}>{liveName(factory)}</option>)}
-          </select>
-          <label className="mt-5 block text-sm font-bold text-slate-700">المحجر</label>
-          <select value={quarryId} onChange={e => { setQuarryId(e.target.value); setError(''); setSuccess(''); }} className="mt-2 w-full rounded-xl border border-slate-300 bg-slate-50 p-3 text-sm text-slate-900">
-            <option value="">اختار المحجر</option>
-            {quarries.map(quarry => <option key={quarry.quarry_id} value={quarry.quarry_id}>{liveName(quarry)}</option>)}
-          </select>
-          <label className="mt-5 block text-sm font-bold text-slate-700">ابحث عن العربية</label>
-          <input type="search" value={vehicleSearch} onChange={e => { setVehicleSearch(e.target.value); setError(''); setSuccess(''); }} placeholder="اكتب رقم اللوحة أو كود العربية" aria-label="البحث عن العربية برقم اللوحة أو الكود" className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900 placeholder:text-slate-400" />
-          <label className="mt-3 block text-sm font-bold text-slate-700">اختار العربية من النتائج ({filteredVehicles.length})</label>
-          <select value={vehicleId} onChange={e => { setVehicleId(e.target.value); setError(''); setSuccess(''); }} className="mt-2 w-full rounded-xl border border-slate-300 bg-slate-50 p-3 text-sm text-slate-900">
-            <option value="">اختار العربية</option>
-            {filteredVehicles.map(vehicle => <option key={vehicle.vehicle_id} value={vehicle.vehicle_id}>{vehicle.plate_number ?? 'بدون رقم لوحة'}{vehicle.vehicle_code ? ` · كود ${vehicle.vehicle_code}` : ''}</option>)}
-          </select>
-          {normalizedVehicleSearch && filteredVehicles.length === 0 && <p className="mt-2 text-sm text-amber-700">مفيش عربية مطابقة للبحث. جرّب رقم اللوحة أو كود العربية.</p>}
-          <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-900">
-            <b>شروط التأكيد:</b> السائق مرتبط بالعربية، وموقع GPS حديث (آخر 10 دقائق)، والعربية داخل النطاق الجغرافي المضبوط لفرع رأس سدر. لا يمكن إسناد نقلة نشطة ثانية لنفس السائق أو العربية.
-          </div>
-          <button type="button" disabled={saving || loading || !factoryId || !quarryId || !vehicleId} onClick={() => void assign()} className="mt-5 w-full rounded-xl bg-emerald-600 p-4 text-sm font-black text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50">{saving ? 'جاري التحقق وتثبيت الإسناد...' : 'تأكيد الإسناد المباشر'}</button>
-        </section>
-
-        <aside className="space-y-4">
-          <section className="rounded-3xl border border-slate-200 bg-white p-5">
-            <div className="flex items-center gap-2"><Truck size={20} className="text-blue-700"/><h3 className="font-black">ملخص الإسناد المباشر</h3></div>
-            <div className="mt-4 space-y-3 text-sm">
-              <div><span className="text-slate-500">المصنع</span><div className="mt-1 font-bold">{liveName(factories.find(f => f.factory_id === factoryId))}</div></div>
-              <div><span className="text-slate-500">المحجر</span><div className="mt-1 font-bold">{liveName(quarries.find(q => q.quarry_id === quarryId))}</div></div>
-              <div><span className="text-slate-500">العربية</span><div className="mt-1 font-bold">{String(selectedVehicle?.plate_number ?? selectedVehicle?.vehicle_code ?? 'لم يتم الاختيار')}</div></div>
-            </div>
-          </section>
-          <section className="rounded-3xl border border-slate-200 bg-slate-50 p-5"><h3 className="font-black">حالة البيانات</h3><div className="mt-3 text-sm leading-7 text-slate-600">{loading ? 'جاري تحميل البيانات...' : `مصانع: ${factories.length} · محاجر: ${quarries.length} · عربيات: ${availableVehicles.length}`}</div></section>
-        </aside>
-      </div>
-    </section>
-  );
+ const [snapshot,setSnapshot]=useState<LiveSnapshot|null>(null);
+ const [orderId,setOrderId]=useState(''); const [driverId,setDriverId]=useState(''); const [vehicleId,setVehicleId]=useState('');
+ const [loading,setLoading]=useState(true); const [saving,setSaving]=useState(false); const [error,setError]=useState(''); const [success,setSuccess]=useState('');
+ const refresh=useCallback(async()=>{setLoading(true);setError('');try{setSnapshot(await getLiveSnapshot());}catch(e:any){setError(e?.message||'تعذر تحميل بيانات الإسناد.');}finally{setLoading(false);}},[]);
+ useEffect(()=>{void refresh();},[refresh]);
+ const activeBookings=useMemo(()=>(snapshot?.bookings??[]).filter(b=>['ASSIGNED','ARRIVED','LOADING','LOADED','IN_TRANSIT'].includes(String(b.status).toUpperCase())),[snapshot]);
+ const orders=(snapshot?.load_orders??[]).filter(o=>o.status==='PUBLISHED');
+ const busyDrivers=new Set(activeBookings.map(b=>b.driver_id)); const busyVehicles=new Set(activeBookings.map(b=>b.vehicle_id));
+ const drivers=(snapshot?.drivers??[]).filter(d=>d.is_active&&!busyDrivers.has(d.driver_id));
+ const vehicles=(snapshot?.vehicles??[]).filter(v=>v.is_active&&!busyVehicles.has(v.vehicle_id));
+ const selectedOrder=orders.find(o=>o.load_order_id===orderId);
+ async function assign(){
+  if(!orderId||!driverId||!vehicleId){setError('اختار أمر تحميل منشور وسائق وعربية.');return;}
+  setSaving(true);setError('');setSuccess('');
+  try{
+   const {data,error:rpcError}=await supabase.rpc('main_office_direct_assign',{p_load_order_id:orderId,p_driver_id:driverId,p_vehicle_id:vehicleId});
+   if(rpcError)throw rpcError;
+   if(!data?.booking_id||data?.status!=='ASSIGNED')throw new Error('لم يتم تأكيد الإسناد من النظام.');
+   setSuccess(`تم الإسناد بنجاح. كود النقلة: ${data.trip_code||'—'} · رقم الأمر: ${selectedOrder?.order_number??'—'}`);
+   setOrderId('');setDriverId('');setVehicleId('');await refresh();
+  }catch(e:any){
+   const raw=String(e?.message||'');const messages:Record<string,string>={LOAD_ORDER_NOT_FOUND:'أمر التحميل غير موجود.',LOAD_ORDER_NOT_PUBLISHED:'أمر التحميل لم يعد منشورًا.',DRIVER_NOT_ACTIVE:'السائق غير نشط.',VEHICLE_NOT_ACTIVE:'العربية غير نشطة.',DRIVER_OR_VEHICLE_NOT_ASSIGNED_TO_RAS_SEDR:'السائق أو العربية غير مرتبطين بمرجع رأس سدر.',DRIVER_HAS_ACTIVE_BOOKING:'السائق عليه نقلة نشطة بالفعل.',VEHICLE_HAS_ACTIVE_BOOKING:'العربية عليها نقلة نشطة بالفعل.',RAS_SEDR_BRANCH_CONFIGURATION_INVALID:'إعداد مكتب رأس سدر غير سليم.',MAIN_OFFICE_ACCESS_REQUIRED:'الإسناد متاح للمكتب الرئيسي فقط.'};
+   const key=Object.keys(messages).find(k=>raw.includes(k));setError(key?messages[key]:raw||'تعذر تنفيذ الإسناد.');
+  }finally{setSaving(false);}
+ }
+ return <section className="space-y-5">
+  <header className="rounded-3xl border border-emerald-200 bg-white p-5 sm:p-6"><div className="flex items-start gap-3"><div className="rounded-2xl bg-emerald-100 p-3 text-emerald-800"><Truck size={26}/></div><div className="min-w-0 flex-1"><h2 className="text-xl font-black sm:text-2xl">إسناد نقلة من أمر تحميل</h2><p className="mt-2 text-sm leading-7 text-slate-600">الإسناد مرتبط بأمر منشور من المكتب الرئيسي، وبسائق وعربية نشطين. التحقق النهائي من الصلاحيات وحالة السائق والعربية يتم على الخادم.</p></div><button type="button" onClick={()=>void refresh()} disabled={loading} className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-slate-300 px-3 py-2 text-sm font-bold disabled:opacity-60"><RefreshCw size={16} className={loading?'animate-spin':''}/><span className="hidden sm:inline">تحديث</span></button></div></header>
+  {error&&<div role="alert" className="flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-800"><AlertTriangle size={18} className="mt-1 shrink-0"/><span>{error}</span></div>}
+  {success&&<div role="status" className="flex items-start gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-800"><CheckCircle2 size={18} className="mt-1 shrink-0"/><span>{success}</span></div>}
+  <div className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 space-y-5"><div><h3 className="text-lg font-black">بيانات الإسناد</h3><p className="mt-1 text-sm text-slate-500">المتاح: {orders.length} أمر منشور · {drivers.length} سائق غير مشغول · {vehicles.length} عربية غير مشغولة</p></div>
+   <label className="block text-sm font-bold">أمر التحميل المنشور<select value={orderId} onChange={e=>setOrderId(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 bg-slate-50 p-3 font-normal" disabled={loading}><option value="">اختار أمر التحميل</option>{orders.map(o=><option key={o.load_order_id} value={o.load_order_id}>#{o.order_number} · {o.factory_name} ← {o.quarry_name} · المطلوب {o.requested_quantity}</option>)}</select></label>
+   {selectedOrder&&<div className="rounded-xl bg-slate-50 p-3 text-sm text-slate-700"><ClipboardList className="ml-1 inline" size={16}/> المصنع: {selectedOrder.factory_name} · المحجر: {selectedOrder.quarry_name} · الكمية: {selectedOrder.requested_quantity}</div>}
+   <label className="block text-sm font-bold">السائق<select value={driverId} onChange={e=>setDriverId(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 bg-slate-50 p-3 font-normal" disabled={loading}><option value="">اختار السائق</option>{drivers.map(d=><option key={d.driver_id} value={d.driver_id}>{d.name} · {d.driver_code}</option>)}</select></label>
+   <label className="block text-sm font-bold">العربية<select value={vehicleId} onChange={e=>setVehicleId(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 bg-slate-50 p-3 font-normal" disabled={loading}><option value="">اختار العربية</option>{vehicles.map(v=><option key={v.vehicle_id} value={v.vehicle_id}>{v.plate_number} · {v.vehicle_code}</option>)}</select></label>
+   {orders.length===0&&<p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">لا توجد أوامر منشورة متاحة. أنشئ أمرًا من مركز التشغيل وانشره أولًا.</p>}
+   <button type="button" disabled={saving||loading||!orderId||!driverId||!vehicleId} onClick={()=>void assign()} className="w-full rounded-xl bg-emerald-600 p-4 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-50">{saving?'جاري التحقق وتثبيت الإسناد...':'تأكيد إسناد النقلة'}</button>
+  </div>
+ </section>;
 };
