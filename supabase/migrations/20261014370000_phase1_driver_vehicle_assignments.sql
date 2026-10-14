@@ -78,8 +78,8 @@ begin
  );
 end $$;
 
-drop function if exists public.main_office_create_driver(text,text,text);
-drop function if exists public.main_office_update_driver(uuid,text,text,text);
+revoke all on function public.main_office_create_driver(text,text,text) from public,anon,authenticated;
+revoke all on function public.main_office_update_driver(uuid,text,text,text) from public,anon,authenticated;
 
 revoke all on function public.main_office_create_driver(text,text,text,uuid) from public,anon,authenticated;
 revoke all on function public.main_office_update_driver(uuid,text,text,text,uuid) from public,anon,authenticated;
