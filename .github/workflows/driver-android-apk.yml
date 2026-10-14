@@ -13,16 +13,6 @@ on:
       - 'capacitor.config.json'
       - 'tsconfig.json'
       - '.github/workflows/driver-android-apk.yml'
-  pull_request:
-    paths:
-      - 'src/**'
-      - 'native/android/**'
-      - 'index.html'
-      - 'package.json'
-      - 'capacitor.config.json'
-      - 'tsconfig.json'
-      - 'docs/prototypes/**'
-      - '.github/workflows/driver-android-apk.yml'
 
 permissions:
   contents: read
