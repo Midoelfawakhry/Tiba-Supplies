@@ -48,8 +48,12 @@ public class NativeDriverTrackingPlugin extends Plugin {
     @PluginMethod
     public void stop(PluginCall call) {
         try {
-            // stopService triggers onDestroy, which clears encrypted session material.
-            getContext().stopService(new Intent(getContext(), NativeDriverTrackingService.class));
+            // Clear encrypted session material even if Android has already stopped the service.
+            getContext().getSharedPreferences("native_driver_tracking", android.content.Context.MODE_PRIVATE)
+                .edit().remove("encrypted_session").apply();
+            Intent intent = new Intent(getContext(), NativeDriverTrackingService.class);
+            intent.setAction(NativeDriverTrackingService.ACTION_STOP);
+            getContext().stopService(intent);
             call.resolve();
         } catch (Exception e) {
             call.reject("تعذر إيقاف خدمة تتبع الموقع.", e);
