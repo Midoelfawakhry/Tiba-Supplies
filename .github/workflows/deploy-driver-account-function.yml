@@ -1,32 +1,48 @@
-name: Deploy driver account Edge Function
+name: Deploy driver account Edge Function (Shadow)
 
 on:
   push:
     branches:
-      - main
+      - shadow/phase1-hardening
     paths:
       - "supabase/functions/create-driver-account/**"
       - ".github/workflows/deploy-driver-account-function.yml"
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
   deploy:
-    name: Deploy create-driver-account
+    name: Deploy create-driver-account to Shadow
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository
+      - name: Check out Shadow application
         uses: actions/checkout@v4
+        with:
+          ref: shadow/phase1-hardening
 
       - name: Set up Supabase CLI
         uses: supabase/setup-cli@v1
         with:
           version: latest
 
-      - name: Deploy create-driver-account
+      - name: Validate deployment target
+        shell: bash
+        run: |
+          test "${GITHUB_REF_NAME}" = "shadow/phase1-hardening" || {
+            echo "::error::This workflow may deploy only from shadow/phase1-hardening"
+            exit 1
+          }
+          echo "Target is the dedicated Tiba Supplies Shadow project."
+
+      - name: Deploy create-driver-account to Shadow only
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        shell: bash
         run: |
-          test -n "$SUPABASE_ACCESS_TOKEN" || (echo "Missing repository secret: SUPABASE_ACCESS_TOKEN" && exit 1)
-          supabase functions deploy create-driver-account --project-ref "tnlcvwtphbunteifoonc"
+          test -n "$SUPABASE_ACCESS_TOKEN" || {
+            echo "::error::Missing repository secret: SUPABASE_ACCESS_TOKEN"
+            exit 1
+          }
+          supabase functions deploy create-driver-account --project-ref "awgppfjxegognuqozldl"
