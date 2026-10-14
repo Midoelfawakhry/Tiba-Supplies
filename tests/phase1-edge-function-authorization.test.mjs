@@ -127,3 +127,12 @@ test("completing first-login password setup clears the forced-change flag", () =
   const reset = source.slice(resetStart, createAccountStart);
   assert.match(reset, /must_change_password: true/);
 });
+
+
+test("administrative password reset must require a change at next login", () => {
+  const resetStart = source.indexOf('if (body.action === "reset_password")');
+  const resetEnd = source.indexOf('    const { data: driver, error: driverError }', resetStart + 80);
+  const reset = source.slice(resetStart, resetEnd);
+  assert.match(reset, /app_metadata: \{ \.\.\.appMetadata, must_change_password: true \}/);
+  assert.match(reset, /must_change_password: true/);
+});
