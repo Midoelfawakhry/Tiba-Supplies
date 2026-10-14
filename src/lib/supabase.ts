@@ -44,6 +44,7 @@ function getClient(): SupabaseClient {
 export const supabase = {
   auth: {
     getSession: () => getClient().auth.getSession(),
+    refreshSession: () => getClient().auth.refreshSession(),
     onAuthStateChange(callback: (event: string, session: any) => void) {
       if (!client) {
         callback('INITIAL_SESSION', null);
