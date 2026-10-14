@@ -64,7 +64,6 @@ export const DriverApp: React.FC = () => {
   const [session, setSession] = useState<any>(null);
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
-  const [passwordConfirmation, setPasswordConfirmation] = useState('');
   const [authBusy, setAuthBusy] = useState(false);
   const [driverAuthorized, setDriverAuthorized] = useState(false);
   const [error, setError] = useState(supabaseDiagnostics.configurationError);
@@ -75,7 +74,6 @@ export const DriverApp: React.FC = () => {
   const [pendingDirectAssignments, setPendingDirectAssignments] = useState<any[]>([]);
   const [acceptingBookingId, setAcceptingBookingId] = useState<string | null>(null);
   const [deliveryBusyBookingId, setDeliveryBusyBookingId] = useState<string | null>(null);
-  const mustChangePassword = session?.user?.app_metadata?.must_change_password === true;
 
   useEffect(() => {
     let active = true;
@@ -172,7 +170,7 @@ export const DriverApp: React.FC = () => {
   }
 
   useEffect(() => {
-    if (!session || mustChangePassword) {
+    if (!session) {
       setDriverAuthorized(false);
       return;
     }
@@ -194,10 +192,10 @@ export const DriverApp: React.FC = () => {
       setDriverAuthorized(true);
     })();
     return () => { active = false; };
-  }, [session?.user?.id, mustChangePassword]);
+  }, [session?.user?.id]);
 
   useEffect(() => {
-    if (!session || !driverAuthorized || mustChangePassword) return;
+    if (!session || !driverAuthorized) return;
     const timer = window.setInterval(() => {
       void (async () => {
         const { data, error: portalError } = await supabase.rpc('driver_get_portal_snapshot');
@@ -208,10 +206,10 @@ export const DriverApp: React.FC = () => {
       })();
     }, 15000);
     return () => window.clearInterval(timer);
-  }, [session?.user?.id, driverAuthorized, mustChangePassword]);
+  }, [session?.user?.id, driverAuthorized]);
 
   useEffect(() => {
-    if (!session || !driverAuthorized || mustChangePassword) return;
+    if (!session || !driverAuthorized) return;
     let active = true;
     let watcherId: string | undefined;
     // Throttle successful uploads, not failed attempts. Retry failures after 60s.
@@ -398,7 +396,7 @@ export const DriverApp: React.FC = () => {
       active = false;
       if (watcherId) void BackgroundGeolocation.removeWatcher({ id: watcherId });
     };
-  }, [session?.user?.id, driverAuthorized, mustChangePassword]);
+  }, [session?.user?.id, driverAuthorized]);
 
   function normalizePhone(input: string) {
     let value = input.trim().replace(/[\s()-]/g, '');
@@ -435,37 +433,6 @@ export const DriverApp: React.FC = () => {
     }
   }
 
-  async function changeFirstPassword(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError('');
-    if (password.length < 8) {
-      setError('كلمة المرور الجديدة يجب ألا تقل عن 8 أحرف.');
-      return;
-    }
-    if (password !== passwordConfirmation) {
-      setError('تأكيد كلمة المرور غير مطابق.');
-      return;
-    }
-    setAuthBusy(true);
-    try {
-      const { error: passwordError } = await supabase.auth.updateUser({ password });
-      if (passwordError) throw passwordError;
-      const { data, error: completionError } = await supabase.functions.invoke('create-driver-account', {
-        body: { action: 'complete_password_setup' },
-      });
-      if (completionError) throw completionError;
-      if (!data?.success) throw new Error('تعذر إنهاء إعداد كلمة المرور. حاول مرة أخرى.');
-      await supabase.auth.signOut();
-      setSession(null);
-      setPassword('');
-      setPasswordConfirmation('');
-      setError('تم تغيير كلمة المرور. سجّل الدخول الآن بالكلمة الجديدة.');
-    } catch (e: any) {
-      setError(e?.message || 'تعذر تغيير كلمة المرور. حاول مرة أخرى.');
-    } finally {
-      setAuthBusy(false);
-    }
-  }
 
   function locationPermissionInstructions() {
     const platform = Capacitor.getPlatform();
@@ -580,24 +547,6 @@ export const DriverApp: React.FC = () => {
     );
   }
 
-  if (mustChangePassword) {
-    return (
-      <main dir="rtl" className="min-h-screen bg-rose-50/70 p-5 flex items-center justify-center">
-        <form onSubmit={changeFirstPassword} className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-7 shadow-sm">
-          <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-red-700"><Truck size={28} /></div>
-          <p className="text-xs font-black tracking-widest text-red-700">TIBA SUPPLIES · DRIVER</p>
-          <h1 className="mt-2 text-2xl font-black text-slate-900">غيّر كلمة المرور المؤقتة</h1>
-          <p className="mt-2 text-sm leading-6 text-slate-500">اختر كلمة مرور جديدة خاصة بك. لن تظهر بيانات التطبيق قبل تغييرها.</p>
-          {error && <div role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
-          <label className="mt-5 block text-sm font-bold text-slate-700">كلمة مرور جديدة</label>
-          <input value={password} onChange={e => setPassword(e.target.value)} type="password" autoComplete="new-password" minLength={8} required className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-slate-900 outline-none focus:border-red-500" />
-          <label className="mt-4 block text-sm font-bold text-slate-700">تأكيد كلمة المرور</label>
-          <input value={passwordConfirmation} onChange={e => setPasswordConfirmation(e.target.value)} type="password" autoComplete="new-password" minLength={8} required className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-slate-900 outline-none focus:border-red-500" />
-          <button disabled={authBusy} className="mt-5 w-full rounded-xl bg-red-600 p-3 font-black text-white transition hover:bg-red-700 disabled:opacity-60">{authBusy ? 'جارٍ الحفظ...' : 'حفظ كلمة المرور'}</button>
-        </form>
-      </main>
-    );
-  }
 
   if (!driverAuthorized) {
     return <div dir="rtl" className="min-h-screen grid place-items-center bg-gradient-to-br from-sky-50 via-white to-emerald-50 text-slate-700">جاري التحقق من حساب السائق...</div>;
