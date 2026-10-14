@@ -661,6 +661,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
                   const raw = String(e?.message || '');
                   const messages: Record<string,string> = {
                     VEHICLE_HAS_ACTIVE_BOOKING: 'لا يمكن إيقاف العربية لأن عليها نقلة نشطة.',
+                    VEHICLE_HAS_ACTIVE_DRIVER: 'لا يمكن إيقاف العربية وهي مرتبطة بسائق نشط. أوقف السائق أولًا أو غيّر العربية المرتبطة به.',
                     ENTITY_NOT_FOUND: 'العربية غير موجودة.',
                     MAIN_OFFICE_ACCESS_REQUIRED: 'تغيير حالة العربية متاح للمكتب الرئيسي فقط.',
                   };
