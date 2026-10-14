@@ -50,7 +50,7 @@ Deno.serve(async (req: Request) => {
       if (appMetadata.must_change_password !== true) return json({ success: true });
 
       const { error: updateError } = await admin.auth.admin.updateUserById(callerId, {
-        app_metadata: { ...appMetadata, must_change_password: true },
+        app_metadata: { ...appMetadata, must_change_password: false },
       });
       if (updateError) throw updateError;
       return json({ success: true });
