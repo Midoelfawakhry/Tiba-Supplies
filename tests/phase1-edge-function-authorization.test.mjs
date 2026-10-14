@@ -50,14 +50,13 @@ test("Phase 1 Main Office guard precedes privileged account creation and reset",
   assert.ok(resetBranch > gate && reset > resetBranch, "Password reset must happen after the Main Office guard and inside its reset branch");
 });
 
-test("password setup is limited to an active driver linked to the authenticated user", () => {
-  const setupStart = source.indexOf('if (body.action === "complete_password_setup")');
-  const createStart = source.indexOf('// Phase 1 authorization contract', setupStart);
-  assert.ok(setupStart >= 0 && createStart > setupStart, "Password setup and office creation paths must remain separate");
-  const setup = source.slice(setupStart, createStart);
-  assert.match(setup, /\.from\("drivers"\)/);
-  assert.match(setup, /\.eq\("auth_user_id", callerId\)/);
-  assert.match(setup, /\.eq\("is_active", true\)/);
+test("driver login uses office-managed phone/password credentials without forced first-login change", () => {
+  assert.match(source, /driverLoginEmail\(phone\)/);
+  assert.match(source, /password: temporaryPassword/);
+  assert.match(source, /app_metadata: \{ must_change_password: false \}/);
+  assert.match(source, /app_metadata: \{ \.\.\.appMetadata, must_change_password: false \}/);
+  assert.doesNotMatch(source, /must_change_password: true/);
+  assert.doesNotMatch(source, /complete_password_setup/);
 });
 
 test("branch employee creation is restricted to ADMIN and HEAD_OFFICE", () => {
@@ -109,33 +108,14 @@ test("both office interfaces expose the shared AI assistant with separate role c
 });
 
 
-test("temporary driver passwords require a first-login password change", () => {
-  assert.match(source, /app_metadata: \{ must_change_password: true \}/);
-  assert.match(source, /app_metadata: \{ \.\.\.appMetadata, must_change_password: true \}/);
-  assert.match(source, /must_change_password: true/);
-  assert.match(source, /body\.action === "complete_password_setup"/);
+test("new driver accounts and office password resets do not force password changes", () => {
+  assert.match(source, /app_metadata: \{ must_change_password: false \}/);
+  assert.match(source, /app_metadata: \{ \.\.\.appMetadata, must_change_password: false \}/);
+  assert.doesNotMatch(source, /must_change_password: true/);
+  assert.doesNotMatch(source, /complete_password_setup/);
 });
 
 
-test("completing first-login password setup clears the forced-change flag", () => {
-  const setupStart = source.indexOf('if (body.action === "complete_password_setup")');
-  const createStart = source.indexOf('// Phase 1 authorization contract', setupStart);
-  const setup = source.slice(setupStart, createStart);
-  assert.match(setup, /app_metadata: \{ \.\.\.appMetadata, must_change_password: false \}/);
-  const resetStart = source.indexOf('if (body.action === "reset_password")');
-  const createAccountStart = source.indexOf('const \{ data: created, error: createError \}', resetStart);
-  const reset = source.slice(resetStart, createAccountStart);
-  assert.match(reset, /must_change_password: true/);
-});
-
-
-test("administrative password reset must require a change at next login", () => {
-  const resetStart = source.indexOf('if (body.action === "reset_password")');
-  const resetEnd = source.indexOf('    const { data: driver, error: driverError }', resetStart + 80);
-  const reset = source.slice(resetStart, resetEnd);
-  assert.match(reset, /app_metadata: \{ \.\.\.appMetadata, must_change_password: true \}/);
-  assert.match(reset, /must_change_password: true/);
-});
 
 
 const trackingSource = await readFile(
