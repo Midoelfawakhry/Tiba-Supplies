@@ -183,6 +183,7 @@ export const DriverApp: React.FC = () => {
     if (!session || !driverAuthorized || mustChangePassword) return;
     let active = true;
     let nativeTrackingToken: string | null = null;
+    let nativeUserAccessToken: string | null = null;
     const apiBase = String(import.meta.env.VITE_SUPABASE_URL || '').replace(/\\/$/, '');
     const publishableKey = String(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '');
 
@@ -204,6 +205,7 @@ export const DriverApp: React.FC = () => {
         if (Capacitor.isNativePlatform()) {
           if (!apiBase || !publishableKey) throw new Error('إعدادات خدمة الموقع غير مكتملة.');
           const accessToken = await getAccessToken();
+          nativeUserAccessToken = accessToken;
           const sessionResponse = await fetch(`${apiBase}/functions/v1/driver-native-location`, {
             method: 'POST',
             headers: {
@@ -280,15 +282,14 @@ export const DriverApp: React.FC = () => {
     return () => {
       active = false;
       void BackgroundGeolocation.stop().catch(() => undefined);
-      if (nativeTrackingToken && apiBase && publishableKey) {
+      if (nativeTrackingToken && nativeUserAccessToken && apiBase && publishableKey) {
         void (async () => {
           try {
-            const accessToken = await getAccessToken();
             await fetch(`${apiBase}/functions/v1/driver-native-location`, {
               method: 'POST',
               headers: {
                 apikey: publishableKey,
-                Authorization: `Bearer ${accessToken}`,
+                Authorization: `Bearer ${nativeUserAccessToken}`,
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({ action: 'revoke' }),
