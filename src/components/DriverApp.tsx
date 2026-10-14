@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { MapPin, Truck, Clock3, ShieldCheck, LogOut, Navigation, CircleAlert, FileText } from 'lucide-react';
 import { supabase, supabaseDiagnostics } from '../lib/supabase';
-import { Capacitor, registerPlugin } from '@capacitor/core';
+import { Capacitor, CapacitorHttp, registerPlugin } from '@capacitor/core';
 import type { BackgroundGeolocationPlugin } from '@capacitor-community/background-geolocation';
 import { Geolocation } from '@capacitor/geolocation';
 
@@ -224,14 +224,41 @@ export const DriverApp: React.FC = () => {
                 : STATIONARY_LOCATION_UPLOAD_INTERVAL_MS;
             if (Date.now() - lastSentAt < minUploadInterval) return;
             lastSentAt = Date.now();
-            const { error: locationError } = await supabase.rpc('update_driver_live_location', {
+            const locationPayload = {
               p_latitude: location.latitude,
               p_longitude: location.longitude,
               p_accuracy_m: location.accuracy,
               p_heading: location.bearing ?? null,
               p_speed_kmh: location.speed == null ? null : location.speed * 3.6,
               p_captured_at: capturedAt,
-            });
+            };
+
+            // Use native HTTP for Android background uploads: WebView requests can be throttled with the screen off.
+            let locationError: { message?: string } | null = null;
+            if (Capacitor.isNativePlatform() && import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) {
+              try {
+                const response = await CapacitorHttp.post({
+                  url: `${String(import.meta.env.VITE_SUPABASE_URL).replace(/\\/$/, '')}/rest/v1/rpc/update_driver_live_location`,
+                  headers: {
+                    apikey: String(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY),
+                    Authorization: `Bearer ${session.access_token}`,
+                    'Content-Type': 'application/json',
+                  },
+                  data: locationPayload,
+                  connectTimeout: 15000,
+                  readTimeout: 15000,
+                });
+                if (response.status < 200 || response.status >= 300) {
+                  const detail = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+                  locationError = { message: `HTTP ${response.status}: ${detail}` };
+                }
+              } catch (nativeError: any) {
+                locationError = { message: nativeError?.message || 'فشل إرسال الموقع من خدمة الخلفية.' };
+              }
+            } else {
+              const result = await supabase.rpc('update_driver_live_location', locationPayload);
+              locationError = result.error;
+            }
             if (!active) return;
             if (locationError) {
               setError(locationError.message || 'تعذر حفظ الموقع. تأكد من إعدادات السائق في النظام.');
