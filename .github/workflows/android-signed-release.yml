@@ -10,6 +10,7 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - 'capacitor.config.json'
+      - 'supabase/migrations/**'
       - '.github/workflows/android-signed-release.yml'
   workflow_dispatch:
 
