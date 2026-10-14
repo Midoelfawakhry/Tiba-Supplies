@@ -1,55 +1,60 @@
-# Tiba-Supplies — Phase 1
+# Tiba-Supplies — Shadow Phase 1
 
-Arabic-first operations dashboard for Tiba-Supplies transport loading operations.
+Arabic-first operations application for organizing transport loading operations. This branch is the independent Shadow application workspace.
 
-## Phase 1 scope
+## Phase 1 workflow
 
-- Authenticated operations dashboard connected to Supabase (no demo/mock data fallback).
-- Operational office is the active `HEAD` office: **مكتب طيبة للتوريدات - الإسماعيلية**.
-- Driver check-in office is the active `BRANCH` office: **مكتب طيبة للتوريدات - رأس سدر**.
-- Load-order creation with active factory, active quarry, requested trip count, and priority.
-- Read-only overview of orders, bookings, actual loading records, active drivers, and active vehicles.
-- Does not automatically assign historical drivers to vehicles. Vehicle-owner management and driver matching remain separate workflows.
+1. **Main Office** creates a load order as a draft, selects an active factory and quarry, sets requested trip count and priority, then publishes it.
+2. **Driver eligibility** is evaluated server-side using the driver's active account, current driver-to-vehicle assignment, current location, location freshness/accuracy, and the configured Ras Sedr geofence.
+3. **Direct assignment** links a published order to an eligible driver and that driver's currently assigned active vehicle. Server-side checks remain authoritative.
+4. **Actual loading and trip progress** are recorded against the specific booking/order relationship. Actual records must not be inferred from factory/quarry matches alone.
+5. **Arrival and delivery** use driver-owned server RPCs with fresh, accurate location data. Delivery confirmation is audited and cannot be duplicated.
+6. **Branch Office** has a read-only, office-scoped snapshot. It cannot perform Main Office mutations.
+7. **Directories** keep vehicle owners separate from drivers and vehicles; driver-to-vehicle assignments retain their history.
 
-## Supabase configuration
+## App variants
 
-Create local environment values based on `.env.example`:
+- Main Office web / Windows app
+- Driver Android app, including native background location tracking
+- Ras Sedr Branch app
 
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_PUBLISHABLE_KEY`
+All Shadow builds must target the dedicated Shadow Supabase project. Do not configure a production database URL or service-role key in frontend build variables.
 
-Use the Supabase **publishable/anon client key only** in browser builds. Never place a service-role key in frontend environment variables.
+## Local setup
 
-## Database migrations
+Create a local `.env` from `.env.example` and set:
 
-Apply these migrations in filename order if they are not already applied:
+- `VITE_SUPABASE_URL` — the Shadow project URL
+- `VITE_SUPABASE_PUBLISHABLE_KEY` — the Shadow publishable key
 
-1. `supabase/migrations/20261009_phase1_live_core.sql`
-2. `supabase/migrations/20261010_create_load_order_rpc.sql`
-3. `supabase/migrations/20261010_separate_operational_and_checkin_offices.sql`
+Never put a service-role key in browser or Android client configuration.
 
-The office-separation migration preserves Ras Sedr as the driver check-in location, creates/uses Ismailia as the operational office, and updates the snapshot/dispatch/delivery RPCs. If the database already has the changes, do not re-run ad-hoc edits; use the migration's idempotent checks and the verification SQL under `supabase/tests`.
-
-## Run locally
-
-```bash
-npm install
-npm run dev
-```
-
-## Build checks
+Install dependencies and run the checks:
 
 ```bash
+npm ci
+npm run test:phase1
 npm run lint
 npm run build
 ```
 
-## Google AI Studio
+## Database and test policy
 
-Import the GitHub repository's **main** branch after the Phase 1 PR is merged. Configure the two Vite environment variables in the build/runtime environment supported by the AI Studio project. If AI Studio imports the repository before the merge, it will only see the existing default-branch version.
+- Shadow Supabase is the only database target for this branch.
+- Review migration state before applying any migration; do not re-run ad-hoc SQL to compensate for a migration mismatch.
+- Do not create fake operational records in the shared Shadow database to make screens appear populated.
+- Use isolated synthetic fixtures for integration and end-to-end tests.
+- The source-level contract tests do not replace authenticated database runtime tests or device smoke tests.
 
-## Data safety
+## Release gate
 
-- Supabase is the system of record; Excel files are source/reference material, not a daily import process.
-- No destructive migration is part of the Phase 1 workflow.
-- No driver-to-vehicle assignment is created by the load-order creation flow.
+Do not call the Shadow app release-ready until all of the following are evidenced:
+
+- Phase 1 contract and authorization tests pass.
+- TypeScript check and production web build pass.
+- Shadow database RPC authorization and workflow acceptance tests pass.
+- Driver, Main Office, and Branch app variants are tested independently.
+- Driver background tracking, permissions, stale-location behavior, and login/logout are verified on a real Android device.
+- Signed APK artifacts are generated and their installation is smoke-tested.
+
+This document describes the Shadow application only. It does not authorize production deployment or release.
