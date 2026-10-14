@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
-const [baseline, mainOffice, assignmentSql, lifecycle, driverLocation, delivery, deactivationGuard, masterUpdate, directoryNotes, branchSql, driverPortal, assignmentUi, driverUi, branchUi, dashboardUi, directoryUi] = await Promise.all([
+const [baseline, mainOffice, assignmentSql, lifecycle, driverLocation, delivery, deactivationGuard, masterUpdate, directoryNotes, vehicleOwnerSql, ownerDeactivationGuard, branchSql, driverPortal, assignmentUi, driverUi, branchUi, dashboardUi, directoryUi] = await Promise.all([
   read("../supabase/migrations/20261014190000_phase1_clean_baseline.sql"),
   read("../supabase/migrations/20261014200000_phase1_main_office_rpcs.sql"),
   read("../supabase/migrations/20261014210000_phase1_direct_assignment.sql"),
@@ -13,6 +13,8 @@ const [baseline, mainOffice, assignmentSql, lifecycle, driverLocation, delivery,
   read("../supabase/migrations/20261014310000_phase1_guard_active_directory_deactivation.sql"),
   read("../supabase/migrations/20261014320000_phase1_main_office_update_master_directory.sql"),
   read("../supabase/migrations/20261014330000_phase1_directory_include_notes.sql"),
+  read("../supabase/migrations/20261014340000_phase1_vehicle_owner_and_vehicle_creation.sql"),
+  read("../supabase/migrations/20261014350000_phase1_guard_owner_active_vehicles.sql"),
   read("../supabase/migrations/20261014280000_phase1_branch_read_only_snapshot.sql"),
   read("../supabase/migrations/20261014290000_phase1_driver_portal_snapshot.sql"),
   read("../src/components/DirectLoadAssignmentScreen.tsx"),
@@ -96,4 +98,21 @@ test("factory and quarry master edits use an audited, authorized Phase 1 RPC", (
   assert.match(masterUpdate, /security definer/i);
   assert.match(directoryNotes, /'notes',notes/);
   assert.match(directoryUi, /main_office_update_master_directory/);
+});
+
+test("vehicle owners are managed separately and vehicle codes are generated server-side", () => {
+  assert.match(vehicleOwnerSql, /main_office_create_vehicle_owner/);
+  assert.match(vehicleOwnerSql, /main_office_create_vehicle\(/);
+  assert.match(vehicleOwnerSql, /'VH-'\|\|lpad\(nextval\('public\.vehicle_code_seq'\)/);
+  assert.match(vehicleOwnerSql, /'OW-'\|\|lpad\(nextval\('public\.vehicle_owner_code_seq'\)/);
+  assert.match(directoryUi, /key: 'owners', label: 'ملاك العربيات'/);
+  assert.match(directoryUi, /main_office_create_vehicle_owner/);
+  assert.match(directoryUi, /<AddVehicleForm owners=\{ownerDirectory\}/);
+  assert.doesNotMatch(directoryUi, /create_operational_vehicle/);
+});
+
+test("owners cannot be deactivated while they still own active vehicles", () => {
+  assert.match(ownerDeactivationGuard, /OWNER_HAS_ACTIVE_VEHICLES/);
+  assert.match(ownerDeactivationGuard, /from public\.vehicles where owner_id=p_entity_id and is_active=true/);
+  assert.match(directoryUi, /main_office_set_directory_active/);
 });
