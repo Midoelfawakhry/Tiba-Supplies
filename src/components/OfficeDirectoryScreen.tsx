@@ -547,7 +547,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
       </section>}
       {active === 'drivers' && <section className={`rounded-3xl border bg-white p-4 shadow-sm sm:p-5 ${sectionPalette[active].border}`}>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div><h3 className="font-black">إضافة سائق جديد</h3><p className="mt-1 text-sm text-slate-500">يُحفظ السائق ويرتبط برقم الموبايل والعربية، ثم يدخل برقم الموبايل وكلمة المرور.</p></div>
+          <div><h3 className="font-black">إضافة سائق جديد</h3><p className="mt-1 text-sm text-slate-500">يُنشأ سجل السائق وحساب الدخول. العربية تُربط بالنقلة عند إسناد أمر التحميل.</p></div>
           <button type="button" onClick={() => { setShowDriverForm(v => !v); setError(''); setSuccess(''); }} className={`rounded-xl px-4 py-2.5 text-sm font-black text-white transition ${sectionPalette[active].action}`}>{showDriverForm ? 'إلغاء' : 'إضافة سائق'}</button>
         </div>
         {showDriverForm && <form onSubmit={createDriver} className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -555,17 +555,8 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
           <label className="text-sm font-bold text-slate-700">رقم الموبايل — اسم المستخدم<div className="relative mt-1.5"><Phone size={18} className="absolute right-3 top-3.5 text-slate-400"/><input required type="tel" inputMode="tel" value={driverPhone} onChange={e => setDriverPhone(e.target.value)} className="w-full rounded-xl border border-slate-300 bg-white p-3 pr-10 font-normal" placeholder="01012345678"/></div><span className="mt-1 block text-xs font-normal text-slate-500">السائق سيدخل بهذا الرقم وكلمة المرور التي تحددها.</span></label>
           <label className="text-sm font-bold text-slate-700">كلمة مرور السائق<input required type="password" autoComplete="new-password" minLength={8} value={driverTemporaryPassword} onChange={e => setDriverTemporaryPassword(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal" /><span className="mt-1 block text-xs font-normal text-slate-500">دي كلمة المرور التي ستنشئ بها حساب السائق. سلّمها له مباشرة.</span></label>
           <label className="text-sm font-bold text-slate-700">تأكيد كلمة المرور<input required type="password" autoComplete="new-password" minLength={8} value={driverTemporaryPasswordConfirmation} onChange={e => setDriverTemporaryPasswordConfirmation(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal" /></label>
-          <div className="text-sm font-bold text-slate-700">اختيار رقم العربية المرتبطة بالسائق
-            <label className="relative mt-1.5 block"><span className="sr-only">ابحث برقم العربية</span><input value={vehicleSearch} onChange={e => { setVehicleSearch(e.target.value); setSelectedVehicleId(''); }} className="w-full rounded-xl border border-slate-300 bg-white p-3 pr-10 font-normal" placeholder="ابحث برقم اللوحة أو كود العربية..."/><span className="absolute right-3 top-3 text-slate-400"><Truck size={18}/></span></label>
-            <select required value={selectedVehicleId} onChange={e => setSelectedVehicleId(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal">
-              <option value="">اختار عربية متاحة</option>
-              {filteredAvailableVehicles.map((vehicle: Row) => <option key={vehicle.vehicle_id} value={vehicle.vehicle_id}>{vehicle.plate_number}{vehicle.vehicle_code ? ` · ${vehicle.vehicle_code}` : ''}</option>)}
-            </select>
-            <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3" aria-live="polite">
-              <span className="block text-xs font-semibold text-slate-500">مالك العربية المرتبط بها تلقائيًا</span>
-              <span className="mt-1 block font-bold text-slate-800">{selectedVehicle ? (selectedVehicle.owner_name || 'لا يوجد مالك مسجل لهذه العربية') : 'اختار العربية لعرض اسم المالك'}</span>
-            </div>
-            <p className="mt-1 text-xs font-normal text-slate-500">{filteredAvailableVehicles.length} عربية متاحة للاختيار</p>
+          <div className="sm:col-span-2 rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
+            ربط العربية مش جزء من إنشاء سجل السائق في Phase 1. عند إنشاء أمر تحميل، المكتب الرئيسي بيحدد السائق والعربية معًا، وده بيحافظ على سجل الإسناد الفعلي لكل نقلة.
           </div>
           <label className="text-sm font-bold text-slate-700">كود السواق (اختياري)<input value={driverCode} onChange={e => setDriverCode(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal" placeholder="لو عنده كود بالفعل"/></label>
           <div className="sm:col-span-2 flex flex-wrap items-center gap-3"><button disabled={savingDriver} type="submit" className={`rounded-xl px-5 py-3 text-sm font-black text-white transition disabled:opacity-60 ${sectionPalette[active].action}`}>{savingDriver ? 'جاري حفظ البيانات وإنشاء الحساب...' : 'حفظ السواق وإنشاء الحساب'}</button><p className="text-xs leading-5 text-slate-500">رقم الموبايل هو اسم المستخدم، وكلمة المرور التي تحددها هنا هي كلمة الدخول. لا تُرسل رسائل أو إيميلات.</p></div>
