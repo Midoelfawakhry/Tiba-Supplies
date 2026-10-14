@@ -3,9 +3,10 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
-const [baseline, mainOffice, lifecycle, driverLocation, delivery, branchSql, driverPortal, assignmentUi, driverUi, branchUi, dashboardUi] = await Promise.all([
+const [baseline, mainOffice, assignmentSql, lifecycle, driverLocation, delivery, branchSql, driverPortal, assignmentUi, driverUi, branchUi, dashboardUi, directoryUi] = await Promise.all([
   read("../supabase/migrations/20261014190000_phase1_clean_baseline.sql"),
   read("../supabase/migrations/20261014200000_phase1_main_office_rpcs.sql"),
+  read("../supabase/migrations/20261014210000_phase1_direct_assignment.sql"),
   read("../supabase/migrations/20261014230000_phase1_directory_and_booking_lifecycle.sql"),
   read("../supabase/migrations/20261014240000_phase1_driver_location_and_arrival.sql"),
   read("../supabase/migrations/20261014300000_phase1_harden_driver_delivery_confirmation.sql"),
@@ -15,6 +16,7 @@ const [baseline, mainOffice, lifecycle, driverLocation, delivery, branchSql, dri
   read("../src/components/DriverApp.tsx"),
   read("../src/components/BranchOfficeApp.tsx"),
   read("../src/components/LiveOperationsBoard.tsx"),
+  read("../src/components/OfficeDirectoryScreen.tsx"),
 ]);
 
 test("clean baseline revokes direct client table access and seeds only office reference rows", () => {
@@ -25,7 +27,7 @@ test("clean baseline revokes direct client table access and seeds only office re
 });
 
 test("Main Office assignment is connected to a published order, driver, and vehicle", () => {
-  assert.match(mainOffice, /main_office_direct_assign/);
+  assert.match(assignmentSql, /main_office_direct_assign/);
   assert.match(assignmentUi, /main_office_direct_assign/);
   assert.match(assignmentUi, /p_load_order_id:\s*orderId/);
   assert.match(assignmentUi, /p_driver_id:\s*driverId/);
@@ -65,4 +67,13 @@ test("operations dashboard uses Phase 1 booking statuses", () => {
     assert.match(dashboardUi, new RegExp(status));
   }
   assert.doesNotMatch(dashboardUi, /\['BOOKED', 'LOADING_STATEMENT', 'IN_TRANSIT'\]/);
+});
+
+test("directory screen reads and mutates through Phase 1 directory RPCs", () => {
+  assert.match(directoryUi, /main_office_get_directory/);
+  assert.match(directoryUi, /main_office_upsert_directory/);
+  assert.match(directoryUi, /main_office_set_directory_active/);
+  assert.match(directoryUi, /قائمة الانتظار غير موجودة في نموذج Phase 1 الحالي/);
+  assert.match(directoryUi, /إنشاء حساب سائق وربطه بالعربية لم يُنقل بعد/);
+  assert.match(directoryUi, /حفظ تعديل العربية أو تغيير مالكها يحتاج RPC Phase 1 مخصصًا/);
 });
