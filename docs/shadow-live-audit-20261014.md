@@ -24,7 +24,7 @@
 ### P1 — Branch snapshot includes high-sensitivity fields; verify directory scoping
 **Function confirmed:** `get_branch_office_snapshot()` returns phone numbers for drivers, owners, and vehicle-related rows in branch-scoped actual-loading/allocation results. The definition also selects the first active HEAD office for its snapshot. The directory query is beyond the truncated excerpt and must be reviewed in full before a final scope claim.
 
-**Shadow correction:** inspect the complete function and branch UI requirements. Default to least data necessary and branch-scoped driver/vehicle directory unless a documented cross-branch business rule requires global visibility. Do not remove fields needed for legitimate operations without mapping the UI.
+**Shadow correction:** this is a confirmed cross-branch directory exposure in the branch snapshot. Scope the directory to drivers assigned to the authenticated branch (using the effective-dated office assignment model) or record an explicit business decision permitting a global directory. Return only the contact/vehicle fields required for the approved branch workflow. Test two branches with distinct drivers to prove no cross-branch leakage.
 
 ### P1 — Phase 1 snapshot is role-gated but globally returns active directory records
 **Function confirmed:** `get_phase1_snapshot()` rejects roles outside ADMIN/HEAD_OFFICE. It returns all active factories, quarries, drivers, and vehicles, while operational load orders/bookings/loading records are scoped to the first active HEAD office.
