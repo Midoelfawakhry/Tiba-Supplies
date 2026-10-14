@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - shadow/phase1-hardening
     paths:
       - 'src/**'
       - 'index.html'
