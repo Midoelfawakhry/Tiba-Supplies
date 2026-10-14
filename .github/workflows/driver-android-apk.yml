@@ -7,10 +7,21 @@ on:
       - main
     paths:
       - 'src/**'
+      - 'native/android/**'
       - 'index.html'
       - 'package.json'
       - 'capacitor.config.json'
       - 'tsconfig.json'
+      - '.github/workflows/driver-android-apk.yml'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'native/android/**'
+      - 'index.html'
+      - 'package.json'
+      - 'capacitor.config.json'
+      - 'tsconfig.json'
+      - 'docs/prototypes/**'
       - '.github/workflows/driver-android-apk.yml'
 
 permissions:
@@ -133,6 +144,50 @@ jobs:
 
       - name: Add Android platform
         run: npx cap add android
+
+      - name: Install native driver tracking service (driver APK only)
+        if: matrix.app_mode == 'driver'
+        shell: bash
+        run: |
+          set -euo pipefail
+          TARGET="android/app/src/main/java/com/tibasupplies/driver"
+          mkdir -p "$TARGET"
+          cp native/android/NativeDriverTrackingPlugin.java "$TARGET/"
+          cp native/android/NativeDriverTrackingService.java "$TARGET/"
+          MAIN="$(find android/app/src/main/java -name MainActivity.java -print -quit)"
+          if [ -z "$MAIN" ]; then
+            echo "::error::Capacitor MainActivity.java was not found"
+            exit 1
+          fi
+          MAIN_ACTIVITY="$MAIN" node <<'NODE'
+          const fs = require('node:fs');
+          const main = process.env.MAIN_ACTIVITY;
+          let java = fs.readFileSync(main, 'utf8');
+          if (!java.includes('NativeDriverTrackingPlugin.class')) {
+            if (!java.includes('import android.os.Bundle;')) {
+              java = java.replace(/(package [^;]+;\s*)/, '$1\nimport android.os.Bundle;');
+            }
+            if (java.includes('super.onCreate(savedInstanceState);')) {
+              java = java.replace('super.onCreate(savedInstanceState);', 'registerPlugin(NativeDriverTrackingPlugin.class);\n        super.onCreate(savedInstanceState);');
+            } else {
+              java = java.replace(/}\s*$/, '    @Override\n    public void onCreate(Bundle savedInstanceState) {\n        registerPlugin(NativeDriverTrackingPlugin.class);\n        super.onCreate(savedInstanceState);\n    }\n}\n');
+            }
+          }
+          fs.writeFileSync(main, java);
+          if (!fs.readFileSync(main, 'utf8').includes('registerPlugin(NativeDriverTrackingPlugin.class)')) {
+            throw new Error('Could not register NativeDriverTrackingPlugin in MainActivity.');
+          }
+          const file = 'android/app/src/main/AndroidManifest.xml';
+          let xml = fs.readFileSync(file, 'utf8');
+          const service = '<service android:name="com.tibasupplies.driver.NativeDriverTrackingService" android:enabled="true" android:exported="false" android:stopWithTask="false" android:foregroundServiceType="location" />';
+          if (!xml.includes('com.tibasupplies.driver.NativeDriverTrackingService')) {
+            xml = xml.replace('</application>', '    ' + service + '\n  </application>');
+          }
+          fs.writeFileSync(file, xml);
+          if (!fs.readFileSync(file, 'utf8').includes(service)) throw new Error('Native tracking service was not registered in AndroidManifest.xml');
+          NODE
+          grep -q 'registerPlugin(NativeDriverTrackingPlugin.class)' "$MAIN"
+          echo "Native driver tracking plugin and service installed."
 
       - name: Declare and verify Android location permissions
         shell: bash

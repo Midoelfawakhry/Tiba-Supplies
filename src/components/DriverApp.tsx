@@ -7,6 +7,20 @@ import { Geolocation } from '@capacitor/geolocation';
 
 const BackgroundGeolocation = registerPlugin<BackgroundGeolocationPlugin>('BackgroundGeolocation');
 
+type NativeDriverTrackingPlugin = {
+  start(options: {
+    accessToken: string;
+    refreshToken: string;
+    userId: string;
+    projectUrl: string;
+    publishableKey: string;
+    expiresAt: number;
+  }): Promise<{ started: boolean }>;
+  stop(): Promise<void>;
+};
+const NativeDriverTracking = registerPlugin<NativeDriverTrackingPlugin>('NativeDriverTracking');
+
+
 // Battery-efficient live-location prototype. Keep office/business workflows unchanged.
 const LOCATION_DISTANCE_FILTER_METERS = 25;
 const MOVING_LOCATION_UPLOAD_INTERVAL_MS = 10 * 60_000;
@@ -185,7 +199,80 @@ export const DriverApp: React.FC = () => {
     if (!session || !driverAuthorized || mustChangePassword) return;
     let active = true;
     let watcherId: string | undefined;
+    // Throttle successful uploads, not failed attempts. Retry failures after 60s.
     let lastSentAt = 0;
+    let lastAttemptAt = 0;
+    let lastUploadFailed = false;
+    let nativeServiceStarted = false;
+    let nativeStartPending = false;
+
+    // Android uses a native foreground service for ongoing collection and upload.
+    // The community watcher is used only to obtain its permission flow, then removed.
+    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
+      void (async () => {
+        try {
+          watcherId = await BackgroundGeolocation.addWatcher({
+            backgroundMessage: 'مشاركة موقعك مع طيبة مفعّلة أثناء العمل. أوقف التتبع بتسجيل الخروج.',
+            backgroundTitle: 'Tiba Supplies — تتبع موقع السائق',
+            requestPermissions: true,
+            stale: false,
+            distanceFilter: LOCATION_DISTANCE_FILTER_METERS,
+          }, async (location, watcherError) => {
+            if (!active) return;
+            if (watcherError) {
+              setError(watcherError.message || 'تعذر طلب أذونات تتبع الموقع.');
+              return;
+            }
+            if (!location || nativeServiceStarted || nativeStartPending) return;
+            if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) {
+              setError('إعدادات الاتصال الآمن بقاعدة البيانات غير مكتملة.');
+              return;
+            }
+            nativeStartPending = true;
+            if (watcherId) {
+              const oldWatcherId = watcherId;
+              watcherId = undefined;
+              await BackgroundGeolocation.removeWatcher({ id: oldWatcherId });
+            }
+            try {
+              const result = await NativeDriverTracking.start({
+                accessToken: session.access_token,
+                refreshToken: session.refresh_token,
+                userId: session.user.id,
+                projectUrl: String(import.meta.env.VITE_SUPABASE_URL || ''),
+                publishableKey: String(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || ''),
+                expiresAt: (session.expires_at || 0) * 1000,
+              });
+              nativeServiceStarted = result.started;
+              nativeStartPending = false;
+              if (!active) {
+                await NativeDriverTracking.stop();
+                nativeServiceStarted = false;
+                return;
+              }
+              setPosition({
+                latitude: location.latitude,
+                longitude: location.longitude,
+                accuracy: location.accuracy,
+                capturedAt: new Date(location.time ?? Date.now()).toLocaleString('ar-EG'),
+              });
+              setError('');
+            } catch (nativeError: any) {
+              nativeStartPending = false;
+              if (active) setError(nativeError?.message || 'تعذر تشغيل خدمة تتبّع Android المستقلة.');
+            }
+          });
+        } catch (permissionError: any) {
+          if (active) setError(permissionError?.message || 'تعذر طلب أذونات الموقع والإشعارات.');
+        }
+      })();
+
+      return () => {
+        active = false;
+        if (watcherId) void BackgroundGeolocation.removeWatcher({ id: watcherId });
+        if (nativeServiceStarted) void NativeDriverTracking.stop();
+      };
+    }
 
     void (async () => {
       try {
@@ -222,8 +309,10 @@ export const DriverApp: React.FC = () => {
               : speedMps >= STATIONARY_SPEED_THRESHOLD_MPS
                 ? SLOW_LOCATION_UPLOAD_INTERVAL_MS
                 : STATIONARY_LOCATION_UPLOAD_INTERVAL_MS;
-            if (Date.now() - lastSentAt < minUploadInterval) return;
-            lastSentAt = Date.now();
+            const now = Date.now();
+            if (!lastUploadFailed && now - lastSentAt < minUploadInterval) return;
+            if (lastUploadFailed && now - lastAttemptAt < 60_000) return;
+            lastAttemptAt = now;
             const locationPayload = {
               p_latitude: location.latitude,
               p_longitude: location.longitude,
@@ -233,15 +322,28 @@ export const DriverApp: React.FC = () => {
               p_captured_at: capturedAt,
             };
 
-            // Use native HTTP for Android background uploads: WebView requests can be throttled with the screen off.
+            // Refresh the session for each upload; a captured access token can expire
+            // during a long-running background work session.
             let locationError: { message?: string } | null = null;
-            if (Capacitor.isNativePlatform() && import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) {
-              try {
+            try {
+              let { data: authData, error: authError } = await supabase.auth.getSession();
+              // Background callbacks can resume after the normal foreground token-refresh
+              // timer has been suspended. Refresh proactively if the access token is near expiry.
+              if (!authError && authData.session && (authData.session.expires_at ?? 0) * 1000 <= Date.now() + 120_000) {
+                const refreshed = await supabase.auth.refreshSession();
+                authData = refreshed.data;
+                authError = refreshed.error;
+              }
+              const accessToken = authData.session?.access_token;
+              if (authError || !accessToken) {
+                locationError = { message: authError?.message || 'انتهت جلسة السائق؛ افتح التطبيق وسجّل الدخول من جديد.' };
+              } else if (Capacitor.isNativePlatform() && import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) {
+                // Native HTTP avoids WebView throttling with the screen off.
                 const response = await CapacitorHttp.post({
                   url: `${String(import.meta.env.VITE_SUPABASE_URL).replace(/\/$/, '')}/rest/v1/rpc/update_driver_live_location`,
                   headers: {
                     apikey: String(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY),
-                    Authorization: `Bearer ${session.access_token}`,
+                    Authorization: `Bearer ${accessToken}`,
                     'Content-Type': 'application/json',
                   },
                   data: locationPayload,
@@ -252,12 +354,19 @@ export const DriverApp: React.FC = () => {
                   const detail = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
                   locationError = { message: `HTTP ${response.status}: ${detail}` };
                 }
-              } catch (nativeError: any) {
-                locationError = { message: nativeError?.message || 'فشل إرسال الموقع من خدمة الخلفية.' };
+              } else {
+                const result = await supabase.rpc('update_driver_live_location', locationPayload);
+                locationError = result.error;
               }
+            } catch (uploadError: any) {
+              locationError = { message: uploadError?.message || 'فشل إرسال الموقع في الخلفية.' };
+            }
+
+            if (locationError) {
+              lastUploadFailed = true;
             } else {
-              const result = await supabase.rpc('update_driver_live_location', locationPayload);
-              locationError = result.error;
+              lastSentAt = Date.now();
+              lastUploadFailed = false;
             }
             if (!active) return;
             if (locationError) {
@@ -276,7 +385,7 @@ export const DriverApp: React.FC = () => {
       active = false;
       if (watcherId) void BackgroundGeolocation.removeWatcher({ id: watcherId });
     };
-  }, [session, driverAuthorized, mustChangePassword]);
+  }, [session?.user?.id, driverAuthorized, mustChangePassword]);
 
   function normalizePhone(input: string) {
     let value = input.trim().replace(/[\s()-]/g, '');
