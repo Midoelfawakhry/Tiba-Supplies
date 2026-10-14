@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
-const [baseline, mainOffice, assignmentSql, lifecycle, driverLocation, delivery, deactivationGuard, masterUpdate, directoryNotes, vehicleOwnerSql, ownerDeactivationGuard, driverVehicleLifecycle, driverAccountEdge, branchSql, driverPortal, assignmentUi, driverUi, branchUi, dashboardUi, directoryUi, driverVehicleAssignments, driverVehicleBookingGuard, driverCodeSequence, idempotentDelivery] = await Promise.all([
+const [baseline, mainOffice, assignmentSql, lifecycle, driverLocation, delivery, deactivationGuard, masterUpdate, directoryNotes, vehicleOwnerSql, ownerDeactivationGuard, driverVehicleLifecycle, driverAccountEdge, branchSql, driverPortal, assignmentUi, driverUi, branchUi, dashboardUi, directoryUi, driverVehicleAssignments, driverVehicleBookingGuard, driverCodeSequence, idempotentDelivery, bookingDeliveryGate] = await Promise.all([
   read("../supabase/migrations/20261014190000_phase1_clean_baseline.sql"),
   read("../supabase/migrations/20261014200000_phase1_main_office_rpcs.sql"),
   read("../supabase/migrations/20261014210000_phase1_direct_assignment.sql"),
@@ -28,6 +28,7 @@ const [baseline, mainOffice, assignmentSql, lifecycle, driverLocation, delivery,
   read("../supabase/migrations/20261014430000_phase1_enforce_assigned_vehicle_on_booking.sql"),
   read("../supabase/migrations/20261014420000_phase1_driver_code_sequence.sql"),
   read("../supabase/migrations/20261014440000_phase1_idempotent_delivery_audit.sql"),
+  read("../supabase/migrations/20261014270000_phase1_driver_audit_and_delivery_gate.sql"),
 ]);
 
 test("clean baseline revokes direct client table access and seeds only office reference rows", () => {
@@ -169,4 +170,14 @@ test("driver delivery confirmation is idempotent in both data and audit trail", 
   assert.match(idempotentDelivery, /'already_confirmed',not v_inserted/);
   assert.match(idempotentDelivery, /p_accuracy_m>100/);
   assert.match(idempotentDelivery, /interval '10 minutes'/);
+});
+
+
+test("Main Office cannot finalize delivery before driver confirmation", () => {
+  assert.match(bookingDeliveryGate, /DRIVER_DELIVERY_CONFIRMATION_REQUIRED/);
+  assert.match(bookingDeliveryGate, /delivery_confirmations dc where dc\.booking_id=p_booking_id and dc\.confirmed_by_driver_id=v_booking\.driver_id/);
+  assert.match(bookingDeliveryGate, /v_booking\.status<>'IN_TRANSIT'/);
+  assert.match(bookingDeliveryGate, /POSITIVE_ACTUAL_WEIGHT_REQUIRED/);
+  assert.match(bookingDeliveryGate, /actual_loading_records/);
+  assert.match(bookingDeliveryGate, /CANCELLATION_REASON_REQUIRED/);
 });
