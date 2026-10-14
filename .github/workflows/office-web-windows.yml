@@ -1,9 +1,8 @@
-name: Build Tiba Supplies Main Office Web and Windows
+name: Build Tiba Supplies Shadow Office Web and Windows
 
 on:
   push:
     branches:
-      - main
       - shadow/phase1-hardening
     paths:
       - 'src/**'
@@ -26,10 +25,10 @@ env:
 
 jobs:
   build-web:
-    name: Build main office web app
+    name: Build Shadow office web app
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout latest main
+      - name: Checkout Shadow branch
         uses: actions/checkout@v4
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -55,16 +54,16 @@ jobs:
           if (!bundle.includes(process.env.VITE_SUPABASE_PUBLISHABLE_KEY)) throw new Error('Supabase publishable key missing from web bundle.');
           console.log('Office web bundle contains the configured Supabase project URL and publishable key.');
           NODE
-      - name: Upload main office web build
+      - name: Upload Shadow office web build
         uses: actions/upload-artifact@v4
         with:
-          name: tiba-supplies-main-office-web
+          name: tiba-supplies-shadow-office-web
           path: dist/**
           if-no-files-found: error
           retention-days: 30
 
   build-windows:
-    name: Build main office Windows portable EXE
+    name: Build Shadow office Windows portable EXE
     runs-on: windows-latest
     steps:
       - name: Checkout latest main
@@ -92,7 +91,7 @@ jobs:
       - name: Upload Windows portable EXE
         uses: actions/upload-artifact@v4
         with:
-          name: tiba-supplies-main-office-windows
+          name: tiba-supplies-shadow-office-windows
           path: release/*.exe
           if-no-files-found: error
           retention-days: 30
