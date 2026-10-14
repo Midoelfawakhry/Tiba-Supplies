@@ -55,7 +55,7 @@ jobs:
           fi
 
           # Supabase createClient expects the project URL, not the REST endpoint path.
-          NORMALIZED_URL="$(node -e 'const u = new URL(process.env.VITE_SUPABASE_URL); if (u.protocol !== "https:" || u.origin !== "https://tnlcvwtphbunteifoonc.supabase.co") process.exit(2); process.stdout.write(u.origin)')" || {
+          NORMALIZED_URL="$(node -e 'const u = new URL(process.env.VITE_SUPABASE_URL); if (u.protocol !== "https:" || u.origin !== "https://awgppfjxegognuqozldl.supabase.co") process.exit(2); process.stdout.write(u.origin)')" || {
             echo "::error::VITE_SUPABASE_URL is not a valid HTTPS Supabase project URL."
             exit 1
           }
