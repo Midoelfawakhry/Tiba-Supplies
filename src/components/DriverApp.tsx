@@ -242,7 +242,14 @@ export const DriverApp: React.FC = () => {
             // during a long-running background work session.
             let locationError: { message?: string } | null = null;
             try {
-              const { data: authData, error: authError } = await supabase.auth.getSession();
+              let { data: authData, error: authError } = await supabase.auth.getSession();
+              // Background callbacks can resume after the normal foreground token-refresh
+              // timer has been suspended. Refresh proactively if the access token is near expiry.
+              if (!authError && authData.session && (authData.session.expires_at ?? 0) * 1000 <= Date.now() + 120_000) {
+                const refreshed = await supabase.auth.refreshSession();
+                authData = refreshed.data;
+                authError = refreshed.error;
+              }
               const accessToken = authData.session?.access_token;
               if (authError || !accessToken) {
                 locationError = { message: authError?.message || 'انتهت جلسة السائق؛ افتح التطبيق وسجّل الدخول من جديد.' };
