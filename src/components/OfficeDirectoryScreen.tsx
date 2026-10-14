@@ -111,7 +111,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
       setSnapshot({ ...data, factories, quarries, drivers, vehicles });
       setWaiting([]);
       setAvailableVehicles(vehicles.filter((v: Row) => v.is_active !== false));
-      setOwnerDirectory(directory.owners ?? []);
+      setOwnerDirectory((directory.owners ?? []).map((r: Row) => ({ owner_id: r.id, owner_code: r.code, name: r.name, phone: r.phone, is_active: r.is_active })));
     } catch (e: any) {
       setError(e?.message || 'تعذر تحميل دليل بيانات المكتب.');
     } finally {
