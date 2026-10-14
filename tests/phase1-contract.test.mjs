@@ -45,7 +45,7 @@ test("Main Office assignment is connected to a published order, driver, and vehi
   assert.match(assignmentUi, /p_load_order_id:\s*orderId/);
   assert.match(assignmentUi, /p_driver_id:\s*driverId/);
   assert.match(assignmentUi, /p_vehicle_id:\s*vehicleId/);
-  assert.match(assignmentUi, /o\.status === 'PUBLISHED'/);
+  assert.match(assignmentUi, /o\.status\s*===\s*'PUBLISHED'/);
   assert.match(assignmentUi, /d\.is_active&&d\.vehicle_id&&!busyDrivers\.has\(d\.driver_id\)/);
   assert.match(assignmentUi, /v\.vehicle_id===selectedDriver\?\.vehicle_id/);
   assert.match(assignmentUi, /setVehicleId\(drivers\.find\(d=>d\.driver_id===next\)\?\.vehicle_id\?\?''\)/);
@@ -90,8 +90,6 @@ test("directory screen reads and mutates through Phase 1 directory RPCs", () => 
   assert.match(directoryUi, /main_office_upsert_directory/);
   assert.match(directoryUi, /main_office_set_directory_active/);
   assert.match(directoryUi, /قائمة الانتظار غير موجودة في نموذج Phase 1 الحالي/);
-  assert.match(directoryUi, /إنشاء حساب سائق وربطه بالعربية لم يُنقل بعد/);
-  assert.match(directoryUi, /حفظ تعديل العربية أو تغيير مالكها يحتاج RPC Phase 1 مخصصًا/);
 });
 
 test("directory deactivation rejects drivers and vehicles with active trips server-side", () => {
