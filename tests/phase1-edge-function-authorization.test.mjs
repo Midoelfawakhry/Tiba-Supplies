@@ -115,3 +115,15 @@ test("temporary driver passwords require a first-login password change", () => {
   assert.match(source, /must_change_password: true/);
   assert.match(source, /body\.action === "complete_password_setup"/);
 });
+
+
+test("completing first-login password setup clears the forced-change flag", () => {
+  const setupStart = source.indexOf('if (body.action === "complete_password_setup")');
+  const createStart = source.indexOf('// Phase 1 authorization contract', setupStart);
+  const setup = source.slice(setupStart, createStart);
+  assert.match(setup, /app_metadata: \{ \.\.\.appMetadata, must_change_password: false \}/);
+  const resetStart = source.indexOf('if (body.action === "reset_password")');
+  const createAccountStart = source.indexOf('const \{ data: created, error: createError \}', resetStart);
+  const reset = source.slice(resetStart, createAccountStart);
+  assert.match(reset, /must_change_password: true/);
+});
