@@ -584,19 +584,18 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
       </section>}
 
       {editingVehicle && active === 'vehicles' && <section className="rounded-3xl border border-blue-200 bg-white p-4 shadow-sm sm:p-5">
-        <div className="mb-4"><h3 className="font-black">تعديل بيانات العربية</h3><p className="mt-1 text-sm text-slate-500">عدّل اللوحة أو انقل الملكية لمالك موجود أو سجّل مالكًا جديدًا.</p></div>
+        <div className="mb-4"><h3 className="font-black">تعديل بيانات العربية</h3><p className="mt-1 text-sm text-slate-500">تعديل اللوحة والمالك المسجل فقط. كود العربية ثابت، ولا يمكن تعديلها أثناء نقلة نشطة.</p></div>
         <form onSubmit={saveVehicleEdit} className="grid gap-3 sm:grid-cols-2">
-          <label className="text-sm font-bold text-slate-700">رقم العربية / اللوحة<input required value={vehicleEditPlate} onChange={e => setVehicleEditPlate(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal"/></label>
-          <label className="text-sm font-bold text-slate-700">كود العربية<input value={vehicleEditCode} onChange={e => setVehicleEditCode(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal"/></label>
-          <div className="sm:col-span-2">
-            <div className="mb-2 text-sm font-bold text-slate-700">المالك</div>
-            <div className="mb-3 flex flex-wrap gap-2">
-              <button type="button" onClick={() => setVehicleOwnerMode('existing')} className={vehicleOwnerMode === 'existing' ? 'rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white' : 'rounded-xl border border-slate-300 px-4 py-2 text-sm font-bold'}>مالك موجود</button>
-              <button type="button" onClick={() => setVehicleOwnerMode('new')} className={vehicleOwnerMode === 'new' ? 'rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white' : 'rounded-xl border border-slate-300 px-4 py-2 text-sm font-bold'}>مالك جديد</button>
-            </div>
-            {vehicleOwnerMode === 'existing' ? <select required value={vehicleEditOwnerId} onChange={e => setVehicleEditOwnerId(e.target.value)} className="w-full rounded-xl border border-slate-300 bg-white p-3 font-normal"><option value="">اختر المالك</option>{ownerDirectory.map(owner => <option key={owner.owner_id} value={owner.owner_id} disabled={!owner.is_active}>{owner.name}{owner.phone ? ` · ${owner.phone}` : ''}{!owner.is_active ? ' · غير نشط' : ''}</option>)}</select> : <div className="grid gap-3 sm:grid-cols-2"><label className="text-sm font-bold text-slate-700">اسم المالك الجديد<input required value={newOwnerName} onChange={e => setNewOwnerName(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal"/></label><label className="text-sm font-bold text-slate-700">موبايل المالك (اختياري)<input type="tel" value={newOwnerPhone} onChange={e => setNewOwnerPhone(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal"/></label></div>}
-          </div>
-          <div className="sm:col-span-2 flex flex-wrap gap-3"><button disabled={savingEdit || (vehicleOwnerMode === 'existing' && ownerDirectory.length === 0)} type="submit" className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-black text-white transition hover:bg-blue-700 disabled:opacity-60">{savingEdit ? 'جاري الحفظ...' : 'حفظ التعديل'}</button><button type="button" onClick={() => setEditingVehicle(null)} className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-bold">إلغاء</button></div>
+          <label className="text-sm font-bold text-slate-700">رقم العربية / اللوحة<input required maxLength={40} value={vehicleEditPlate} onChange={e => setVehicleEditPlate(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal"/></label>
+          <label className="text-sm font-bold text-slate-700">كود العربية (ثابت)<input readOnly value={vehicleEditCode} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 font-normal text-slate-500"/></label>
+          <label className="sm:col-span-2 text-sm font-bold text-slate-700">المالك المسجل والنشط
+            <select required value={vehicleEditOwnerId} onChange={e => setVehicleEditOwnerId(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal">
+              <option value="">اختر المالك</option>
+              {ownerDirectory.map(owner => <option key={owner.owner_id} value={owner.owner_id} disabled={!owner.is_active}>{owner.name}{owner.owner_code ? ` · ${owner.owner_code}` : ''}{!owner.is_active ? ' · غير نشط' : ''}</option>)}
+            </select>
+            <span className="mt-1 block text-xs font-normal text-slate-500">لإضافة مالك جديد، استخدم تبويب «ملاك العربيات» أولًا.</span>
+          </label>
+          <div className="sm:col-span-2 flex flex-wrap gap-3"><button disabled={savingEdit || ownerDirectory.filter(owner => owner.is_active !== false).length === 0} type="submit" className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-black text-white transition hover:bg-blue-700 disabled:opacity-60">{savingEdit ? 'جاري الحفظ...' : 'حفظ التعديل'}</button><button type="button" onClick={() => setEditingVehicle(null)} className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-bold">إلغاء</button></div>
         </form>
       </section>}
 
