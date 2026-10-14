@@ -193,8 +193,8 @@ test("cancelling an eligible booking reconciles its load-order status", () => {
 test("actual loading resolves through its booking to exactly one load order", () => {
   // Prevent regression to a factory/quarry join, which can misattribute records
   // when separate orders share the same factory and quarry.
-  assert.match(branchSql, /from public\\.actual_loading_records al join public\\.bookings b on b\\.booking_id=al\\.booking_id join public\\.drivers d on d\\.driver_id=b\\.driver_id join public\\.vehicles v on v\\.vehicle_id=b\\.vehicle_id join public\\.load_orders lo on lo\\.load_order_id=b\\.load_order_id/);
-  assert.match(branchSql, /where d\\.office_id=v_office\\.office_id and v\\.office_id=v_office\\.office_id/);
-  assert.doesNotMatch(branchSql, /actual_loading_records al[\\s\\S]{0,1000}join public\\.load_orders lo on lo\\.factory_id=al\\.factory_id and lo\\.quarry_id=al\\.quarry_id/);
-  assert.match(baseline, /booking_id uuid not null unique references public\\.bookings\\(booking_id\\)/);
+  assert.match(branchSql, /from public\.actual_loading_records al join public\.bookings b on b\.booking_id=al\.booking_id join public\.drivers d on d\.driver_id=b\.driver_id join public\.vehicles v on v\.vehicle_id=b\.vehicle_id join public\.load_orders lo on lo\.load_order_id=b\.load_order_id/);
+  assert.match(branchSql, /where d\.office_id=v_office\.office_id and v\.office_id=v_office\.office_id/);
+  assert.doesNotMatch(branchSql, /actual_loading_records al[\s\S]{0,1000}join public\.load_orders lo on lo\.factory_id=al\.factory_id and lo\.quarry_id=al\.quarry_id/);
+  assert.match(baseline, /booking_id uuid not null unique references public\.bookings\(booking_id\)/);
 });
