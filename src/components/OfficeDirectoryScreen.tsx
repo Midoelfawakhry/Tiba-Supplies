@@ -109,8 +109,8 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
       const directory = directoryResult.data ?? {};
       const factories = (directory.factories ?? []).map((r: Row) => ({ factory_id: r.id, code: r.code, factory_code: r.code, name: r.name, notes: r.notes, is_active: r.is_active }));
       const quarries = (directory.quarries ?? []).map((r: Row) => ({ quarry_id: r.id, code: r.code, quarry_code: r.code, name: r.name, notes: r.notes, is_active: r.is_active, latitude: r.latitude, longitude: r.longitude }));
-      const drivers = (directory.drivers ?? []).map((r: Row) => ({ driver_id: r.id, driver_code: r.code, code: r.code, name: r.name, phone: r.phone, office_id: r.office_id, is_active: r.is_active }));
-      const vehicles = (directory.vehicles ?? []).map((r: Row) => ({ vehicle_id: r.id, vehicle_code: r.code, plate_number: r.plate_number, owner_id: r.owner_id, office_id: r.office_id, is_active: r.is_active }));
+      const drivers = (directory.drivers ?? []).map((r: Row) => ({ driver_id: r.id, driver_code: r.code, code: r.code, name: r.name, phone: r.phone, office_id: r.office_id, is_active: r.is_active, vehicle_id: r.vehicle_id, vehicle_code: r.vehicle_code, plate_number: r.plate_number }));
+      const vehicles = (directory.vehicles ?? []).map((r: Row) => ({ vehicle_id: r.id, vehicle_code: r.code, plate_number: r.plate_number, owner_id: r.owner_id, office_id: r.office_id, is_active: r.is_active, assigned_driver_id: r.assigned_driver_id, assigned_driver_name: r.assigned_driver_name }));
       setSnapshot({ ...data, factories, quarries, drivers, vehicles });
       setWaiting([]);
       setAvailableVehicles(vehicles.filter((v: Row) => v.is_active !== false));
@@ -236,8 +236,8 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     setDriverEditName(String(row.name ?? row.driver_name ?? ''));
     setDriverEditPhone(String(row.phone ?? ''));
     setDriverEditCode(String(row.driver_code ?? ''));
-    setDriverEditVehicleId('');
-    setDriverEditVehicles([]);
+    setDriverEditVehicleId(String(row.vehicle_id ?? ''));
+    setDriverEditVehicles((snapshot?.vehicles ?? []).filter((vehicle: Row) => vehicle.is_active !== false && (!vehicle.assigned_driver_id || String(vehicle.assigned_driver_id) === String(row.driver_id))));
     setDriverEditOptionsLoaded(true);
     setError(''); setSuccess('');
   }
@@ -279,7 +279,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     try {
       const { data, error: rpcError } = await supabase.rpc('main_office_update_driver', {
         p_driver_id: editingDriver.driver_id, p_name: driverEditName.trim(),
-        p_phone: driverEditPhone.trim(), p_driver_code: driverEditCode.trim() || null,
+        p_phone: driverEditPhone.trim(), p_driver_code: driverEditCode.trim() || null, p_vehicle_id: driverEditVehicleId || null,
       });
       if (rpcError) throw rpcError;
       if (!data?.success) throw new Error('تعذر تأكيد تعديل السائق.');
@@ -287,7 +287,9 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     } catch (e: any) {
       const raw=String(e?.message||'');
       const messages: Record<string,string> = {
-        DRIVER_ID_NAME_PHONE_REQUIRED:'أكمل اسم السائق ورقم الموبايل.',
+        DRIVER_ID_NAME_PHONE_AND_VEHICLE_REQUIRED:'أكمل بيانات السائق واختار العربية.',
+        VEHICLE_NOT_AVAILABLE:'العربية غير نشطة أو غير متاحة للاستخدام.',
+        VEHICLE_ALREADY_ASSIGNED:'العربية مرتبطة بسائق آخر. اختار عربية مختلفة.',
         DRIVER_PHONE_INVALID:'أدخل رقم موبايل مصري صحيحًا.',
         DRIVER_PHONE_EXISTS:'رقم الموبايل مسجل لسائق آخر.',
         DRIVER_NOT_FOUND:'السائق غير موجود.',
@@ -414,12 +416,12 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     setSavingDriver(true);
     try {
       const { data: result, error: createError } = await supabase.rpc('main_office_create_driver', {
-        p_name: driverName.trim(), p_phone: driverPhone.trim(), p_driver_code: driverCode.trim() || null,
+        p_name: driverName.trim(), p_phone: driverPhone.trim(), p_driver_code: driverCode.trim() || null, p_vehicle_id: selectedVehicleId || null,
       });
       if (createError) throw createError;
       if (!result?.success || !result?.driver_id) throw new Error('تعذر تأكيد حفظ السائق.');
       const savedDriver = { driverId: String(result.driver_id), name: driverName.trim() };
-      setDriverName(''); setDriverPhone(''); setDriverCode(''); setShowDriverForm(false);
+      setDriverName(''); setDriverPhone(''); setDriverCode(''); setVehicleSearch(''); setSelectedVehicleId(''); setShowDriverForm(false);
       try {
         await createDriverAccount(savedDriver.driverId, driverTemporaryPassword);
         setSuccess(`تم إنشاء السائق ${result.driver_code} وحساب الدخول. ربط العربية يتم عند إسناد أمر تحميل.`);
@@ -433,7 +435,9 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     } catch (e: any) {
       const raw=String(e?.message||'');
       const messages: Record<string,string> = {
-        DRIVER_NAME_AND_PHONE_REQUIRED:'أكمل اسم السائق ورقم الموبايل.',
+        DRIVER_NAME_PHONE_AND_VEHICLE_REQUIRED:'أكمل اسم السائق ورقم الموبايل واختار العربية.',
+        VEHICLE_NOT_AVAILABLE:'العربية غير نشطة أو غير متاحة للاستخدام.',
+        VEHICLE_ALREADY_ASSIGNED:'العربية مرتبطة بسائق آخر. حدّث القائمة واختار عربية مختلفة.',
         DRIVER_PHONE_INVALID:'أدخل رقم موبايل مصري صحيحًا.',
         DRIVER_PHONE_EXISTS:'رقم الموبايل مسجل لسائق بالفعل.',
         DRIVER_CODE_EXISTS:'كود السائق مستخدم بالفعل.',
@@ -555,8 +559,16 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
           <label className="text-sm font-bold text-slate-700">رقم الموبايل — اسم المستخدم<div className="relative mt-1.5"><Phone size={18} className="absolute right-3 top-3.5 text-slate-400"/><input required type="tel" inputMode="tel" value={driverPhone} onChange={e => setDriverPhone(e.target.value)} className="w-full rounded-xl border border-slate-300 bg-white p-3 pr-10 font-normal" placeholder="01012345678"/></div><span className="mt-1 block text-xs font-normal text-slate-500">السائق سيدخل بهذا الرقم وكلمة المرور التي تحددها.</span></label>
           <label className="text-sm font-bold text-slate-700">كلمة مرور السائق<input required type="password" autoComplete="new-password" minLength={8} value={driverTemporaryPassword} onChange={e => setDriverTemporaryPassword(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal" /><span className="mt-1 block text-xs font-normal text-slate-500">دي كلمة المرور التي ستنشئ بها حساب السائق. سلّمها له مباشرة.</span></label>
           <label className="text-sm font-bold text-slate-700">تأكيد كلمة المرور<input required type="password" autoComplete="new-password" minLength={8} value={driverTemporaryPasswordConfirmation} onChange={e => setDriverTemporaryPasswordConfirmation(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal" /></label>
+          <div className="sm:col-span-2 text-sm font-bold text-slate-700">العربية المرتبطة بالسائق
+            <label className="relative mt-1.5 block"><span className="sr-only">ابحث عن العربية</span><input value={vehicleSearch} onChange={e => { setVehicleSearch(e.target.value); setSelectedVehicleId(''); }} className="w-full rounded-xl border border-slate-300 bg-white p-3 pr-10 font-normal" placeholder="ابحث برقم اللوحة أو كود العربية..."/><span className="absolute right-3 top-3 text-slate-400"><Truck size={18}/></span></label>
+            <select required value={selectedVehicleId} onChange={e => setSelectedVehicleId(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal">
+              <option value="">اختار عربية متاحة</option>
+              {filteredAvailableVehicles.filter((vehicle: Row) => !vehicle.assigned_driver_id).map((vehicle: Row) => <option key={vehicle.vehicle_id} value={vehicle.vehicle_id}>{vehicle.plate_number}{vehicle.vehicle_code ? ` · ${vehicle.vehicle_code}` : ''}</option>)}
+            </select>
+            <span className="mt-1 block text-xs font-normal text-slate-500">{filteredAvailableVehicles.filter((vehicle: Row) => !vehicle.assigned_driver_id).length} عربية نشطة غير مرتبطة بسائق</span>
+          </div>
           <div className="sm:col-span-2 rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
-            ربط العربية مش جزء من إنشاء سجل السائق في Phase 1. عند إنشاء أمر تحميل، المكتب الرئيسي بيحدد السائق والعربية معًا، وده بيحافظ على سجل الإسناد الفعلي لكل نقلة.
+            اختار عربية موجودة ونشطة من الأسطول. النظام يمنع ربط نفس العربية بأكثر من سائق نشط، ويحتفظ بتاريخ تغييرات الربط.
           </div>
           <label className="text-sm font-bold text-slate-700">كود السواق (اختياري)<input value={driverCode} onChange={e => setDriverCode(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal" placeholder="لو عنده كود بالفعل"/></label>
           <div className="sm:col-span-2 flex flex-wrap items-center gap-3"><button disabled={savingDriver} type="submit" className={`rounded-xl px-5 py-3 text-sm font-black text-white transition disabled:opacity-60 ${sectionPalette[active].action}`}>{savingDriver ? 'جاري حفظ البيانات وإنشاء الحساب...' : 'حفظ السواق وإنشاء الحساب'}</button><p className="text-xs leading-5 text-slate-500">رقم الموبايل هو اسم المستخدم، وكلمة المرور التي تحددها هنا هي كلمة الدخول. لا تُرسل رسائل أو إيميلات.</p></div>
@@ -573,12 +585,12 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
       </section>}
 
       {editingDriver && active === 'drivers' && <section className="rounded-3xl border border-red-200 bg-white p-4 shadow-sm sm:p-5">
-        <div className="mb-4"><h3 className="font-black">تعديل بيانات السائق</h3><p className="mt-1 text-sm text-slate-500">غيّر بياناته أو انقله لعربية متاحة. يمكنك اختيار «بدون عربية» مؤقتًا.</p></div>
+        <div className="mb-4"><h3 className="font-black">تعديل بيانات السائق</h3><p className="mt-1 text-sm text-slate-500">عدّل بياناته أو انقله إلى عربية نشطة وغير مرتبطة بسائق آخر.</p></div>
         <form onSubmit={saveDriverEdit} className="grid gap-3 sm:grid-cols-2">
           <label className="text-sm font-bold text-slate-700">اسم السائق<input required value={driverEditName} onChange={e => setDriverEditName(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal"/></label>
           <label className="text-sm font-bold text-slate-700">رقم الموبايل<input required type="tel" disabled={Boolean(editingDriver.auth_user_id)} value={driverEditPhone} onChange={e => setDriverEditPhone(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal disabled:bg-slate-100"/>{editingDriver.auth_user_id && <span className="mt-1 block text-xs font-normal text-slate-500">هذا الرقم هو اسم دخول السائق، لذلك تعديله يحتاج إجراءً منفصلًا للحساب.</span>}</label>
           <label className="text-sm font-bold text-slate-700">كود السائق (اختياري)<input value={driverEditCode} onChange={e => setDriverEditCode(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal"/></label>
-          <label className="text-sm font-bold text-slate-700">العربية المرتبطة<select value={driverEditVehicleId} onChange={e => setDriverEditVehicleId(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal"><option value="">بدون عربية مؤقتًا</option>{driverEditVehicles.map(vehicle => <option key={vehicle.vehicle_id} value={vehicle.vehicle_id}>{vehicle.plate_number}{vehicle.owner_name ? ` · المالك: ${vehicle.owner_name}` : ''}</option>)}</select></label>
+          <label className="text-sm font-bold text-slate-700">العربية المرتبطة<select value={driverEditVehicleId} onChange={e => setDriverEditVehicleId(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal"><option value="">اختار عربية نشطة</option>{driverEditVehicles.map(vehicle => <option key={vehicle.vehicle_id} value={vehicle.vehicle_id}>{vehicle.plate_number}{vehicle.vehicle_code ? ` · ${vehicle.vehicle_code}` : ''}</option>)}</select></label>
           <div className="sm:col-span-2 flex flex-wrap gap-3"><button disabled={savingEdit || !driverEditOptionsLoaded} type="submit" className="rounded-xl bg-red-600 px-5 py-3 text-sm font-black text-white transition hover:bg-red-700 disabled:opacity-60">{savingEdit ? 'جاري الحفظ...' : 'حفظ التعديل'}</button><button type="button" onClick={() => setEditingDriver(null)} className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-bold">إلغاء</button></div>
         </form>
       </section>}
