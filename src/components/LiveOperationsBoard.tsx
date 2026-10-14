@@ -11,10 +11,17 @@ import { SystemAiAssistant } from './SystemAiAssistant';
 import { getLiveSnapshot, LiveSnapshot, liveName } from '../services/liveData';
 
 const statusLabel: Record<string, string> = {
-  PUBLISHED: 'متاح',
-  LOADING_STATEMENT: 'جاري التحميل',
-  BOOKED: 'مكتمل التخصيص',
+  DRAFT: 'مسودة',
+  PUBLISHED: 'متاح للإسناد',
+  IN_PROGRESS: 'جارٍ التنفيذ',
+  COMPLETED: 'مكتمل',
   CANCELLED: 'ملغي',
+  ASSIGNED: 'تم الإسناد',
+  ARRIVED: 'وصل السائق',
+  LOADING: 'جاري التحميل',
+  LOADED: 'تم التحميل',
+  IN_TRANSIT: 'في الطريق',
+  DELIVERED: 'تم التسليم',
 };
 
 type OfficeScreen = 'dashboard' | 'tracking' | 'directory' | 'direct' | 'drivers' | 'vehicles' | 'waiting' | 'orders' | 'actual' | 'vehicleReports' | 'factoryStatement' | 'quarryStatement' | 'analytics' | 'employees' | 'assistant';
@@ -123,7 +130,7 @@ export const LiveOperationsBoard: React.FC = () => {
   const counts = useMemo(() => {
     const orders = data?.load_orders ?? [];
     const bookings = data?.bookings ?? [];
-    const activeBookings = bookings.filter(b => ['BOOKED', 'LOADING_STATEMENT', 'IN_TRANSIT'].includes(b.status)).length;
+    const activeBookings = bookings.filter(b => ['ASSIGNED', 'ARRIVED', 'LOADING', 'LOADED', 'IN_TRANSIT'].includes(String(b.status).toUpperCase())).length;
     const requested = orders.reduce((n, o) => n + Number(o.requested_quantity || 0), 0);
     return { orders: orders.length, requested, activeBookings };
   }, [data]);
