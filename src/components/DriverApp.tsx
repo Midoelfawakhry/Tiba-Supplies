@@ -501,38 +501,30 @@ export const DriverApp: React.FC = () => {
           });
           if (saveError) throw new Error(saveError.message || 'تعذر حفظ الموقع. فعّل مشاركة الموقع وتأكد من ربط حسابك بالعربية.');
 
-          // Saving a live GPS point is not a check-in. This RPC validates the
-          // office geofence and atomically records arrival + waiting-list entry.
-          const { data: arrival, error: arrivalError } = await supabase.rpc('driver_arrive', {
-            p_latitude: coords.latitude,
-            p_longitude: coords.longitude,
-          });
-          if (arrivalError) {
-            const raw = String(arrivalError.message || '');
-            const known: Record<string, string> = {
-              UNAUTHENTICATED: 'انتهت جلسة الدخول. سجّل الدخول مرة أخرى.',
-              DRIVER_NOT_FOUND: 'حسابك غير مرتبط بسائق نشط. راجع المكتب.',
-              NO_ACTIVE_OFFICE_ASSIGNMENT: 'حسابك غير مربوط بمكتب نشط. راجع المكتب.',
-              NO_ACTIVE_VEHICLE_ASSIGNMENT: 'لا توجد عربية مرتبطة بحسابك حاليًا. راجع المكتب.',
-              OFFICE_LOCATION_NOT_CONFIGURED: 'إحداثيات مكتب رأس سدر غير مكتملة في النظام.',
-              DRIVER_ALREADY_WAITING: 'أنت مسجل بالفعل في قائمة الانتظار.',
-            };
-            const code = Object.keys(known).find(key => raw.includes(key));
-            if (code === 'DRIVER_ALREADY_WAITING') {
-              await refreshPortal();
-              setError(known[code]);
-            } else if (code) {
-              throw new Error(known[code]);
-            } else if (raw.includes('OUTSIDE_GEOFENCE')) {
-              throw new Error('الموقع المسجل خارج نطاق مكتب رأس سدر. راجع دقة GPS وإحداثيات المكتب.');
-            } else {
-              throw new Error(raw || 'تعذر تسجيل الوصول في قائمة الانتظار.');
+          // Phase 1 arrival is tied to a real assigned booking; location alone never creates a queue entry.
+          const assignedBooking = (portal?.my_bookings || []).find((booking: any) => booking.raw_status === 'ASSIGNED');
+          if (assignedBooking?.booking_id) {
+            const { data: arrival, error: arrivalError } = await supabase.rpc('driver_confirm_arrival', {
+              p_booking_id: assignedBooking.booking_id,
+              p_latitude: coords.latitude,
+              p_longitude: coords.longitude,
+              p_accuracy_m: coords.accuracy,
+              p_captured_at: new Date(timestamp).toISOString(),
+            });
+            if (arrivalError) {
+              const raw = String(arrivalError.message || '');
+              if (raw.includes('OUTSIDE_GEOFENCE')) throw new Error('أنت خارج نطاق مكتب رأس سدر البالغ 10 كم.');
+              if (raw.includes('LOCATION_TOO_OLD') || raw.includes('LOCATION_TIMESTAMP_INVALID')) throw new Error('بيانات GPS قديمة. حدّث الموقع وحاول تاني.');
+              if (raw.includes('BOOKING_NOT_ASSIGNED')) throw new Error('النقلة لم تعد في حالة انتظار الوصول.');
+              throw new Error(raw || 'تعذر تأكيد الوصول للنقلة.');
             }
+            await refreshPortal();
+            setError(arrival?.status === 'ARRIVED' || arrival?.success
+              ? `تم تأكيد وصولك للنقلة. المسافة من المكتب: ${Math.round(Number(arrival.distance_meters ?? arrival.distance_m ?? 0))} متر.`
+              : 'تم حفظ الموقع، لكن النظام لم يؤكد الوصول. حاول مرة أخرى.');
           } else {
             await refreshPortal();
-            setError(arrival?.success
-              ? `تم تسجيل وصولك وإضافتك لقائمة الانتظار. المسافة من المكتب: ${Math.round(Number(arrival.distance_meters || 0))} متر.`
-              : 'تم تحديد الموقع، لكن النظام لم يؤكد تسجيل الوصول. حاول مرة أخرى أو راجع المكتب.');
+            setError('تم حفظ موقعك. تأكيد الوصول متاح لما يكون فيه نقلة مسندة لحسابك؛ الموقع وحده لا ينشئ نقلة أو قائمة انتظار.');
           }
         } catch (checkInError: any) {
           setError(checkInError?.message || 'تعذر تسجيل الوصول. حاول مرة أخرى.');
