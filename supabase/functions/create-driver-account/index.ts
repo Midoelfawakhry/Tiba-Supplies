@@ -56,8 +56,8 @@ Deno.serve(async (req: Request) => {
       return json({ success: true });
     }
 
-    // Phase 1 authorization contract: use the authenticated caller's current
-    // Main Office RPC guard instead of legacy app_users/user_roles schema.
+    // Shadow Phase 1 authorization contract: authorize privileged driver-account
+    // operations through the current Main Office RPC guard, never legacy role tables.
     const { error: officeAccessError } = await callerClient.rpc("main_office_get_directory");
     if (officeAccessError) {
       const message = String(officeAccessError.message ?? "");
