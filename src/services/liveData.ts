@@ -1,10 +1,8 @@
 import { supabase } from '../lib/supabase';
 
 export type LiveSnapshot = {
-  // The primary operational office that creates load orders.
   office: Record<string, any> | null;
   operational_office: Record<string, any> | null;
-  // The office where drivers explicitly check in.
   check_in_office: Record<string, any> | null;
   factories: Record<string, any>[];
   quarries: Record<string, any>[];
@@ -16,7 +14,9 @@ export type LiveSnapshot = {
 };
 
 export async function getLiveSnapshot(): Promise<LiveSnapshot> {
-  const { data, error } = await supabase.rpc('get_phase1_snapshot');
+  // Phase 1 greenfield reads use the reviewed Main Office RPC rather than
+  // the legacy get_phase1_snapshot function from the previous schema.
+  const { data, error } = await supabase.rpc('main_office_get_dashboard');
   if (error) throw error;
 
   return {
