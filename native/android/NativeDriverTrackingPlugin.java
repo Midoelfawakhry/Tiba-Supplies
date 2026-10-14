@@ -47,11 +47,9 @@ public class NativeDriverTrackingPlugin extends Plugin {
 
     @PluginMethod
     public void stop(PluginCall call) {
-        Intent intent = new Intent(getContext(), NativeDriverTrackingService.class);
-        intent.setAction(NativeDriverTrackingService.ACTION_STOP);
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) getContext().startForegroundService(intent);
-            else getContext().startService(intent);
+            // stopService triggers onDestroy, which clears encrypted session material.
+            getContext().stopService(new Intent(getContext(), NativeDriverTrackingService.class));
             call.resolve();
         } catch (Exception e) {
             call.reject("تعذر إيقاف خدمة تتبع الموقع.", e);
