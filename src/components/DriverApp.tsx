@@ -7,6 +7,20 @@ import { Geolocation } from '@capacitor/geolocation';
 
 const BackgroundGeolocation = registerPlugin<BackgroundGeolocationPlugin>('BackgroundGeolocation');
 
+type NativeDriverTrackingPlugin = {
+  start(options: {
+    accessToken: string;
+    refreshToken: string;
+    userId: string;
+    projectUrl: string;
+    publishableKey: string;
+    expiresAt: number;
+  }): Promise<{ started: boolean }>;
+  stop(): Promise<void>;
+};
+const NativeDriverTracking = registerPlugin<NativeDriverTrackingPlugin>('NativeDriverTracking');
+
+
 // Battery-efficient live-location prototype. Keep office/business workflows unchanged.
 const LOCATION_DISTANCE_FILTER_METERS = 25;
 const MOVING_LOCATION_UPLOAD_INTERVAL_MS = 10 * 60_000;
@@ -189,6 +203,68 @@ export const DriverApp: React.FC = () => {
     let lastSentAt = 0;
     let lastAttemptAt = 0;
     let lastUploadFailed = false;
+    let nativeServiceStarted = false;
+
+    // Android uses a native foreground service for ongoing collection and upload.
+    // The community watcher is used only to obtain its permission flow, then removed.
+    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
+      void (async () => {
+        try {
+          watcherId = await BackgroundGeolocation.addWatcher({
+            backgroundMessage: 'مشاركة موقعك مع طيبة مفعّلة أثناء العمل. أوقف التتبع بتسجيل الخروج.',
+            backgroundTitle: 'Tiba Supplies — تتبع موقع السائق',
+            requestPermissions: true,
+            stale: false,
+            distanceFilter: LOCATION_DISTANCE_FILTER_METERS,
+          }, async (location, watcherError) => {
+            if (!active) return;
+            if (watcherError) {
+              setError(watcherError.message || 'تعذر طلب أذونات تتبع الموقع.');
+              return;
+            }
+            if (!location) return;
+            if (watcherId) {
+              const oldWatcherId = watcherId;
+              watcherId = undefined;
+              await BackgroundGeolocation.removeWatcher({ id: oldWatcherId });
+            }
+            try {
+              const result = await NativeDriverTracking.start({
+                accessToken: session.access_token,
+                refreshToken: session.refresh_token,
+                userId: session.user.id,
+                projectUrl: String(import.meta.env.VITE_SUPABASE_URL || ''),
+                publishableKey: String(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || ''),
+                expiresAt: (session.expires_at || 0) * 1000,
+              });
+              nativeServiceStarted = result.started;
+              if (!active) {
+                await NativeDriverTracking.stop();
+                nativeServiceStarted = false;
+                return;
+              }
+              setPosition({
+                latitude: location.latitude,
+                longitude: location.longitude,
+                accuracy: location.accuracy,
+                capturedAt: new Date(location.time ?? Date.now()).toLocaleString('ar-EG'),
+              });
+              setError('');
+            } catch (nativeError: any) {
+              if (active) setError(nativeError?.message || 'تعذر تشغيل خدمة تتبّع Android المستقلة.');
+            }
+          });
+        } catch (permissionError: any) {
+          if (active) setError(permissionError?.message || 'تعذر طلب أذونات الموقع والإشعارات.');
+        }
+      })();
+
+      return () => {
+        active = false;
+        if (watcherId) void BackgroundGeolocation.removeWatcher({ id: watcherId });
+        if (nativeServiceStarted) void NativeDriverTracking.stop();
+      };
+    }
 
     void (async () => {
       try {
