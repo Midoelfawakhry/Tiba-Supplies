@@ -401,7 +401,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
       setPasswordResetDriver(null);
       setNewDriverPassword('');
       setConfirmDriverPassword('');
-      setSuccess('تم تحديث كلمة المرور. سيستخدم السائق كلمة المرور الجديدة مباشرة.');
+      setSuccess('تم تحديث كلمة المرور المؤقتة. لازم السائق يغيّرها عند أول تسجيل دخول.');
     } catch (e: any) {
       setError(e?.message || 'تعذر تحديث كلمة مرور السائق.');
     } finally {
