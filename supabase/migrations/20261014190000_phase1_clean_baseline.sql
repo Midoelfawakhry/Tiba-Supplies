@@ -187,7 +187,7 @@ create table public.audit_log (
 insert into public.offices (office_code,name,office_type,is_active,latitude,longitude,geofence_radius_m)
 values
   ('MAIN','المكتب الرئيسي','HEAD_OFFICE',true,null,null,10000),
-  ('RAS_SEDR','مكتب رأس سدر','BRANCH',true,null,null,10000);
+  ('RAS_SEDR','مكتب رأس سدر','BRANCH',true,29.556864,32.761699,10000);
 
 -- Client access is mediated by vetted RPCs/Edge Functions; no direct table grants.
 do $$
