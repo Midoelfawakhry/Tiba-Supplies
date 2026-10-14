@@ -173,7 +173,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
         MAIN_OFFICE_ACCESS_REQUIRED: 'الإجراء متاح للمكتب الرئيسي فقط.',
       };
       const key = Object.keys(messages).find(code => raw.includes(code));
-      setError(key ? messages[key] : raw || 'تعذر تغيير حالة المالك.');
+      setError(Object.entries(messages).find(([code]) => raw.includes(code))?.[1] ?? (raw || 'تعذر تغيير حالة المالك.'));
     } finally { setSavingEdit(false); }
   }
 
@@ -197,40 +197,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
 
   async function removeWaitingEntry(_row: Row) {
     setError('قائمة الانتظار غير موجودة في نموذج Phase 1 الحالي؛ تم إيقاف الإجراء القديم لحماية البيانات.');
-    return;
-    const driverName = String(_row.driver_name ?? 'السائق');
-    const plate = String(row.plate_number ?? 'العربية غير محددة');
-    const reason = window.prompt(`اكتب سبب إزالة ${driverName} — ${plate} من قائمة الانتظار:`);
-    if (!reason?.trim()) return;
-    if (!window.confirm(`تأكيد إزالة ${driverName} من قائمة الانتظار؟ سيتم الاحتفاظ بسجل الدخول وتسجيل اسم منفّذ الإجراء وسببه.`)) return;
-    setError('');
-    setSuccess('');
-    setSavingEdit(true);
-    try {
-      const { data, error: rpcError } = await supabase.rpc('office_remove_waiting_entry', {
-        p_entry_id: row.entry_id,
-        p_reason: reason.trim(),
-      });
-      if (rpcError) throw rpcError;
-      if (!data?.success) throw new Error('تعذر تأكيد إزالة السائق من قائمة الانتظار.');
-      setSuccess('تمت إزالة السائق من قائمة الانتظار مع الاحتفاظ بالسجل التاريخي وتسجيل السبب.');
-      await load();
-    } catch (e: any) {
-      const raw = String(e?.message || '');
-      const messages: Record<string, string> = {
-        AUTH_REQUIRED: 'انتهت جلسة المكتب. سجّل الدخول مرة أخرى.',
-        INSUFFICIENT_ROLE: 'إزالة السائق من قائمة الانتظار متاحة للمكتب الرئيسي فقط.',
-        WAITING_ENTRY_NOT_FOUND: 'عنصر الانتظار غير موجود أو لم يعد في حالة انتظار.',
-        WAITING_ENTRY_NOT_IN_BRANCH_QUEUE: 'عنصر الانتظار ليس ضمن قائمة انتظار رأس سدر الحالية.',
-        REMOVE_REASON_REQUIRED: 'اكتب سبب الإزالة أولًا.',
-      };
-      const key = Object.keys(messages).find(code => raw.includes(code));
-      setError(key ? messages[key] : raw || 'تعذر إزالة السائق من قائمة الانتظار.');
-    } finally {
-      setSavingEdit(false);
-    }
   }
-
   async function beginDriverEdit(row: Row) {
     setEditingDriver(row);
     setDriverEditName(String(row.name ?? row.driver_name ?? ''));
@@ -547,7 +514,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
           <div><h3 className="font-black">إضافة عربية جديدة</h3><p className="mt-1 text-sm text-slate-500">تسجيل العربية ومالكها. ربط السواق خطوة منفصلة.</p></div>
           <button type="button" onClick={() => setShowVehicleForm(v => !v)} className={`rounded-xl px-4 py-2.5 text-sm font-black text-white transition ${sectionPalette[active].action}`}>{showVehicleForm ? 'إلغاء' : 'إضافة عربية'}</button>
         </div>
-        {showVehicleForm && <div className="mt-4"><AddVehicleForm owners={ownerDirectory} onSaved={() => { void load(); setSuccess('تمت إضافة العربية بكود تلقائي وربطها بالمالك المختار.'); }} /></div>}
+        {showVehicleForm && <div className="mt-4"><AddVehicleForm owners={ownerDirectory as Array<{ owner_id: string; name: string; owner_code?: string; is_active?: boolean }>} onSaved={() => { void load(); setSuccess('تمت إضافة العربية بكود تلقائي وربطها بالمالك المختار.'); }} /></div>}
       </section>}
       {active === 'drivers' && <section className={`rounded-3xl border bg-white p-4 shadow-sm sm:p-5 ${sectionPalette[active].border}`}>
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -666,41 +633,14 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
                     MAIN_OFFICE_ACCESS_REQUIRED: 'تغيير حالة العربية متاح للمكتب الرئيسي فقط.',
                   };
                   const key = Object.keys(messages).find(code => raw.includes(code));
-                  setError(key ? messages[key] : raw || 'تعذر تغيير حالة العربية.');
+                  setError(Object.entries(messages).find(([code]) => raw.includes(code))?.[1] ?? (raw || 'تعذر تغيير حالة العربية.'));
                 } finally { setSavingEdit(false); }
               }} className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold disabled:opacity-50 ${row.is_active === false ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-700'}`}>{row.is_active === false ? 'تفعيل العربية' : 'إيقاف العربية'}</button>}{active === 'owners' && <button type="button" disabled={savingEdit} onClick={() => void setOwnerActive(row)} className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold disabled:opacity-50 ${row.is_active === false ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-700'}`}>{row.is_active === false ? 'تفعيل المالك' : 'إيقاف المالك'}</button>}{active === 'drivers' && row.is_active !== false && row.auth_user_id && <button type="button" onClick={() => { setPasswordResetDriver(row); setNewDriverPassword(''); setConfirmDriverPassword(''); setEditingDriver(null); setError(''); setSuccess(''); }} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-800">كلمة المرور</button>}{active === "drivers" && row.is_active !== false && <button type="button" disabled={savingEdit} onClick={() => void deactivateDriver(row)} aria-label="إيقاف السائق" className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-700 disabled:opacity-50"><UserX size={10}/> إيقاف</button>}{(active === 'drivers' || active === 'vehicles') && <button type="button" onClick={() => active === 'drivers' ? void beginDriverEdit(row) : beginVehicleEdit(row)} aria-label={active === 'drivers' ? 'تعديل بيانات السائق' : 'تعديل بيانات العربية'} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"><Pencil size={10}/> تعديل</button>}
               {active === 'actual' && row.booking_id && !['CANCELLED', 'DELIVERED', 'COMPLETED'].includes(snapshot?.bookings?.find((b: Row) => b.booking_id === row.booking_id)?.status) && !row.delivery_confirmed_at && row.actual_weight == null && <button type="button" onClick={async () => {
-                const reason = window.prompt('اكتب سبب إلغاء النقلة:');
-                if (!reason?.trim()) return;
-                const vehicleOut = window.confirm('هل العربية فيها عطل أو لازم تفضل خارج الخدمة؟ اضغط موافق لو خارج الخدمة، أو إلغاء لو ترجع لقائمة الانتظار.');
-                setError(''); setSuccess('');
-                try {
-                  throw new Error('إلغاء الحجز القديم غير مدعوم في Phase 1. استخدم إلغاء أمر التحميل إذا كانت حالته تسمح بذلك.');
-      const { data, error: rpcError } = await supabase.rpc('office_cancel_booking', { p_booking_id: row.booking_id, p_reason: reason.trim(), p_vehicle_out_of_service: vehicleOut });
-                  if (rpcError) throw rpcError;
-                  if (!data?.success) throw new Error('تعذر تأكيد إلغاء النقلة.');
-                  setSuccess(vehicleOut ? 'تم إلغاء النقلة وحفظ سجلها. العربية لم تُرجع لقائمة الانتظار لأنها خارج الخدمة.' : 'تم إلغاء النقلة وحفظ سجلها، وإرجاع العربية إلى آخر قائمة الانتظار كبداية دورة جديدة.');
-                  await load();
-                } catch (e: any) { setError(e?.message || 'تعذر إلغاء النقلة.'); }
+                setError('إلغاء الحجز القديم غير مدعوم في Phase 1. استخدم إلغاء أمر التحميل إذا كانت حالته تسمح بذلك.');
               }} className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-700">إلغاء النقلة</button>}
               {active === 'actual' && row.booking_id && snapshot?.bookings?.find((b: Row) => b.booking_id === row.booking_id)?.status !== 'CANCELLED' && <button type="button" onClick={async () => {
-                const factories = snapshot?.factories ?? [];
-                const options = factories.map((f: Row) => `${f.name} [${f.factory_id}]`).join('\n');
-                const chosen = window.prompt('اكتب معرّف المصنع الجديد كما هو ظاهر بين الأقواس:\n' + options, '');
-                if (!chosen?.trim()) return;
-                const match = chosen.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
-                if (!match || !factories.some((f: Row) => f.factory_id === match[1])) { setError('معرّف المصنع غير صحيح. انسخه من القائمة المعروضة.'); return; }
-                const reason = window.prompt('اكتب سبب إعادة توجيه النقلة:');
-                if (!reason?.trim()) return;
-                setError(''); setSuccess('');
-                try {
-                  throw new Error('تحويل الحجز غير متاح في عقد Phase 1 الحالي؛ تم تعطيل الإجراء القديم.');
-      const { data, error: rpcError } = await supabase.rpc('office_redirect_booking', { p_booking_id: row.booking_id, p_factory_id: match[1], p_reason: reason.trim() });
-                  if (rpcError) throw rpcError;
-                  if (!data?.success) throw new Error('تعذر تأكيد إعادة توجيه النقلة.');
-                  setSuccess(row.delivery_confirmed_at || row.actual_weight != null || ['DELIVERED', 'COMPLETED'].includes(snapshot?.bookings?.find((b: Row) => b.booking_id === row.booking_id)?.status) ? 'تم تصحيح وجهة نقلة لها وزن/تسليم مسجل. احتفظ النظام ببيانات الوزن والتسليم وسجل الوجهة السابقة والجديدة وسبب التصحيح.' : 'تم تغيير وجهة النقلة إلى المصنع الجديد، مع حفظ سبب التوجيه وسجل الوجهة السابقة والجديدة.');
-                  await load();
-                } catch (e: any) { setError(e?.message || 'تعذر إعادة توجيه النقلة.'); }
+                setError('تحويل الحجز غير متاح في عقد Phase 1 الحالي؛ تم تعطيل الإجراء القديم.');
               }} className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-800">إعادة توجيه</button>}{active !== 'waiting' && <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-500">#{index + 1}</span>}</div></div>
           </article>)}
           {!loading && rows.length === 0 && <div className="p-10 text-center text-sm leading-6 text-slate-500">لا توجد سجلات في هذا القسم حاليًا. لن نعرض بيانات تجريبية بدل البيانات الحقيقية.</div>}
