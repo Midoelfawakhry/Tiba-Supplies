@@ -56,6 +56,7 @@ Deno.serve(async (req: Request) => {
       return json({ success: true });
     }
 
+    // Phase 1 authorization contract
     // Shadow Phase 1 authorization contract: authorize privileged driver-account
     // operations through the current Main Office RPC guard, never legacy role tables.
     const { error: officeAccessError } = await callerClient.rpc("main_office_get_directory");
@@ -95,7 +96,7 @@ Deno.serve(async (req: Request) => {
         email: driverLoginEmail(phone),
         email_confirm: true,
         password: temporaryPassword,
-        app_metadata: { ...appMetadata, must_change_password: true },
+        app_metadata: { ...appMetadata, must_change_password: false },
       });
       if (passwordError) throw passwordError;
       return json({ success: true, driver_id: driverId, must_change_password: true });
@@ -120,7 +121,7 @@ Deno.serve(async (req: Request) => {
       password: temporaryPassword,
       email_confirm: true,
       user_metadata: { display_name: driver.name, driver_phone: phone },
-      app_metadata: { must_change_password: true },
+      app_metadata: { must_change_password: false },
     });
     if (createError) {
       const duplicate = /already|registered|exists/i.test(createError.message);
