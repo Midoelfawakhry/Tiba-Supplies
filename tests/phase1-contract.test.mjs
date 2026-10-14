@@ -116,7 +116,7 @@ test("vehicle owners are managed separately and vehicle codes are generated serv
   assert.match(vehicleOwnerSql, /'OW-'\|\|lpad\(nextval\('public\.vehicle_owner_code_seq'\)/);
   assert.match(directoryUi, /key: 'owners', label: 'ملاك العربيات'/);
   assert.match(directoryUi, /main_office_create_vehicle_owner/);
-  assert.match(directoryUi, /<AddVehicleForm owners=\{ownerDirectory\}/);
+  assert.match(directoryUi, /<AddVehicleForm owners=\{ownerDirectory(?: as [^}]+)?\}/);
   assert.doesNotMatch(directoryUi, /create_operational_vehicle/);
 });
 
