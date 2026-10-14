@@ -27,7 +27,7 @@ export const BranchOfficeApp: React.FC = () => {
   const load=useCallback(async()=>{
     setLoading(true); setError('');
     try{
-      const {data,error:rpcError}=await supabase.rpc('get_branch_office_snapshot');
+      const {data,error:rpcError}=await supabase.rpc('branch_get_snapshot');
       if(rpcError) throw rpcError;
       setSnapshot(data||{});
       setUpdatedAt(new Date());
