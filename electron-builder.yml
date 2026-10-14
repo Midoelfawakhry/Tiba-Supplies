@@ -1,0 +1,15 @@
+appId: com.tibasupplies.office.desktop
+productName: Tiba Supplies Office
+directories:
+  output: release
+files:
+  - dist/**/*
+  - electron/main.cjs
+extraMetadata:
+  main: electron/main.cjs
+win:
+  target:
+    - target: portable
+      arch:
+        - x64
+artifactName: Tiba-Supplies-Office-${version}-Windows.${ext}
