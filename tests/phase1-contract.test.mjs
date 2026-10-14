@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
-const [baseline, mainOffice, assignmentSql, lifecycle, driverLocation, delivery, deactivationGuard, masterUpdate, directoryNotes, vehicleOwnerSql, ownerDeactivationGuard, driverVehicleLifecycle, driverAccountEdge, branchSql, driverPortal, assignmentUi, driverUi, branchUi, dashboardUi, directoryUi, driverVehicleAssignments, driverVehicleBookingGuard, driverCodeSequence, idempotentDelivery, bookingDeliveryGate] = await Promise.all([
+const [baseline, mainOffice, assignmentSql, lifecycle, driverLocation, delivery, deactivationGuard, masterUpdate, directoryNotes, vehicleOwnerSql, ownerDeactivationGuard, driverVehicleLifecycle, driverAccountEdge, branchSql, driverPortal, assignmentUi, driverUi, branchUi, dashboardUi, directoryUi, driverVehicleAssignments, driverVehicleBookingGuard, driverCodeSequence, idempotentDelivery, bookingDeliveryGate, cancellationReconcile] = await Promise.all([
   read("../supabase/migrations/20261014190000_phase1_clean_baseline.sql"),
   read("../supabase/migrations/20261014200000_phase1_main_office_rpcs.sql"),
   read("../supabase/migrations/20261014210000_phase1_direct_assignment.sql"),
@@ -29,6 +29,7 @@ const [baseline, mainOffice, assignmentSql, lifecycle, driverLocation, delivery,
   read("../supabase/migrations/20261014420000_phase1_driver_code_sequence.sql"),
   read("../supabase/migrations/20261014440000_phase1_idempotent_delivery_audit.sql"),
   read("../supabase/migrations/20261014270000_phase1_driver_audit_and_delivery_gate.sql"),
+  read("../supabase/migrations/20261014450000_phase1_reconcile_order_after_booking_cancellation.sql"),
 ]);
 
 test("clean baseline revokes direct client table access and seeds only office reference rows", () => {
@@ -180,4 +181,12 @@ test("Main Office cannot finalize delivery before driver confirmation", () => {
   assert.match(bookingDeliveryGate, /POSITIVE_ACTUAL_WEIGHT_REQUIRED/);
   assert.match(bookingDeliveryGate, /actual_loading_records/);
   assert.match(bookingDeliveryGate, /CANCELLATION_REASON_REQUIRED/);
+});
+
+
+test("cancelling an eligible booking reconciles its load-order status", () => {
+  assert.match(cancellationReconcile, /if v_next='CANCELLED' then/);
+  assert.match(cancellationReconcile, /status not in \('DELIVERED','CANCELLED'\)/);
+  assert.match(cancellationReconcile, /then 'IN_PROGRESS'[\s\S]*else 'PUBLISHED'/);
+  assert.match(cancellationReconcile, /lo\.status not in \('COMPLETED','CANCELLED'\)/);
 });
