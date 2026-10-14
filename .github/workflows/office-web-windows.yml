@@ -11,6 +11,7 @@ on:
       - 'package-lock.json'
       - 'vite.config.ts'
       - 'electron/**'
+      - 'electron-builder.yml'
       - '.github/workflows/office-web-windows.yml'
   workflow_dispatch:
 
