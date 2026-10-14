@@ -121,27 +121,24 @@ Deno.serve(async (request) => {
     .maybeSingle();
   if (driverError || !driver) return response(403, { error: "DRIVER_NOT_ACTIVE" });
 
-  const { data: assignment, error: assignmentError } = await admin.from("vehicle_driver_assignments")
+  const { data: assignment, error: assignmentError } = await admin.from("driver_vehicle_assignments")
     .select("vehicle_id,vehicles!inner(vehicle_id,is_active)")
     .eq("driver_id", driver.driver_id)
-    .is("assigned_to", null)
-    .lte("assigned_from", new Date().toISOString())
+    .is("ended_at", null)
+    .lte("assigned_at", new Date().toISOString())
     .eq("vehicles.is_active", true)
-    .order("assigned_from", { ascending: false })
+    .order("assigned_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   if (assignmentError || !assignment) return response(403, { error: "NO_ACTIVE_VEHICLE_ASSIGNMENT" });
 
   const { error: upsertError } = await admin.from("driver_live_locations").upsert({
     driver_id: driver.driver_id,
-    vehicle_id: assignment.vehicle_id,
     latitude,
     longitude,
     accuracy_m: accuracy,
-    heading,
-    speed_kmh: speedMps === null || !Number.isFinite(speedMps) ? null : speedMps * 3.6,
     captured_at: new Date(capturedMs).toISOString(),
-    updated_at: new Date().toISOString(),
+    received_at: new Date().toISOString(),
   }, { onConflict: "driver_id" });
   if (upsertError) return response(500, { error: "LOCATION_WRITE_FAILED" });
 
