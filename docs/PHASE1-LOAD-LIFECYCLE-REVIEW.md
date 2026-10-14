@@ -3,30 +3,27 @@
 Review date: 2026-10-14
 Branch: shadow/phase1-hardening
 
-This is a static source review. No SQL was executed and no database was changed.
+This is a static source review. No production data or schema was changed during this review.
 
-## Confirmed relationships in the reference types
-- bookings.load_order_id references load_orders.load_order_id.
-- actual_loading_records.booking_id references bookings.booking_id.
-- delivery_confirmations.booking_id references bookings.booking_id and is marked one-to-one in the generated reference types.
+## Confirmed relationships in the baseline
+- `bookings.load_order_id` references `load_orders.load_order_id`.
+- `actual_loading_records.booking_id` references `bookings.booking_id`, is NOT NULL, and is unique in the clean Phase 1 baseline.
+- `delivery_confirmations.booking_id` references `bookings.booking_id` and is unique.
 
-## Current snapshot concern
-The Phase 1 snapshot joins actual_loading_records to load_orders using factory_id and quarry_id, rather than traversing actual_loading_records.booking_id -> bookings.load_order_id. This is a broader match than the direct relationship documented in the reference types and may duplicate or misattribute rows when orders share a factory/quarry pair.
+## Actual-loading join review
+The current `branch_get_snapshot()` migration already follows the correct relationship path:
 
-## Safe implementation direction
-1. Join actual loading records to bookings by booking_id.
-2. Join bookings to load_orders by load_order_id.
-3. Filter using the resolved load order's office_id.
-4. Keep actual_loading_records with a nullable booking_id in mind; decide whether such legacy/manual records belong in a separate reconciliation list instead of silently dropping or guessing their order.
-5. Return explicit fields rather than serializing entire rows.
-6. Add tests for multiple orders with the same factory/quarry, a missing booking link, and records belonging to another office.
+`actual_loading_records al → bookings b ON b.booking_id = al.booking_id → load_orders lo ON lo.load_order_id = b.load_order_id`
 
-## Additional operational controls to validate
-- Confirm delivery is only accepted for the authenticated driver's own booking.
-- Confirm the booking is in an eligible state and actual weight is positive.
-- Confirm a delivery confirmation cannot be repeated.
-- Confirm cancellation cannot undo a delivered/weighted trip.
-- Confirm direct assignment is limited to the HEAD office and location freshness/geofence is checked server-side.
+It does **not** match load orders by factory/quarry pair. This means two orders that share a factory and quarry remain distinguishable by booking/order identity. The earlier concern in this document that the current snapshot used a factory/quarry join was inaccurate and is corrected here.
+
+The clean baseline also disallows a null `booking_id` for actual-loading records. A legacy/manual record without a booking link cannot be inserted into this baseline as defined. If historical imports are introduced later, they should be handled through an explicit reconciliation/import design, not by guessing an order.
+
+## Remaining validation
+1. Add a regression contract test to prevent the snapshot from regressing to a factory/quarry join.
+2. Test two separate orders with the same factory/quarry pair and verify the actual record resolves through its booking to exactly one order.
+3. Validate office scoping against the approved office model. The baseline has no `office_id` column on `load_orders`; do not claim a per-order office filter exists until the data model explicitly supports it. Branch visibility currently scopes allocations/loading through driver and vehicle office assignments.
+4. Keep authorization, delivery ownership, duplicate confirmation, cancellation, and geofence checks under runtime acceptance testing.
 
 ## Status
-Findings and suggested join path only. Runtime behavior and live data have not been tested. Shadow remains without tables until a reviewed schema bootstrap is available. Production has not been changed.
+Static source review only. Runtime database acceptance has not been proven by this document. Shadow must be checked directly before claiming live runtime validation. Production remains untouched.
