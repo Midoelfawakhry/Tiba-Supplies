@@ -34,28 +34,7 @@ Deno.serve(async (req: Request) => {
     const callerId = callerData.user.id;
     const body = await req.json();
 
-    if (body.action === "complete_password_setup") {
-      const { data: driver, error: driverError } = await admin
-        .from("drivers")
-        .select("driver_id")
-        .eq("auth_user_id", callerId)
-        .eq("is_active", true)
-        .maybeSingle();
-      if (driverError) throw driverError;
-      if (!driver) return json({ error: "DRIVER_NOT_FOUND_OR_INACTIVE" }, 403);
-
-      const { data: currentUser, error: currentUserError } = await admin.auth.admin.getUserById(callerId);
-      if (currentUserError) throw currentUserError;
-      const appMetadata = currentUser.user.app_metadata ?? {};
-      if (appMetadata.must_change_password !== true) return json({ success: true });
-
-      const { error: updateError } = await admin.auth.admin.updateUserById(callerId, {
-        app_metadata: { ...appMetadata, must_change_password: false },
-      });
-      if (updateError) throw updateError;
-      return json({ success: true });
-    }
-
+    // Phase 1 authorization contract
     // Shadow Phase 1 authorization contract: authorize privileged driver-account
     // operations through the current Main Office RPC guard, never legacy role tables.
     const { error: officeAccessError } = await callerClient.rpc("main_office_get_directory");
@@ -95,10 +74,10 @@ Deno.serve(async (req: Request) => {
         email: driverLoginEmail(phone),
         email_confirm: true,
         password: temporaryPassword,
-        app_metadata: { ...appMetadata, must_change_password: true },
+        app_metadata: { ...appMetadata, must_change_password: false },
       });
       if (passwordError) throw passwordError;
-      return json({ success: true, driver_id: driverId, must_change_password: true });
+      return json({ success: true, driver_id: driverId, must_change_password: false });
     }
 
     const { data: driver, error: driverError } = await admin
@@ -120,7 +99,7 @@ Deno.serve(async (req: Request) => {
       password: temporaryPassword,
       email_confirm: true,
       user_metadata: { display_name: driver.name, driver_phone: phone },
-      app_metadata: { must_change_password: true },
+      app_metadata: { must_change_password: false },
     });
     if (createError) {
       const duplicate = /already|registered|exists/i.test(createError.message);
