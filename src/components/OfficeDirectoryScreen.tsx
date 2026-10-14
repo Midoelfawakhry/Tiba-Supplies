@@ -98,19 +98,20 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     setLoading(true);
     setError('');
     try {
-      const data = await getLiveSnapshot();
-      const [waitingResult, vehiclesResult, ownersResult] = await Promise.all([
-        supabase.rpc('get_office_waiting_list'),
-        supabase.rpc('get_available_vehicles'),
-        supabase.rpc('get_vehicle_owner_directory'),
+      const [data, directoryResult] = await Promise.all([
+        getLiveSnapshot(),
+        supabase.rpc('main_office_get_directory'),
       ]);
-      if (waitingResult.error) throw waitingResult.error;
-      if (vehiclesResult.error) throw vehiclesResult.error;
-      if (ownersResult.error) throw ownersResult.error;
-      setSnapshot(data);
-      setWaiting(Array.isArray(waitingResult.data) ? waitingResult.data : []);
-      setAvailableVehicles(Array.isArray(vehiclesResult.data) ? vehiclesResult.data : []);
-      setOwnerDirectory(Array.isArray(ownersResult.data) ? ownersResult.data : []);
+      if (directoryResult.error) throw directoryResult.error;
+      const directory = directoryResult.data ?? {};
+      const factories = (directory.factories ?? []).map((r: Row) => ({ factory_id: r.id, code: r.code, factory_code: r.code, name: r.name, is_active: r.is_active }));
+      const quarries = (directory.quarries ?? []).map((r: Row) => ({ quarry_id: r.id, code: r.code, quarry_code: r.code, name: r.name, is_active: r.is_active, latitude: r.latitude, longitude: r.longitude }));
+      const drivers = (directory.drivers ?? []).map((r: Row) => ({ driver_id: r.id, driver_code: r.code, code: r.code, name: r.name, phone: r.phone, office_id: r.office_id, is_active: r.is_active }));
+      const vehicles = (directory.vehicles ?? []).map((r: Row) => ({ vehicle_id: r.id, vehicle_code: r.code, plate_number: r.plate_number, owner_id: r.owner_id, office_id: r.office_id, is_active: r.is_active }));
+      setSnapshot({ ...data, factories, quarries, drivers, vehicles });
+      setWaiting([]);
+      setAvailableVehicles(vehicles.filter((v: Row) => v.is_active !== false));
+      setOwnerDirectory(directory.owners ?? []);
     } catch (e: any) {
       setError(e?.message || 'تعذر تحميل دليل بيانات المكتب.');
     } finally {
@@ -129,13 +130,16 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     setSuccess('');
     setSavingEdit(true);
     try {
-      const { data, error: insertError } = await supabase.rpc('office_create_directory_entity', {
+      if (!code.trim()) throw new Error('لازم تدخل كود واضح وفريد للسجل.');
+      const { data, error: insertError } = await supabase.rpc('main_office_upsert_directory', {
         p_entity_type: kind === 'factories' ? 'FACTORY' : 'QUARRY',
         p_name: name.trim(),
-        p_code: code.trim() || null,
+        p_code: code.trim(),
+        p_notes: null,
+        p_is_active: true,
       });
       if (insertError) throw insertError;
-      if (!data?.success) throw new Error('تعذر تأكيد إضافة السجل.');
+      if (!data?.id) throw new Error('تعذر تأكيد إضافة السجل.');
       setSuccess(`تمت إضافة ${label} بنجاح.`);
       setEntitySearch('');
       await load();
@@ -218,8 +222,8 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     if (!window.confirm('تأكيد إيقاف ' + name + '؟ سيتم منعه من الاختيارات الجديدة مع الاحتفاظ بكل سجلات التحميل والربط السابقة. لن يتم الإيقاف لو عليه نقلة نشطة.')) return;
     setError(''); setSuccess(''); setSavingEdit(true);
     try {
-      const { data, error: rpcError } = await supabase.rpc('set_operational_driver_active', { p_driver_id: row.driver_id, p_is_active: false });
-      if (rpcError) throw rpcError; if (!data?.success) throw new Error('تعذر تأكيد إيقاف السائق.');
+      const { data, error: rpcError } = await supabase.rpc('main_office_set_directory_active', { p_entity_type: 'DRIVER', p_entity_id: row.driver_id, p_is_active: false });
+      if (rpcError) throw rpcError; if (!data?.id) throw new Error('تعذر تأكيد إيقاف السائق.');
       setEditingDriver(null); setSuccess('تم إيقاف السائق مع الاحتفاظ بالسجلات التاريخية.'); await load();
     } catch (e: any) {
       const raw = String(e?.message || '');
@@ -455,15 +459,30 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     if (!['factories', 'quarries'].includes(active)) return;
     setSavingMaster(true); setError(''); setSuccess('');
     try {
-      const { data, error: rpcError } = await supabase.rpc('save_master_directory_entry', {
-        p_entity_type: active === 'factories' ? 'factory' : 'quarry',
-        p_entity_id: editingMasterEntry ? (active === 'factories' ? editingMasterEntry.factory_id : editingMasterEntry.quarry_id) : null,
-        p_name: masterForm.name.trim(), p_code: masterForm.code.trim() || null,
-        p_address: masterForm.address.trim() || null, p_phone: masterForm.phone.trim() || null,
-        p_is_active: masterForm.is_active,
-      });
-      if (rpcError) throw rpcError;
-      if (!data?.success) throw new Error('تعذر تأكيد حفظ بيانات الدليل.');
+      if (editingMasterEntry) {
+        const entityId = active === 'factories' ? editingMasterEntry.factory_id : editingMasterEntry.quarry_id;
+        const { data, error: rpcError } = await supabase.rpc('main_office_set_directory_active', {
+          p_entity_type: active === 'factories' ? 'FACTORY' : 'QUARRY',
+          p_entity_id: entityId,
+          p_is_active: masterForm.is_active,
+        });
+        if (rpcError) throw rpcError;
+        if (!data?.id) throw new Error('تعذر تأكيد تحديث حالة السجل.');
+        if (masterForm.name.trim() !== String(editingMasterEntry.name ?? '') || masterForm.code.trim() !== String(editingMasterEntry.code ?? editingMasterEntry.factory_code ?? editingMasterEntry.quarry_code ?? '')) {
+          throw new Error('تعديل الاسم أو الكود غير متاح في عقد Phase 1 الحالي؛ تم تحديث الحالة فقط. لم يتم حفظ الاسم أو الكود.');
+        }
+      } else {
+        if (!masterForm.code.trim() || !masterForm.name.trim()) throw new Error('الكود والاسم مطلوبان.');
+        const { data, error: rpcError } = await supabase.rpc('main_office_upsert_directory', {
+          p_entity_type: active === 'factories' ? 'FACTORY' : 'QUARRY',
+          p_code: masterForm.code.trim(),
+          p_name: masterForm.name.trim(),
+          p_notes: [masterForm.address.trim(), masterForm.phone.trim()].filter(Boolean).join(' | ') || null,
+          p_is_active: masterForm.is_active,
+        });
+        if (rpcError) throw rpcError;
+        if (!data?.id) throw new Error('تعذر تأكيد حفظ بيانات الدليل.');
+      }
       setShowMasterForm(false); setEditingMasterEntry(null);
       setMasterForm({ name: '', code: '', address: '', phone: '', is_active: true });
       setSuccess(editingMasterEntry ? 'تم تحديث بيانات الدليل بنجاح.' : 'تمت إضافة البيانات إلى دليل المكتب.');
