@@ -7,6 +7,7 @@ on:
       - main
     paths:
       - 'src/**'
+      - 'native/android/**'
       - 'index.html'
       - 'package.json'
       - 'capacitor.config.json'
@@ -15,6 +16,7 @@ on:
   pull_request:
     paths:
       - 'src/**'
+      - 'native/android/**'
       - 'index.html'
       - 'package.json'
       - 'capacitor.config.json'
@@ -142,6 +144,37 @@ jobs:
 
       - name: Add Android platform
         run: npx cap add android
+
+      - name: Install native driver tracking service (driver APK only)
+        if: matrix.app_mode == 'driver'
+        shell: bash
+        run: |
+          set -euo pipefail
+          TARGET="android/app/src/main/java/com/tibasupplies/driver"
+          mkdir -p "$TARGET"
+          cp native/android/NativeDriverTrackingPlugin.java "$TARGET/"
+          cp native/android/NativeDriverTrackingService.java "$TARGET/"
+          MAIN="$(find android/app/src/main/java -name MainActivity.java -print -quit)"
+          if [ -z "$MAIN" ]; then
+            echo "::error::Capacitor MainActivity.java was not found"
+            exit 1
+          fi
+          if ! grep -q 'NativeDriverTrackingPlugin.class' "$MAIN"; then
+            sed -i '/super.onCreate(savedInstanceState);/i\        registerPlugin(NativeDriverTrackingPlugin.class);' "$MAIN"
+          fi
+          node <<'NODE'
+          const fs = require('node:fs');
+          const file = 'android/app/src/main/AndroidManifest.xml';
+          let xml = fs.readFileSync(file, 'utf8');
+          const service = '<service android:name="com.tibasupplies.driver.NativeDriverTrackingService" android:enabled="true" android:exported="false" android:stopWithTask="false" android:foregroundServiceType="location" />';
+          if (!xml.includes('com.tibasupplies.driver.NativeDriverTrackingService')) {
+            xml = xml.replace('</application>', '    ' + service + '\n  </application>');
+          }
+          fs.writeFileSync(file, xml);
+          if (!fs.readFileSync(file, 'utf8').includes(service)) throw new Error('Native tracking service was not registered in AndroidManifest.xml');
+          NODE
+          grep -q 'registerPlugin(NativeDriverTrackingPlugin.class)' "$MAIN"
+          echo "Native driver tracking plugin and service installed."
 
       - name: Declare and verify Android location permissions
         shell: bash
