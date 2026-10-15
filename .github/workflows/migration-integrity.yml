@@ -2,12 +2,12 @@ name: Migration integrity
 
 on:
   push:
-    branches: [main, chore/migration-history-integrity]
+    branches: [main, chore/migration-history-integrity, shadow/phase1-hardening]
     paths:
       - "supabase/migrations/**"
       - ".github/workflows/migration-integrity.yml"
   pull_request:
-    branches: [main]
+    branches: [main, shadow/phase1-hardening]
     paths:
       - "supabase/migrations/**"
       - ".github/workflows/migration-integrity.yml"
