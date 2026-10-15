@@ -93,7 +93,7 @@ Deno.serve(async (req: Request) => {
 
     let result: any = null;
     let lastProviderError = "";
-    const models = ["gemini-2.5-flash", "gemini-2.0-flash-lite"];
+    const models = ["gemini-3.8-flash"];
 
     for (const model of models) {
       const response = await fetch(
@@ -104,7 +104,7 @@ Deno.serve(async (req: Request) => {
           body: JSON.stringify({
             systemInstruction: { parts: [{ text: systemInstruction }] },
             contents,
-            generationConfig: { temperature: 0.2, maxOutputTokens: 900 },
+            generationConfig: { thinkingConfig: { thinkingLevel: "low" }, maxOutputTokens: 900 },
           }),
         },
       );
