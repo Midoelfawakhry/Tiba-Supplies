@@ -328,7 +328,10 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
       const messages: Record<string,string> = {
         DRIVER_ID_NAME_PHONE_AND_VEHICLE_REQUIRED:'أكمل بيانات السائق واختار العربية.',
         VEHICLE_NOT_AVAILABLE:'العربية غير نشطة أو غير متاحة للاستخدام.',
+        VEHICLE_NOT_AVAILABLE_IN_TARGET_BRANCH:'العربية ليست ضمن أسطول مكتب رأس سدر.',
+        VEHICLE_HAS_ACTIVE_BOOKING:'لا يمكن تغيير ربط العربية أثناء وجود نقلة نشطة عليها.',
         VEHICLE_ALREADY_ASSIGNED:'العربية مرتبطة بسائق آخر. اختار عربية مختلفة.',
+        DRIVER_NOT_ASSIGNED_TO_RAS_SEDR:'السائق ليس تابعًا لمكتب رأس سدر.',
         DRIVER_PHONE_INVALID:'أدخل رقم موبايل مصري صحيحًا.',
         DRIVER_PHONE_EXISTS:'رقم الموبايل مسجل لسائق آخر.',
         DRIVER_NOT_FOUND:'السائق غير موجود.',
