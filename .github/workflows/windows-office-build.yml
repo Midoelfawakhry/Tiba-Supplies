@@ -1,0 +1,54 @@
+name: Build Tiba Supplies Main Office for Windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - shadow/phase1-hardening
+    paths:
+      - 'src/**'
+      - 'electron/**'
+      - 'electron-builder.yml'
+      - 'package.json'
+      - '.github/workflows/windows-office-build.yml'
+      - 'supabase/migrations/**'
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows-office:
+    runs-on: windows-latest
+    env:
+      VITE_APP_MODE: office
+      VITE_SUPABASE_URL: https://awgppfjxegognuqozldl.supabase.co
+      VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_k78B7hdU7uSnAtvfA18iWQ_BxzVmdmz
+    steps:
+      - name: Checkout Shadow branch
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Type-check
+        run: npm run lint
+
+      - name: Build office web app
+        run: npm run build
+
+      - name: Package Windows portable EXE
+        run: npm run desktop:win
+
+      - name: Upload Windows EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tiba-Supplies-Main-Office-Windows-x64
+          path: release/*.exe
+          if-no-files-found: error
+          retention-days: 14
