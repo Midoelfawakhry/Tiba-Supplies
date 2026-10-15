@@ -219,8 +219,9 @@ export const DriverApp: React.FC = () => {
     let nativeServiceStarted = false;
     let nativeStartPending = false;
 
-    // Android uses a native foreground service for ongoing collection and upload.
-    // The community watcher is used only to obtain its permission flow, then removed.
+    // Android: start the native foreground service as soon as the permission watcher
+    // is initialized. Do not wait for its first GPS callback; that can delay or prevent
+    // the native service from starting and creates a circular startup dependency.
     if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
       void (async () => {
         try {
@@ -230,53 +231,50 @@ export const DriverApp: React.FC = () => {
             requestPermissions: true,
             stale: false,
             distanceFilter: LOCATION_DISTANCE_FILTER_METERS,
-          }, async (location, watcherError) => {
+          }, (location, watcherError) => {
             if (!active) return;
             if (watcherError) {
               setError(watcherError.message || 'تعذر طلب أذونات تتبع الموقع.');
               return;
             }
-            if (!location || nativeServiceStarted || nativeStartPending) return;
-            if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) {
-              setError('إعدادات الاتصال الآمن بقاعدة البيانات غير مكتملة.');
-              return;
-            }
-            nativeStartPending = true;
-            if (watcherId) {
-              const oldWatcherId = watcherId;
-              watcherId = undefined;
-              await BackgroundGeolocation.removeWatcher({ id: oldWatcherId });
-            }
-            try {
-              const result = await NativeDriverTracking.start({
-                accessToken: session.access_token,
-                refreshToken: session.refresh_token,
-                userId: session.user.id,
-                projectUrl: String(import.meta.env.VITE_SUPABASE_URL || ''),
-                publishableKey: String(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || ''),
-                expiresAt: (session.expires_at || 0) * 1000,
-              });
-              nativeServiceStarted = result.started;
-              nativeStartPending = false;
-              if (!active) {
-                await NativeDriverTracking.stop();
-                nativeServiceStarted = false;
-                return;
-              }
+            if (location) {
               setPosition({
                 latitude: location.latitude,
                 longitude: location.longitude,
                 accuracy: location.accuracy,
                 capturedAt: new Date(location.time ?? Date.now()).toLocaleString('ar-EG'),
               });
-              setError('');
-            } catch (nativeError: any) {
-              nativeStartPending = false;
-              if (active) setError(nativeError?.message || 'تعذر تشغيل خدمة تتبّع Android المستقلة.');
             }
           });
-        } catch (permissionError: any) {
-          if (active) setError(permissionError?.message || 'تعذر طلب أذونات الموقع والإشعارات.');
+
+          if (!active) {
+            if (watcherId) await BackgroundGeolocation.removeWatcher({ id: watcherId });
+            return;
+          }
+          if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) {
+            setError('إعدادات الاتصال الآمن بقاعدة البيانات غير مكتملة.');
+            return;
+          }
+
+          // Start without depending on a successful first location callback.
+          const result = await NativeDriverTracking.start({
+            accessToken: session.access_token,
+            refreshToken: session.refresh_token,
+            userId: session.user.id,
+            projectUrl: String(import.meta.env.VITE_SUPABASE_URL || ''),
+            publishableKey: String(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || ''),
+            expiresAt: (session.expires_at || 0) * 1000,
+          });
+          nativeServiceStarted = result.started;
+          if (!active && nativeServiceStarted) {
+            await NativeDriverTracking.stop();
+            nativeServiceStarted = false;
+            return;
+          }
+          if (!result.started) setError('لم تؤكد خدمة أندرويد بدء التتبع.');
+          else setError('');
+        } catch (trackingError: any) {
+          if (active) setError(trackingError?.message || 'تعذر تشغيل خدمة تتبع الموقع في الخلفية.');
         }
       })();
 
