@@ -34,5 +34,9 @@ export async function getLiveSnapshot(): Promise<LiveSnapshot> {
 }
 
 export function liveName(record: Record<string, any> | undefined, fallback = 'غير محدد') {
-  return record?.name ?? record?.factory_name ?? record?.quarry_name ?? fallback;
+  const rawName = record?.name ?? record?.factory_name ?? record?.quarry_name;
+  if (!rawName) return fallback;
+  // Internal factory/quarry codes may be embedded in legacy display names (e.g. FAC-002 · الجوهرة).
+  // Keep the code in the database, but show only the human-readable name in every UI using liveName.
+  return String(rawName).replace(/^\s*(?:FAC|QRY|FACTORY|QUARRY)[-_ ]?\d+\s*[·•|:-]\s*/i, '').trim() || fallback;
 }
