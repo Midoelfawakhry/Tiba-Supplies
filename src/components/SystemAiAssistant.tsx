@@ -71,7 +71,51 @@ export const SystemAiAssistant: React.FC<SystemAiAssistantProps> = ({ audience, 
       setVoiceStatus('الصوت مقفول؛ الإجابة مكتوبة.');
       return;
     }
-    setVoiceStatus('جاري تجهيز الصوت…');
+    setVoiceStatus('جاري تجهيز الصوت العربي…');
+
+    // Prefer an explicitly installed Arabic browser voice; the default system
+    // voice may be English and can read Arabic answers incorrectly.
+    if ('speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined') {
+      try {
+        window.speechSynthesis.cancel();
+        let voices = window.speechSynthesis.getVoices();
+        if (!voices.length) {
+          voices = await new Promise<SpeechSynthesisVoice[]>(resolve => {
+            let finished = false;
+            const finish = (items: SpeechSynthesisVoice[]) => {
+              if (finished) return;
+              finished = true;
+              window.speechSynthesis.removeEventListener('voiceschanged', onVoicesChanged);
+              window.clearTimeout(timeout);
+              resolve(items);
+            };
+            const onVoicesChanged = () => finish(window.speechSynthesis.getVoices());
+            const timeout = window.setTimeout(() => finish(window.speechSynthesis.getVoices()), 900);
+            window.speechSynthesis.addEventListener('voiceschanged', onVoicesChanged);
+          });
+        }
+        const arabicVoices = voices.filter(voice => /^ar([-_]|$)/i.test(voice.lang));
+        const selectedVoice =
+          arabicVoices.find(voice => /^ar[-_]EG$/i.test(voice.lang)) ??
+          arabicVoices.find(voice => /arabic|العربية|egypt/i.test(voice.name)) ??
+          arabicVoices[0];
+        if (selectedVoice) {
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.voice = selectedVoice;
+          utterance.lang = selectedVoice.lang || 'ar-EG';
+          utterance.rate = 0.92;
+          utterance.pitch = 1;
+          utterance.onstart = () => setVoiceStatus('المساعد بينطق بالعربية باستخدام صوت الجهاز…');
+          utterance.onend = () => setVoiceStatus('انتهى نطق الإجابة.');
+          utterance.onerror = () => setVoiceStatus('تعذّر تشغيل الصوت العربي. الإجابة موجودة كتابة.');
+          window.speechSynthesis.speak(utterance);
+          return;
+        }
+      } catch {
+        // Try the native Android TTS engine below.
+      }
+    }
+
     try {
       await TextToSpeech.stop();
       await TextToSpeech.speak({
@@ -82,28 +126,13 @@ export const SystemAiAssistant: React.FC<SystemAiAssistantProps> = ({ audience, 
         volume: 1,
         queueStrategy: QueueStrategy.Flush,
       });
-      setVoiceStatus('انتهى نطق الإجابة.');
+      setVoiceStatus('تم إرسال الإجابة لمحرك النطق العربي في الجهاز.');
       return;
     } catch {
-      // Fall back to Web Speech when native TTS is unavailable.
+      // Keep the answer available as text if no Arabic TTS engine is installed.
     }
-    if (!('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') {
-      setVoiceStatus('الإجابة ظهرت كتابة، لكن محرك النطق غير متاح. راجع إعداد تحويل النص إلى كلام في أندرويد.');
-      return;
-    }
-    try {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'ar-EG';
-      utterance.rate = 0.92;
-      utterance.pitch = 1;
-      utterance.onstart = () => setVoiceStatus('المساعد بينطق الإجابة دلوقتي…');
-      utterance.onend = () => setVoiceStatus('انتهى نطق الإجابة.');
-      utterance.onerror = () => setVoiceStatus('الإجابة ظهرت كتابة، لكن الهاتف لم يشغّل الصوت. راجع محرك تحويل النص إلى كلام في إعدادات أندرويد.');
-      window.speechSynthesis.speak(utterance);
-    } catch {
-      setVoiceStatus('الإجابة ظهرت كتابة، لكن تعذّر تشغيل الصوت على الجهاز.');
-    }
+
+    setVoiceStatus('الإجابة ظهرت كتابة، لكن لا يوجد محرك نطق عربي متاح. يلزم تثبيت صوت عربي في إعدادات تحويل النص إلى كلام في أندرويد.');
   }
 
   function stopVoice() {
