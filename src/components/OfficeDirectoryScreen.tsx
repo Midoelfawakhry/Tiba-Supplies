@@ -43,6 +43,7 @@ function rowDetails(row: Row, key: ScreenKey) {
   if (key === 'quarries') return [row.code, row.address, row.phone, row.is_active === false ? 'غير نشط' : 'نشط'].filter(Boolean).join(' · ');
   if (key === 'drivers') return [row.phone, row.driver_code, row.is_active === false ? 'غير نشط' : 'نشط'].filter(Boolean).join(' · ');
   if (key === 'vehicles') return [row.owner_name ? 'المالك: ' + row.owner_name : '', row.truck_type ?? row.vehicle_type, row.capacity_tons ? row.capacity_tons + ' طن' : '', row.is_active === false ? 'غير نشطة' : 'نشطة'].filter(Boolean).join(' · ');
+  if (key === 'owners') return [row.owner_code, row.phone, row.is_active === false ? 'غير نشط' : 'نشط'].filter(Boolean).join(' · ');
   if (key === 'waiting') return [row.driver_name, row.status, row.arrived_at ? new Date(row.arrived_at).toLocaleString('ar-EG') : ''].filter(Boolean).join(' · ');
   if (key === 'loads') return [row.status, row.requested_quantity ? 'المطلوب: ' + row.requested_quantity : '', row.created_at ? new Date(row.created_at).toLocaleString('ar-EG') : ''].filter(Boolean).join(' · ');
   return [row.loading_sequence_date || row.load_date, row.daily_load_number ? 'تحميل اليوم #' + row.daily_load_number : '', row.ticket_number ? 'تذكرة: ' + row.ticket_number : '', row.actual_weight != null ? 'الوزن: ' + row.actual_weight + ' طن' : 'الوزن لم يُسجل', row.driver_id ? 'معرّف السائق: ' + row.driver_id : '', row.vehicle_id ? 'معرّف العربية: ' + row.vehicle_id : '', row.created_at ? new Date(row.created_at).toLocaleString('ar-EG') : ''].filter(Boolean).join(' · ');
@@ -51,7 +52,7 @@ function rowDetails(row: Row, key: ScreenKey) {
 export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showSectionTabs?: boolean }> = ({ initialSection = 'factories', showSectionTabs = true }) => {
   const [active, setActive] = useState<ScreenKey>(initialSection);
   useEffect(() => { setActive(initialSection); }, [initialSection]);
-  useEffect(() => { setShowMasterForm(false); setEditingMasterEntry(null); }, [active]);
+  useEffect(() => { setShowMasterForm(false); setEditingMasterEntry(null); setEditingOwner(null); }, [active]);
   const [snapshot, setSnapshot] = useState<LiveSnapshot | null>(null);
   const [waiting, setWaiting] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,6 +81,9 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
   const [availableVehicles, setAvailableVehicles] = useState<Row[]>([]);
   const [ownerDirectory, setOwnerDirectory] = useState<Row[]>([]);
+  const [editingOwner, setEditingOwner] = useState<Row | null>(null);
+  const [ownerEditName, setOwnerEditName] = useState('');
+  const [ownerEditPhone, setOwnerEditPhone] = useState('');
   const [editingDriver, setEditingDriver] = useState<Row | null>(null);
   const [driverEditName, setDriverEditName] = useState('');
   const [driverEditPhone, setDriverEditPhone] = useState('');
@@ -208,6 +212,43 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     } finally { setSavingEdit(false); }
   }
 
+  function beginOwnerEdit(row: Row) {
+    setEditingOwner(row);
+    setOwnerEditName(String(row.name ?? ''));
+    setOwnerEditPhone(String(row.phone ?? ''));
+    setError(''); setSuccess('');
+  }
+
+  async function saveOwnerEdit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editingOwner) return;
+    if (!ownerEditName.trim()) { setError('اسم المالك مطلوب.'); return; }
+    setError(''); setSuccess(''); setSavingEdit(true);
+    try {
+      const { data, error: rpcError } = await supabase.rpc('main_office_update_vehicle_owner', {
+        p_owner_id: editingOwner.owner_id,
+        p_name: ownerEditName.trim(),
+        p_phone: ownerEditPhone.trim() || null,
+        p_notes: editingOwner.notes ?? null,
+      });
+      if (rpcError) throw rpcError;
+      if (!data?.success || data?.owner_id !== editingOwner.owner_id) throw new Error('تعذر تأكيد تحديث بيانات المالك.');
+      setEditingOwner(null);
+      setSuccess('تم تحديث بيانات المالك مع الاحتفاظ بكود المالك وربطه بالعربيات الحالية.');
+      await load();
+    } catch (e: any) {
+      const raw = String(e?.message || '');
+      const messages: Record<string, string> = {
+        OWNER_ID_AND_NAME_REQUIRED: 'اسم المالك مطلوب.',
+        OWNER_NOT_FOUND: 'المالك غير موجود. حدّث القائمة وحاول مرة أخرى.',
+        MAIN_OFFICE_ACCESS_REQUIRED: 'تعديل بيانات المالك متاح للمكتب الرئيسي فقط.',
+        AUTH_REQUIRED: 'انتهت جلسة المكتب. سجّل الدخول مرة أخرى.',
+      };
+      const key = Object.keys(messages).find(code => raw.includes(code));
+      setError(key ? messages[key] : raw || 'تعذر تحديث بيانات المالك.');
+    } finally { setSavingEdit(false); }
+  }
+
   async function addVehicleOwner() {
     const name = window.prompt('اكتب اسم مالك العربية:');
     if (!name?.trim()) return;
@@ -281,7 +322,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
       });
       if (rpcError) throw rpcError;
       if (!data?.success) throw new Error('تعذر تأكيد تعديل السائق.');
-      setEditingDriver(null); setSuccess('تم تحديث بيانات السائق. ربط النقلة بالعربية يتم من خلال أمر التحميل.'); await load();
+      setEditingDriver(null); setSuccess('تم تحديث بيانات السائق وربط العربية به.'); await load();
     } catch (e: any) {
       const raw=String(e?.message||'');
       const messages: Record<string,string> = {
@@ -422,7 +463,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
       setDriverName(''); setDriverPhone(''); setDriverCode(''); setVehicleSearch(''); setSelectedVehicleId(''); setShowDriverForm(false);
       try {
         await createDriverAccount(savedDriver.driverId, driverTemporaryPassword);
-        setSuccess(`تم إنشاء السائق ${result.driver_code} وحساب الدخول. ربط العربية يتم عند إسناد أمر تحميل.`);
+        setSuccess(`تم إنشاء السائق ${result.driver_code} وحساب الدخول وربط العربية المختارة به.`);
         setDriverTemporaryPassword(''); setDriverTemporaryPasswordConfirmation('');
       } catch (accountError: any) {
         setPendingAccount(savedDriver);
@@ -593,6 +634,15 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
         </form>
       </section>}
 
+      {editingOwner && active === 'owners' && <section className="rounded-3xl border border-teal-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="mb-4"><h3 className="font-black">تعديل بيانات مالك العربية</h3><p className="mt-1 text-sm text-slate-500">كود المالك ثابت، وتعديل الاسم أو الهاتف لا يغيّر ملكية العربيات المرتبطة به.</p></div>
+        <form onSubmit={saveOwnerEdit} className="grid gap-3 sm:grid-cols-2">
+          <label className="text-sm font-bold text-slate-700">اسم المالك *<input required maxLength={200} value={ownerEditName} onChange={e => setOwnerEditName(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal" /></label>
+          <label className="text-sm font-bold text-slate-700">رقم الموبايل<input type="tel" maxLength={40} value={ownerEditPhone} onChange={e => setOwnerEditPhone(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal" /></label>
+          <div className="sm:col-span-2 flex flex-wrap gap-3"><button disabled={savingEdit} type="submit" className="rounded-xl bg-teal-600 px-5 py-3 text-sm font-black text-white disabled:opacity-60">{savingEdit ? 'جاري الحفظ...' : 'حفظ بيانات المالك'}</button><button type="button" onClick={() => setEditingOwner(null)} className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-bold">إلغاء</button></div>
+        </form>
+      </section>}
+
       {editingVehicle && active === 'vehicles' && <section className="rounded-3xl border border-blue-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="mb-4"><h3 className="font-black">تعديل بيانات العربية</h3><p className="mt-1 text-sm text-slate-500">تعديل اللوحة والمالك المسجل فقط. كود العربية ثابت، ولا يمكن تعديلها أثناء نقلة نشطة.</p></div>
         <form onSubmit={saveVehicleEdit} className="grid gap-3 sm:grid-cols-2">
@@ -666,7 +716,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
                   const key = Object.keys(messages).find(code => raw.includes(code));
                   setError(Object.entries(messages).find(([code]) => raw.includes(code))?.[1] ?? (raw || 'تعذر تغيير حالة العربية.'));
                 } finally { setSavingEdit(false); }
-              }} className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold disabled:opacity-50 ${row.is_active === false ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-700'}`}>{row.is_active === false ? 'تفعيل العربية' : 'إيقاف العربية'}</button>}{(['factories', 'quarries'].includes(active)) && <button type="button" disabled={savingEdit} onClick={() => void setMasterDirectoryActive(row)} aria-label={row.is_active === false ? 'تفعيل السجل' : 'إيقاف السجل'} className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold disabled:opacity-50 ${row.is_active === false ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-700'}`}>{row.is_active === false ? 'تفعيل' : 'إيقاف'}</button>}{active === 'owners' && <button type="button" disabled={savingEdit} onClick={() => void setOwnerActive(row)} className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold disabled:opacity-50 ${row.is_active === false ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-700'}`}>{row.is_active === false ? 'تفعيل المالك' : 'إيقاف المالك'}</button>}{active === 'drivers' && row.is_active !== false && row.auth_user_id && <button type="button" onClick={() => { setPasswordResetDriver(row); setNewDriverPassword(''); setConfirmDriverPassword(''); setEditingDriver(null); setError(''); setSuccess(''); }} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-800">كلمة المرور</button>}{active === "drivers" && row.is_active !== false && <button type="button" disabled={savingEdit} onClick={() => void deactivateDriver(row)} aria-label="إيقاف السائق" className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-700 disabled:opacity-50"><UserX size={10}/> إيقاف</button>}{(active === 'drivers' || active === 'vehicles') && <button type="button" onClick={() => active === 'drivers' ? void beginDriverEdit(row) : beginVehicleEdit(row)} aria-label={active === 'drivers' ? 'تعديل بيانات السائق' : 'تعديل بيانات العربية'} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"><Pencil size={10}/> تعديل</button>}
+              }} className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold disabled:opacity-50 ${row.is_active === false ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-700'}`}>{row.is_active === false ? 'تفعيل العربية' : 'إيقاف العربية'}</button>}{(['factories', 'quarries'].includes(active)) && <button type="button" disabled={savingEdit} onClick={() => void setMasterDirectoryActive(row)} aria-label={row.is_active === false ? 'تفعيل السجل' : 'إيقاف السجل'} className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold disabled:opacity-50 ${row.is_active === false ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-700'}`}>{row.is_active === false ? 'تفعيل' : 'إيقاف'}</button>}{active === 'owners' && <button type="button" disabled={savingEdit} onClick={() => beginOwnerEdit(row)} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700"><Pencil size={10}/> تعديل</button>}{active === 'owners' && <button type="button" disabled={savingEdit} onClick={() => void setOwnerActive(row)} className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold disabled:opacity-50 ${row.is_active === false ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-700'}`}>{row.is_active === false ? 'تفعيل المالك' : 'إيقاف المالك'}</button>}{active === 'drivers' && row.is_active !== false && row.auth_user_id && <button type="button" onClick={() => { setPasswordResetDriver(row); setNewDriverPassword(''); setConfirmDriverPassword(''); setEditingDriver(null); setError(''); setSuccess(''); }} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-800">كلمة المرور</button>}{active === "drivers" && row.is_active !== false && <button type="button" disabled={savingEdit} onClick={() => void deactivateDriver(row)} aria-label="إيقاف السائق" className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-700 disabled:opacity-50"><UserX size={10}/> إيقاف</button>}{(active === 'drivers' || active === 'vehicles') && <button type="button" onClick={() => active === 'drivers' ? void beginDriverEdit(row) : beginVehicleEdit(row)} aria-label={active === 'drivers' ? 'تعديل بيانات السائق' : 'تعديل بيانات العربية'} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"><Pencil size={10}/> تعديل</button>}
               {active === 'actual' && row.booking_id && !['CANCELLED', 'DELIVERED', 'COMPLETED'].includes(snapshot?.bookings?.find((b: Row) => b.booking_id === row.booking_id)?.status) && !row.delivery_confirmed_at && row.actual_weight == null && <button type="button" onClick={async () => {
                 setError('إلغاء الحجز القديم غير مدعوم في Phase 1. استخدم إلغاء أمر التحميل إذا كانت حالته تسمح بذلك.');
               }} className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-700">إلغاء النقلة</button>}
