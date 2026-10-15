@@ -75,6 +75,9 @@ export const DriverApp: React.FC = () => {
   const [pendingDirectAssignments, setPendingDirectAssignments] = useState<any[]>([]);
   const [acceptingBookingId, setAcceptingBookingId] = useState<string | null>(null);
   const [acceptanceMessage, setAcceptanceMessage] = useState('');
+  const [dispatchState, setDispatchState] = useState<any>(null);
+  const [selectingLoadOrderId, setSelectingLoadOrderId] = useState<string | null>(null);
+  const [dispatchMessage, setDispatchMessage] = useState('');
   const [deliveryBusyBookingId, setDeliveryBusyBookingId] = useState<string | null>(null);
   const [deliveryWeights, setDeliveryWeights] = useState<Record<string, string>>({});
   const [deliveryScaleImages, setDeliveryScaleImages] = useState<Record<string, File | null>>({});
@@ -120,6 +123,15 @@ export const DriverApp: React.FC = () => {
     setPendingDirectAssignments(Array.isArray(data) ? data : []);
   }
 
+  async function refreshDispatchState() {
+    const { data, error: dispatchError } = await supabase.rpc('driver_get_dispatch_state');
+    if (dispatchError) {
+      setError(dispatchError.message || 'تعذر تحميل حالة قائمة الانتظار والتوزيع.');
+      return;
+    }
+    setDispatchState(data);
+  }
+
   async function refreshPortal() {
     if (!session) return;
     setPortalLoading(true);
@@ -129,8 +141,34 @@ export const DriverApp: React.FC = () => {
     } else {
       setPortal(data);
       await refreshPendingDirectAssignments();
+      await refreshDispatchState();
     }
     setPortalLoading(false);
+  }
+
+  async function selectLoad(loadOrderId: string) {
+    if (selectingLoadOrderId) return;
+    setSelectingLoadOrderId(loadOrderId);
+    setDispatchMessage('');
+    setError('');
+    try {
+      const { data, error: selectionError } = await supabase.rpc('driver_select_load', { p_load_order_id: loadOrderId });
+      if (selectionError) throw selectionError;
+      if (!data?.choice_id || data?.status !== 'CHOSEN' || !data?.selection_ends_at) throw new Error('لم يؤكد النظام تسجيل اختيارك.');
+      setDispatchMessage('تم تسجيل اختيارك. ده مش تخصيص نهائي؛ التوزيع هيتم بعد انتهاء نافذة الخمس دقائق حسب أقدم وقت دخول لقائمة الانتظار.');
+      await refreshDispatchState();
+    } catch (e: any) {
+      const raw = String(e?.message || '');
+      if (raw.includes('DRIVER_NOT_IN_WAITING_QUEUE')) setError('سجّل وصولك لقائمة الانتظار أولًا من زر «أنا وصلت».');
+      else if (raw.includes('SELECTION_WINDOW_CLOSED')) setError('نافذة الاختيار انتهت. استنى نافذة التوزيع التالية.');
+      else if (raw.includes('OUTSIDE_RAS_SEDR_GEOFENCE')) setError('لازم تكون داخل نطاق 10 كم من مكتب رأس سدر.');
+      else if (raw.includes('LOCATION_STALE_OR_INACCURATE')) setError('موقع GPS قديم أو دقته غير كافية. حدّث موقعك وحاول تاني.');
+      else if (raw.includes('DRIVER_HAS_ACTIVE_BOOKING') || raw.includes('VEHICLE_HAS_ACTIVE_BOOKING')) setError('السائق أو العربية عليه نقلة نشطة بالفعل.');
+      else if (raw.includes('LOAD_ORDER_FULL')) setError('الحمولة اكتمل عدد نقلاتها المتاحة. اختار طلبًا آخر قبل انتهاء النافذة.');
+      else setError(raw || 'تعذر تسجيل اختيار النقلة.');
+    } finally {
+      setSelectingLoadOrderId(null);
+    }
   }
 
   async function confirmDelivery(bookingId: string) {
@@ -568,20 +606,25 @@ export const DriverApp: React.FC = () => {
           });
           if (saveError) throw new Error(saveError.message || 'تعذر حفظ الموقع. فعّل مشاركة الموقع وتأكد من ربط حسابك بالعربية.');
 
-          // Phase 1 arrival is tied to a real assigned booking; location alone never creates a queue entry.
+          // Ordinary drivers check in to the queue; an already assigned trip uses the existing trip-arrival workflow.
           const assignedBooking = (portal?.my_bookings || []).find((booking: any) => booking.raw_status === 'ASSIGNED');
+          const capturedAt = new Date(timestamp).toISOString();
           if (assignedBooking?.booking_id) {
+            if (pendingDirectAssignments.some((item: any) => item.booking_id === assignedBooking.booking_id)) {
+              throw new Error('التخصيص المباشر لسه في انتظار قبولك. اضغط «تأكيد القبول» الأول.');
+            }
             const { data: arrival, error: arrivalError } = await supabase.rpc('driver_confirm_arrival', {
               p_booking_id: assignedBooking.booking_id,
               p_latitude: coords.latitude,
               p_longitude: coords.longitude,
               p_accuracy_m: coords.accuracy,
-              p_captured_at: new Date(timestamp).toISOString(),
+              p_captured_at: capturedAt,
             });
             if (arrivalError) {
               const raw = String(arrivalError.message || '');
               if (raw.includes('OUTSIDE_RAS_SEDR_GEOFENCE')) throw new Error('أنت خارج نطاق مكتب رأس سدر البالغ 10 كم.');
               if (raw.includes('LOCATION_TIMESTAMP_STALE_OR_INVALID')) throw new Error('بيانات GPS قديمة. حدّث الموقع وحاول تاني.');
+              if (raw.includes('DRIVER_ACCEPTANCE_REQUIRED')) throw new Error('اقبل التخصيص المباشر الأول قبل تسجيل الوصول للنقلة.');
               if (raw.includes('BOOKING_NOT_AWAITING_ARRIVAL')) throw new Error('النقلة لم تعد في حالة انتظار الوصول.');
               throw new Error(raw || 'تعذر تأكيد الوصول للنقلة.');
             }
@@ -590,8 +633,22 @@ export const DriverApp: React.FC = () => {
               ? `تم تأكيد وصولك للنقلة. المسافة من المكتب: ${Math.round(Number(arrival.distance_meters ?? arrival.distance_m ?? 0))} متر.`
               : 'تم حفظ الموقع، لكن النظام لم يؤكد الوصول. حاول مرة أخرى.');
           } else {
+            const { data: checkIn, error: checkInError } = await supabase.rpc('driver_check_in_queue', {
+              p_latitude: coords.latitude,
+              p_longitude: coords.longitude,
+              p_accuracy_m: coords.accuracy,
+              p_captured_at: capturedAt,
+            });
+            if (checkInError) {
+              const raw = String(checkInError.message || '');
+              if (raw.includes('OUTSIDE_RAS_SEDR_GEOFENCE')) throw new Error('أنت خارج نطاق مكتب رأس سدر البالغ 10 كم.');
+              if (raw.includes('LOCATION_ACCURACY_TOO_LOW')) throw new Error('دقة GPS لازم تكون 100 متر أو أفضل. اتحرك لمكان مفتوح وحاول تاني.');
+              if (raw.includes('LOCATION_TIMESTAMP_STALE_OR_INVALID')) throw new Error('قراءة GPS قديمة. حدّث الموقع وحاول تاني.');
+              if (raw.includes('DRIVER_HAS_ACTIVE_BOOKING')) throw new Error('عندك نقلة نشطة بالفعل؛ مش ممكن تدخل قائمة الانتظار دلوقتي.');
+              throw new Error(raw || 'تعذر تسجيل الوصول لقائمة الانتظار.');
+            }
             await refreshPortal();
-            setError('تم حفظ موقعك. تأكيد الوصول متاح لما يكون فيه نقلة مسندة لحسابك؛ الموقع وحده لا ينشئ نقلة أو قائمة انتظار.');
+            setError(`تم تسجيل وصولك لقائمة الانتظار. دورك الحالي رقم ${checkIn?.queue_position ?? '—'}؛ اختار نقلة متاحة أثناء نافذة الاختيار.`);
           }
         } catch (checkInError: any) {
           setError(checkInError?.message || 'تعذر تسجيل الوصول. حاول مرة أخرى.');
@@ -672,7 +729,7 @@ export const DriverApp: React.FC = () => {
             <p className="mt-2">دقة GPS: {Math.round(position.accuracy)} متر</p>
             <p>وقت القراءة: {position.capturedAt}</p>
             <p className="mt-2 break-all font-mono text-xs">{position.latitude.toFixed(6)}, {position.longitude.toFixed(6)}</p>
-            <p className="mt-3 text-xs leading-5">ملاحظة: قراءة الموقع لا تسجّل Check-in ولا تضيفك لقائمة الانتظار.</p>
+            <p className="mt-3 text-xs leading-5">قراءة الموقع وحدها لا تكفي؛ زر «أنا وصلت» يتحقق من النطاق والدقة وحداثة القراءة ويسجّل دخولك لقائمة الانتظار على السيرفر.</p>
           </div>}
           {error && <div role="alert" className="mt-4 flex gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"><CircleAlert className="shrink-0" size={18}/><span>{error}</span></div>}
         </section>
@@ -724,11 +781,15 @@ export const DriverApp: React.FC = () => {
             </section>
             <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-center gap-2"><Clock3 className="text-red-700" size={22}/><h2 className="font-black">رقمك في الانتظار</h2></div>
-              {portal.queue_status === 'WAITING' ? <p className="mt-3 text-2xl font-black text-red-700">الدور رقم {portal.queue_position || '—'}</p> : <p className="mt-2 text-sm leading-7 text-slate-600">أنت داخل النطاق لكنك غير مسجل حاليًا في قائمة الانتظار. تسجيل الموقع وحده لا يضيفك تلقائيًا إلى القائمة.</p>}
+              {dispatchState?.queue_status === 'WAITING' ? <><p className="mt-3 text-2xl font-black text-red-700">الدور رقم {dispatchState.queue_position || '—'}</p><p className="mt-1 text-xs text-slate-500">وقت دخول القائمة: {dispatchState.queue_arrived_at ? new Date(dispatchState.queue_arrived_at).toLocaleString('ar-EG') : '—'}</p></> : dispatchState?.queue_status === 'ASSIGNED' ? <p className="mt-2 text-sm font-bold text-emerald-700">تم تخصيص نقلة لك. راجع سجل النقلات واتبع خطوات الوصول والتحميل.</p> : <p className="mt-2 text-sm leading-7 text-slate-600">أنت داخل النطاق لكنك غير مسجل حاليًا في قائمة الانتظار. اضغط «أنا وصلت» لتسجيل وقت دخولك على السيرفر.</p>}
+              {dispatchState?.selection_window?.is_open && <p className="mt-3 rounded-xl bg-violet-50 p-3 text-sm font-bold text-violet-900">نافذة اختيار النقلات مفتوحة حتى {new Date(dispatchState.selection_window.selection_ends_at).toLocaleTimeString('ar-EG')}.</p>}
+              {dispatchState?.choice_status === 'CHOSEN' && <p className="mt-3 rounded-xl bg-amber-50 p-3 text-sm font-bold text-amber-900">اختيارك مسجل، لكنه ليس تخصيصًا نهائيًا. التوزيع يتم بعد انتهاء الخمس دقائق حسب أقدم وقت دخول.</p>}
+              {dispatchState?.choice_status === 'ALLOCATED' && <p className="mt-3 rounded-xl bg-emerald-50 p-3 text-sm font-bold text-emerald-900">تم تخصيص النقلة المختارة لك.</p>}
+              {dispatchMessage && <p role="status" className="mt-3 rounded-xl bg-sky-50 p-3 text-sm font-bold text-sky-900">{dispatchMessage}</p>}
             </section>
             <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-center gap-2"><Truck className="text-red-700" size={22}/><h2 className="font-black">الحمولات المتاحة</h2></div>
-              {(portal.available_loads || []).length ? <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">{portal.available_loads.map((load: any) => { const factoryName = String(load.factory_name || 'مصنع غير محدد'); const quarryName = String(load.quarry_name || 'محجر غير محدد'); const color = quarryColor(load.quarry_id, quarryName); return <article key={load.load_order_id} className="rounded-2xl border border-slate-200 bg-white p-3 text-center shadow-sm"><div aria-label={factoryName + ' — ' + quarryName} className="mx-auto grid h-16 w-16 place-items-center rounded-2xl border-2 text-2xl font-black shadow-sm" style={{ backgroundColor: color.background, color: color.foreground, borderColor: color.border }}>{factoryGlyph(factoryName)}</div><h3 className="mt-3 font-black leading-6">{factoryName}</h3><p className="mt-1 text-sm font-bold text-slate-600">{quarryName}</p><p className="mt-3 rounded-xl bg-slate-50 px-2 py-2 text-xs text-slate-600">المتبقي: <strong>{load.remaining_quantity}</strong> نقلة</p><p className="mt-2 text-[11px] text-slate-400">أمر: {String(load.load_order_id).slice(0, 8)}</p></article>; })}</div> : <p className="mt-2 text-sm leading-7 text-slate-500">لا توجد حمولات متاحة حاليًا.</p>}
+              {(dispatchState?.available_loads || []).length ? <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">{dispatchState.available_loads.map((load: any) => { const factoryName = String(load.factory_name || 'مصنع غير محدد'); const quarryName = String(load.quarry_name || 'محجر غير محدد'); const color = quarryColor(load.quarry_id, quarryName); return <article key={load.load_order_id} className="rounded-2xl border border-slate-200 bg-white p-3 text-center shadow-sm"><div aria-label={factoryName + ' — ' + quarryName} className="mx-auto grid h-16 w-16 place-items-center rounded-2xl border-2 text-2xl font-black shadow-sm" style={{ backgroundColor: color.background, color: color.foreground, borderColor: color.border }}>{factoryGlyph(factoryName)}</div><h3 className="mt-3 font-black leading-6">{factoryName}</h3><p className="mt-1 text-sm font-bold text-slate-600">{quarryName}</p><p className="mt-3 rounded-xl bg-slate-50 px-2 py-2 text-xs text-slate-600">المتبقي: <strong>{load.remaining_quantity}</strong> نقلة</p><p className="mt-2 text-[11px] text-slate-400">أمر: {String(load.load_order_id).slice(0, 8)}</p><button type="button" onClick={() => void selectLoad(load.load_order_id)} disabled={selectingLoadOrderId !== null || dispatchState?.queue_status !== 'WAITING' || (dispatchState?.choice_status && dispatchState.choice_status !== 'CHOSEN')} className={`mt-3 w-full rounded-xl p-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-50 ${load.is_selected ? 'bg-emerald-700' : 'bg-violet-700 hover:bg-violet-800'}`}>{selectingLoadOrderId === load.load_order_id ? 'جارٍ تسجيل الاختيار...' : load.is_selected ? 'اختيارك الحالي' : 'اختيار النقلة'}</button></article>; })}</div> : <p className="mt-2 text-sm leading-7 text-slate-500">لا توجد حمولات مفتوحة للاختيار حاليًا. لازم تكون مسجلًا في قائمة الانتظار، ويكون طلب التحميل داخل نافذة الخمس دقائق.</p>}
             </section>
           </>
         )}
