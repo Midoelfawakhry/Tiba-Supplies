@@ -124,10 +124,8 @@ begin
   if auth.uid() is null then raise exception 'AUTH_REQUIRED'; end if;
   if not exists (
     select 1 from public.app_users au
-    join public.user_roles ur on ur.user_id=au.user_id
-    join public.roles r on r.role_id=ur.role_id
     where au.auth_user_id=auth.uid() and au.is_active=true
-      and r.name in ('ADMIN','HEAD_OFFICE','BRANCH')
+      and au.role in ('ADMIN','HEAD_OFFICE','BRANCH')
   ) then raise exception 'INSUFFICIENT_ROLE'; end if;
   if p_from is not null and p_to is not null and p_from>p_to then raise exception 'INVALID_DATE_RANGE'; end if;
 
@@ -180,10 +178,8 @@ begin
   if auth.uid() is null then raise exception 'AUTH_REQUIRED'; end if;
   if not exists (
     select 1 from public.app_users au
-    join public.user_roles ur on ur.user_id=au.user_id
-    join public.roles r on r.role_id=ur.role_id
     where au.auth_user_id=auth.uid() and au.is_active=true
-      and r.name in ('ADMIN','HEAD_OFFICE')
+      and au.role in ('ADMIN','HEAD_OFFICE')
   ) then raise exception 'INSUFFICIENT_ROLE'; end if;
   if p_from is not null and p_to is not null and p_from>p_to then raise exception 'INVALID_DATE_RANGE'; end if;
 
@@ -250,10 +246,8 @@ using (
     )
     or exists (
       select 1 from public.app_users au
-      join public.user_roles ur on ur.user_id=au.user_id
-      join public.roles r on r.role_id=ur.role_id
-      where au.auth_user_id=auth.uid() and au.is_active=true
-        and r.name in ('ADMIN','HEAD_OFFICE')
+    where au.auth_user_id=auth.uid() and au.is_active=true
+      and au.role in ('ADMIN','HEAD_OFFICE')
     )
   )
 );
