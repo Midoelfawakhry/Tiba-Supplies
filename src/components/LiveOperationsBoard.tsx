@@ -135,7 +135,7 @@ export const LiveOperationsBoard: React.FC = () => {
         throw new Error('لم يتم تأكيد نشر أمر التحميل؛ المسودة ما زالت بحاجة للمراجعة.');
       }
       setDraftOrderId(null);
-      setSuccessMessage('تمت مراجعة المسودة ونشر أمر التحميل بنجاح.');
+      setSuccessMessage(`تم نشر أمر التحميل. نافذة الاختيار تنتهي ${published.selection_ends_at ? new Date(published.selection_ends_at).toLocaleTimeString('ar-EG') : 'بعد 5 دقائق'}، وتم إنشاء إشعار لـ ${Number(published.eligible_drivers_notified ?? 0)} سائق مؤهل داخل النطاق ومسجل في الانتظار.`);
       setQuantity('1');
       await load();
     } catch (e: any) {
