@@ -41,14 +41,14 @@ test("clean baseline revokes direct client table access and seeds only office re
 
 test("Main Office assignment is connected to a published order, driver, and vehicle", () => {
   assert.match(assignmentSql, /main_office_direct_assign/);
-  assert.match(assignmentUi, /main_office_direct_assign/);
-  assert.match(assignmentUi, /p_load_order_id:\s*orderId/);
-  assert.match(assignmentUi, /p_driver_id:\s*driverId/);
-  assert.match(assignmentUi, /p_vehicle_id:\s*vehicleId/);
-  assert.match(assignmentUi, /o\.status\s*===\s*'PUBLISHED'/);
+  assert.match(assignmentUi, /main_office_create_direct_trip/);
+  assert.match(assignmentUi, /p_factory_id:factoryId/);
+  assert.match(assignmentUi, /p_quarry_id:quarryId/);
+  assert.match(assignmentUi, /p_driver_id:driverId/);
+  assert.match(assignmentUi, /o\.status==='PUBLISHED'/);
   assert.match(assignmentUi, /d\.is_active&&d\.vehicle_id&&!busyDrivers\.has\(d\.driver_id\)/);
-  assert.match(assignmentUi, /v\.vehicle_id===selectedDriver\?\.vehicle_id/);
-  assert.match(assignmentUi, /setVehicleId\(drivers\.find\(d=>d\.driver_id===next\)\?\.vehicle_id\?\?''\)/);
+  assert.match(assignmentUi, /selectedVehicle\.is_active/);
+  assert.match(assignmentUi, /direct_acceptance_status!=='PENDING'/);
 });
 
 test("driver portal hides available loads without a fresh in-geofence location", () => {
@@ -89,7 +89,8 @@ test("directory screen reads and mutates through Phase 1 directory RPCs", () => 
   assert.match(directoryUi, /main_office_get_directory/);
   assert.match(directoryUi, /main_office_upsert_directory/);
   assert.match(directoryUi, /main_office_set_directory_active/);
-  assert.match(directoryUi, /قائمة الانتظار غير موجودة في نموذج Phase 1 الحالي/);
+  assert.match(directoryUi, /get_office_waiting_list/);
+  assert.match(directoryUi, /main_office_update_vehicle_owner/);
 });
 
 test("directory deactivation rejects drivers and vehicles with active trips server-side", () => {
