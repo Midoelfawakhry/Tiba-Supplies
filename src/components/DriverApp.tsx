@@ -155,7 +155,7 @@ export const DriverApp: React.FC = () => {
         uploadedImagePath = `${bookingId}/${Date.now()}.${extension}`;
         const { data: authData, error: authError } = await supabase.auth.getSession();
         const accessToken = authData.session?.access_token;
-        const projectUrl = String(import.meta.env.VITE_SUPABASE_URL || '').replace(/\\/$/, '');
+        const projectUrl = String(import.meta.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
         const publishableKey = String(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '');
         if (authError || !accessToken || !projectUrl || !publishableKey) {
           throw new Error('انتهت جلسة الدخول أو إعدادات رفع صورة الميزان غير مكتملة. احذف الصورة لو حابب تكمل من غيرها.');
@@ -209,7 +209,7 @@ export const DriverApp: React.FC = () => {
         try {
           const { data: authData } = await supabase.auth.getSession();
           const accessToken = authData.session?.access_token;
-          const projectUrl = String(import.meta.env.VITE_SUPABASE_URL || '').replace(/\\/$/, '');
+          const projectUrl = String(import.meta.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
           const publishableKey = String(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '');
           if (accessToken && projectUrl && publishableKey) {
             const cleanupResponse = await fetch(`${projectUrl}/storage/v1/object/scale-tickets/${uploadedImagePath}`, {
