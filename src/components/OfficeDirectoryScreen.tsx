@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Building2, Mountain, Users, UserX, Truck, ClipboardCheck, ClipboardList, Clock3, RefreshCw, AlertTriangle, Pencil, UserMinus, Phone, MoreHorizontal } from 'lucide-react';
+import { Building2, Mountain, Users, Truck, ClipboardCheck, ClipboardList, Clock3, RefreshCw, AlertTriangle, Pencil, UserMinus, Phone, MoreHorizontal } from 'lucide-react';
 import { getLiveSnapshot, LiveSnapshot, liveName } from '../services/liveData';
 import { supabase } from '../lib/supabase';
 import { AddVehicleForm } from './AddVehicleForm';
@@ -56,6 +56,10 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
   const [success, setSuccess] = useState('');
   const [showDriverForm, setShowDriverForm] = useState(false);
   const [showVehicleForm, setShowVehicleForm] = useState(false);
+  const [showOwnerForm, setShowOwnerForm] = useState(false);
+  const [ownerName, setOwnerName] = useState('');
+  const [ownerPhone, setOwnerPhone] = useState('');
+  const [savingOwner, setSavingOwner] = useState(false);
   const [driverName, setDriverName] = useState('');
   const [driverPhone, setDriverPhone] = useState('');
   const [driverTemporaryPassword, setDriverTemporaryPassword] = useState('');
@@ -213,20 +217,6 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     setNewOwnerPhone('');
   }
 
-  async function deactivateDriver(row: Row) {
-    const name = String(row.name ?? row.driver_name ?? 'السائق');
-    if (!window.confirm('تأكيد إيقاف ' + name + '؟ سيتم منعه من الاختيارات الجديدة مع الاحتفاظ بكل سجلات التحميل والربط السابقة. لن يتم الإيقاف لو عليه نقلة نشطة.')) return;
-    setError(''); setSuccess(''); setSavingEdit(true);
-    try {
-      const { data, error: rpcError } = await supabase.rpc('set_operational_driver_active', { p_driver_id: row.driver_id, p_is_active: false });
-      if (rpcError) throw rpcError; if (!data?.success) throw new Error('تعذر تأكيد إيقاف السائق.');
-      setEditingDriver(null); setSuccess('تم إيقاف السائق مع الاحتفاظ بالسجلات التاريخية.'); await load();
-    } catch (e: any) {
-      const raw = String(e?.message || '');
-      const messages: Record<string,string> = { AUTH_REQUIRED: 'انتهت جلسة المكتب. سجّل الدخول مرة أخرى.', INSUFFICIENT_ROLE: 'إيقاف السائق متاح للمكتب الرئيسي فقط.', DRIVER_NOT_FOUND: 'السائق غير موجود.', DRIVER_HAS_ACTIVE_BOOKING: 'لا يمكن إيقاف السائق لأن عليه نقلة نشطة. أنهِ النقلة أو ألغها أولًا.' };
-      const key = Object.keys(messages).find(code => raw.includes(code)); setError(key ? messages[key] : raw || 'تعذر إيقاف السائق.');
-    } finally { setSavingEdit(false); }
-  }
   async function saveDriverEdit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!editingDriver) return;
@@ -255,7 +245,6 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
         DRIVER_PHONE_EXISTS: 'رقم الموبايل مستخدم لسائق آخر.',
         DRIVER_PHONE_INVALID: 'أدخل رقم موبايل صحيحًا.',
         DRIVER_CODE_EXISTS: 'كود السائق مستخدم بالفعل.',
-        VEHICLE_ALREADY_ASSIGNED: 'العربية مرتبطة بسائق آخر. اختر عربية متاحة.',
         VEHICLE_NOT_AVAILABLE: 'العربية غير متاحة أو غير نشطة.',
         DRIVER_LOGIN_PHONE_CHANGE_REQUIRES_ACCOUNT_UPDATE: 'رقم دخول السائق مرتبط بحسابه. لا يمكن تغييره من شاشة البيانات.',
       };
@@ -431,7 +420,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
       const messages: Record<string, string> = {
         DRIVER_PHONE_EXISTS: 'رقم الموبايل مسجل لسواق بالفعل.',
         VEHICLE_PLATE_EXISTS: 'رقم العربية مسجل بالفعل.',
-        VEHICLE_NOT_AVAILABLE: 'العربية دي مش متاحة أو اتربطت بسواق آخر. حدّث القائمة واختار عربية تانية.',
+        VEHICLE_NOT_AVAILABLE: 'العربية غير موجودة أو غير نشطة. حدّث القائمة واختار عربية نشطة.',
         DRIVER_CODE_EXISTS: 'كود السواق مستخدم بالفعل.',
         REQUIRED_FIELDS_MISSING: 'اكتب اسم السواق ورقم الموبايل ورقم العربية.',
         INSUFFICIENT_ROLE: 'حسابك مش عنده صلاحية إضافة سواقين.',
@@ -528,6 +517,38 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
           <button type="button" onClick={() => setShowVehicleForm(v => !v)} className={`rounded-xl px-4 py-2.5 text-sm font-black text-white transition ${sectionPalette[active].action}`}>{showVehicleForm ? 'إلغاء' : 'إضافة عربية'}</button>
         </div>
         {showVehicleForm && <div className="mt-4"><AddVehicleForm onSaved={() => { void load(); setSuccess('تمت إضافة العربية ومالكها.'); }} /></div>}
+        <div className="mt-5 border-t border-slate-200 pt-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div><h3 className="font-black">إدارة ملاك العربيات</h3><p className="mt-1 text-sm text-slate-500">إضافة مالك مستقلًا عن تسجيل عربية جديدة.</p></div>
+            <button type="button" onClick={() => { setShowOwnerForm(v => !v); setError(''); setSuccess(''); }} className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-black text-blue-800">{showOwnerForm ? 'إغلاق نموذج المالك' : 'إضافة مالك'}</button>
+          </div>
+          {showOwnerForm && <form onSubmit={async event => {
+            event.preventDefault();
+            setSavingOwner(true); setError(''); setSuccess('');
+            try {
+              const { data, error: ownerError } = await supabase.rpc('create_operational_vehicle_owner', { p_name: ownerName.trim(), p_phone: ownerPhone.trim() || null });
+              if (ownerError) throw ownerError;
+              if (!data?.success) throw new Error('تعذر تأكيد إضافة المالك.');
+              setOwnerName(''); setOwnerPhone(''); setShowOwnerForm(false);
+              setSuccess(data.already_exists ? 'المالك مسجل بالفعل، وتم تحديث دليل الملاك.' : 'تمت إضافة المالك بنجاح. يمكنك ربط عربياته من تعديل العربية.');
+              await load();
+            } catch (e: any) {
+              const raw = String(e?.message || '');
+              const messages: Record<string,string> = {
+                AUTH_REQUIRED: 'انتهت جلسة المكتب. سجّل الدخول مرة أخرى.',
+                INSUFFICIENT_ROLE: 'إضافة الملاك متاحة للمكتب الرئيسي فقط.',
+                OWNER_NAME_REQUIRED: 'اكتب اسم المالك.',
+                OWNER_PHONE_INVALID: 'رقم موبايل المالك غير صحيح.',
+              };
+              const key = Object.keys(messages).find(code => raw.includes(code));
+              setError(key ? messages[key] : raw || 'تعذرت إضافة المالك.');
+            } finally { setSavingOwner(false); }
+          }} className="mt-4 grid gap-3 rounded-2xl bg-slate-50 p-4 sm:grid-cols-2">
+            <label className="text-sm font-bold text-slate-700">اسم المالك *<input required maxLength={200} value={ownerName} onChange={e => setOwnerName(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal" /></label>
+            <label className="text-sm font-bold text-slate-700">رقم موبايل المالك (اختياري)<input type="tel" maxLength={40} value={ownerPhone} onChange={e => setOwnerPhone(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal" /></label>
+            <div className="sm:col-span-2"><button disabled={savingOwner} type="submit" className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-black text-white disabled:opacity-60">{savingOwner ? 'جاري حفظ المالك...' : 'حفظ المالك'}</button></div>
+          </form>}
+        </div>
       </section>}
       {active === 'drivers' && <section className={`rounded-3xl border bg-white p-4 shadow-sm sm:p-5 ${sectionPalette[active].border}`}>
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -542,14 +563,14 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
           <div className="text-sm font-bold text-slate-700">اختيار رقم العربية المرتبطة بالسائق
             <label className="relative mt-1.5 block"><span className="sr-only">ابحث برقم العربية</span><input value={vehicleSearch} onChange={e => { setVehicleSearch(e.target.value); setSelectedVehicleId(''); }} className="w-full rounded-xl border border-slate-300 bg-white p-3 pr-10 font-normal" placeholder="ابحث برقم اللوحة أو كود العربية..."/><span className="absolute right-3 top-3 text-slate-400"><Truck size={18}/></span></label>
             <select required value={selectedVehicleId} onChange={e => setSelectedVehicleId(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal">
-              <option value="">اختار عربية متاحة</option>
+              <option value="">اختار العربية</option>
               {filteredAvailableVehicles.map((vehicle: Row) => <option key={vehicle.vehicle_id} value={vehicle.vehicle_id}>{vehicle.plate_number}{vehicle.vehicle_code ? ` · ${vehicle.vehicle_code}` : ''}</option>)}
             </select>
             <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3" aria-live="polite">
               <span className="block text-xs font-semibold text-slate-500">مالك العربية المرتبط بها تلقائيًا</span>
               <span className="mt-1 block font-bold text-slate-800">{selectedVehicle ? (selectedVehicle.owner_name || 'لا يوجد مالك مسجل لهذه العربية') : 'اختار العربية لعرض اسم المالك'}</span>
             </div>
-            <p className="mt-1 text-xs font-normal text-slate-500">{filteredAvailableVehicles.length} عربية متاحة للاختيار</p>
+            <p className="mt-1 text-xs font-normal text-slate-500">{filteredAvailableVehicles.length} عربية نشطة للاختيار</p>
           </div>
           <label className="text-sm font-bold text-slate-700">كود السواق (اختياري)<input value={driverCode} onChange={e => setDriverCode(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal" placeholder="لو عنده كود بالفعل"/></label>
           <div className="sm:col-span-2 flex flex-wrap items-center gap-3"><button disabled={savingDriver} type="submit" className={`rounded-xl px-5 py-3 text-sm font-black text-white transition disabled:opacity-60 ${sectionPalette[active].action}`}>{savingDriver ? 'جاري حفظ البيانات وإنشاء الحساب...' : 'حفظ السواق وإنشاء الحساب'}</button><p className="text-xs leading-5 text-slate-500">رقم الموبايل هو اسم المستخدم، وكلمة المرور التي تحددها هنا هي كلمة الدخول. لا تُرسل رسائل أو إيميلات.</p></div>
@@ -625,7 +646,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
                 {active !== 'waiting' && <span className={`flex ${active === 'drivers' ? 'h-5 w-5 rounded-md' : 'h-7 w-7 rounded-lg'} shrink-0 items-center justify-center ${sectionPalette[active].wash} ${sectionPalette[active].accent}`}><ActiveIcon size={active === 'drivers' ? 12 : 18} strokeWidth={2.1}/></span>}
                 <div className={active === 'waiting' ? 'flex min-w-0 flex-1 items-center gap-x-2 whitespace-nowrap' : active === 'drivers' ? 'flex min-w-0 flex-1 flex-col items-start gap-0.5' : 'min-w-0 flex-1'}><h4 className={active === 'waiting' ? 'shrink-0 font-semibold text-xs leading-5' : active === 'drivers' ? 'block w-full min-w-0 whitespace-normal break-words text-base font-bold leading-6' : 'font-black leading-6 [overflow-wrap:anywhere]'}>{active === 'waiting' ? `${row.plate_number || 'عربية غير محددة'} · ${row.driver_name || 'سائق غير محدد'} · ${row.arrived_at ? new Date(row.arrived_at).toLocaleDateString('ar-EG') : '—'}` : rowTitle(row, active)}</h4>{active === 'waiting' && row.driver_phone && <a href={`tel:${String(row.driver_phone).replace(/[^+\d]/g, '')}`} onClick={event => event.stopPropagation()} aria-label={`اتصال بالسائق ${row.driver_name || ''}`} title={String(row.driver_phone)} className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700"><Phone size={13}/></a>}{active !== 'waiting' && active !== 'drivers' && <p className="mt-1 break-words text-sm leading-6 text-slate-500">{rowDetails(active === 'vehicles' ? { ...row, owner_name: ownerDirectory.find(owner => String(owner.owner_id) === String(row.owner_id))?.name } : row, active) || 'لا توجد تفاصيل إضافية في السجل الحالي.'}</p>}{active === 'drivers' && <div className="flex min-w-0 flex-wrap items-center gap-1.5">{row.phone && <a href={`tel:${String(row.phone).replace(/[^+\\d]/g, '')}`} onClick={event => event.stopPropagation()} title={`اتصال ${row.phone}`} className="inline-flex h-6 items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-1.5 text-[11px] font-bold text-emerald-800"><Phone size={12}/>{row.phone}</a>}<span className="inline-flex items-center rounded-md bg-slate-100 px-1.5 py-1 text-[11px] font-semibold text-slate-700">العربية {row.vehicle_id ? snapshot?.vehicles?.find((vehicle: Row) => String(vehicle.vehicle_id) === String(row.vehicle_id))?.plate_number ?? '—' : '—'}</span><span className={`inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] font-bold ${row.is_active === false ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}><span className={`h-1.5 w-1.5 rounded-full ${row.is_active === false ? 'bg-red-500' : 'bg-emerald-500'}`}/>{row.is_active === false ? 'متوقف' : 'نشط'}</span></div>}</div>
               </div>
-              <div className={active === 'waiting' ? 'flex shrink-0 items-center gap-1 whitespace-nowrap' : active === 'drivers' ? 'flex w-full min-w-0 flex-wrap items-center justify-start gap-2 border-t border-red-100 pt-2' : 'flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0'}>{['factories', 'quarries'].includes(active) && <button type="button" onClick={() => beginMasterEntryEdit(row)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700"><Pencil size={14}/> تعديل</button>}{active === 'waiting' && row.status === 'WAITING' && <details className="relative shrink-0"><summary aria-label={`خيارات العربية ${row.plate_number || ''}`} title="خيارات العربية" className="flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm hover:border-violet-300 hover:bg-violet-50 [&::-webkit-details-marker]:hidden"><MoreHorizontal size={18}/></summary><div className="absolute left-0 top-full z-50 mt-1 min-w-40 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl"><button type="button" disabled={savingEdit} onClick={() => void removeWaitingEntry(row)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"><UserMinus size={14}/> إزالة من الانتظار</button></div></details>}{active === 'drivers' && row.is_active !== false && row.auth_user_id && <button type="button" onClick={() => { setPasswordResetDriver(row); setNewDriverPassword(''); setConfirmDriverPassword(''); setEditingDriver(null); setError(''); setSuccess(''); }} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-800">كلمة المرور</button>}{active === "drivers" && row.is_active !== false && <button type="button" disabled={savingEdit} onClick={() => void deactivateDriver(row)} aria-label="إيقاف السائق" className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-700 disabled:opacity-50"><UserX size={10}/> إيقاف</button>}{(active === 'drivers' || active === 'vehicles') && <button type="button" onClick={() => active === 'drivers' ? void beginDriverEdit(row) : beginVehicleEdit(row)} aria-label={active === 'drivers' ? 'تعديل بيانات السائق' : 'تعديل بيانات العربية'} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"><Pencil size={10}/> تعديل</button>}
+              <div className={active === 'waiting' ? 'flex shrink-0 items-center gap-1 whitespace-nowrap' : active === 'drivers' ? 'flex w-full min-w-0 flex-wrap items-center justify-start gap-2 border-t border-red-100 pt-2' : 'flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0'}>{['factories', 'quarries'].includes(active) && <button type="button" onClick={() => beginMasterEntryEdit(row)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700"><Pencil size={14}/> تعديل</button>}{active === 'waiting' && row.status === 'WAITING' && <details className="relative shrink-0"><summary aria-label={`خيارات العربية ${row.plate_number || ''}`} title="خيارات العربية" className="flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm hover:border-violet-300 hover:bg-violet-50 [&::-webkit-details-marker]:hidden"><MoreHorizontal size={18}/></summary><div className="absolute left-0 top-full z-50 mt-1 min-w-40 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl"><button type="button" disabled={savingEdit} onClick={() => void removeWaitingEntry(row)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"><UserMinus size={14}/> إزالة من الانتظار</button></div></details>}{active === 'drivers' && row.is_active !== false && row.auth_user_id && <button type="button" onClick={() => { setPasswordResetDriver(row); setNewDriverPassword(''); setConfirmDriverPassword(''); setEditingDriver(null); setError(''); setSuccess(''); }} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-800">كلمة المرور</button>}{(active === 'drivers' || active === 'vehicles') && <button type="button" onClick={() => active === 'drivers' ? void beginDriverEdit(row) : beginVehicleEdit(row)} aria-label={active === 'drivers' ? 'تعديل بيانات السائق' : 'تعديل بيانات العربية'} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"><Pencil size={10}/> تعديل</button>}
               {active === 'actual' && row.booking_id && !['CANCELLED', 'DELIVERED', 'COMPLETED'].includes(snapshot?.bookings?.find((b: Row) => b.booking_id === row.booking_id)?.status) && !row.delivery_confirmed_at && row.actual_weight == null && <button type="button" onClick={async () => {
                 const reason = window.prompt('اكتب سبب إلغاء النقلة:');
                 if (!reason?.trim()) return;
