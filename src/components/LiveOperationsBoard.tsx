@@ -52,6 +52,8 @@ export const LiveOperationsBoard: React.FC = () => {
   const [quantity, setQuantity] = useState('1');
   const [priority, setPriority] = useState('3');
   const [savingOrder, setSavingOrder] = useState(false);
+  const [draftOrderId, setDraftOrderId] = useState<string | null>(null);
+  const [publishingOrder, setPublishingOrder] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [activeScreen, setActiveScreen] = useState<OfficeScreen>('dashboard');
 
@@ -108,21 +110,38 @@ export const LiveOperationsBoard: React.FC = () => {
         throw new Error('لم يتم تأكيد إنشاء مسودة أمر التحميل.');
       }
 
-      const { data: published, error: publishError } = await supabase.rpc('main_office_publish_load_order', {
-        p_load_order_id: draft.load_order_id,
-      });
-      if (publishError) throw publishError;
-      if (published?.status !== 'PUBLISHED') {
-        throw new Error('تم إنشاء المسودة لكن لم يتم تأكيد نشر أمر التحميل.');
-      }
-
-      setSuccessMessage('تم إنشاء أمر التحميل ونشره بنجاح.');
-      setQuantity('1');
+      setDraftOrderId(draft.load_order_id);
+      setSuccessMessage('تم حفظ أمر التحميل كمسودة. راجع البيانات ثم اضغط «نشر الأمر» عند الجاهزية.');
       await load();
     } catch (e: any) {
       setError(e?.message || 'تعذر إنشاء أمر التحميل.');
     } finally {
       setSavingOrder(false);
+    }
+  }
+
+
+  async function publishDraftOrder() {
+    if (!draftOrderId) return;
+    setError('');
+    setSuccessMessage('');
+    setPublishingOrder(true);
+    try {
+      const { data: published, error: publishError } = await supabase.rpc('main_office_publish_load_order', {
+        p_load_order_id: draftOrderId,
+      });
+      if (publishError) throw publishError;
+      if (published?.status !== 'PUBLISHED') {
+        throw new Error('لم يتم تأكيد نشر أمر التحميل؛ المسودة ما زالت بحاجة للمراجعة.');
+      }
+      setDraftOrderId(null);
+      setSuccessMessage('تمت مراجعة المسودة ونشر أمر التحميل بنجاح.');
+      setQuantity('1');
+      await load();
+    } catch (e: any) {
+      setError(e?.message || 'تعذر نشر أمر التحميل.');
+    } finally {
+      setPublishingOrder(false);
     }
   }
 
@@ -245,11 +264,15 @@ export const LiveOperationsBoard: React.FC = () => {
               </select>
             </label>
             <div className="flex items-end">
-              <button type="submit" disabled={savingOrder || !data?.factories.length || !data?.quarries.length} className="w-full rounded-xl bg-orange-600 p-3 text-sm font-black text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50">
-                {savingOrder ? 'جاري النشر...' : 'إنشاء ونشر الأمر'}
+              <button type="submit" disabled={savingOrder || !data?.factories.length || !data?.quarries.length || Boolean(draftOrderId)} className="w-full rounded-xl bg-orange-600 p-3 text-sm font-black text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50">
+                {savingOrder ? 'جاري حفظ المسودة...' : 'حفظ كمسودة'}
               </button>
             </div>
           </form>
+          {draftOrderId && <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div><p className="font-black text-amber-900">المسودة محفوظة ولم تُنشر</p><p className="mt-1 text-sm leading-6 text-amber-800">راجع المصنع والمحجر والكمية والأولوية قبل إتاحتها للإسناد. لن تظهر للسائقين قبل النشر.</p></div>
+            <button type="button" onClick={() => void publishDraftOrder()} disabled={publishingOrder} className="shrink-0 rounded-xl bg-emerald-700 px-5 py-3 text-sm font-black text-white hover:bg-emerald-800 disabled:opacity-50">{publishingOrder ? 'جاري النشر...' : 'نشر الأمر بعد المراجعة'}</button>
+          </div>}
         </section>
 
         <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
