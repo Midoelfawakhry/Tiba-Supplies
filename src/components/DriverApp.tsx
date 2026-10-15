@@ -74,6 +74,8 @@ export const DriverApp: React.FC = () => {
   const [pendingDirectAssignments, setPendingDirectAssignments] = useState<any[]>([]);
   const [acceptingBookingId, setAcceptingBookingId] = useState<string | null>(null);
   const [deliveryBusyBookingId, setDeliveryBusyBookingId] = useState<string | null>(null);
+  const [deliveryWeights, setDeliveryWeights] = useState<Record<string, string>>({});
+  const [deliveryScaleImages, setDeliveryScaleImages] = useState<Record<string, File | null>>({});
 
   useEffect(() => {
     let active = true;
@@ -131,9 +133,33 @@ export const DriverApp: React.FC = () => {
 
   async function confirmDelivery(bookingId: string) {
     if (deliveryBusyBookingId) return;
+    const weightText = (deliveryWeights[bookingId] ?? '').trim().replace(',', '.');
+    const actualWeight = Number(weightText);
+    if (!weightText || !Number.isFinite(actualWeight) || actualWeight <= 0 || actualWeight > 1000 || !/^\\d+(\\.\\d{1,3})?$/.test(weightText)) {
+      setError('اكتب الوزن الفعلي بالطن، مثل 85.55، بحد أقصى 3 أرقام عشرية. تأكيد التسليم مش هيتفعل من غير وزن صحيح.');
+      return;
+    }
     setDeliveryBusyBookingId(bookingId);
     setError('');
+    let uploadedImagePath: string | null = null;
     try {
+      const image = deliveryScaleImages[bookingId] ?? null;
+      if (image) {
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(image.type)) {
+          throw new Error('صورة الميزان لازم تكون JPG أو PNG أو WEBP.');
+        }
+        if (image.size > 10 * 1024 * 1024) {
+          throw new Error('حجم صورة الميزان لازم يكون 10 ميجابايت أو أقل.');
+        }
+        const extension = image.type === 'image/png' ? 'png' : image.type === 'image/webp' ? 'webp' : 'jpg';
+        uploadedImagePath = `${bookingId}/${Date.now()}.${extension}`;
+        const { error: uploadError } = await supabase.storage.from('scale-tickets').upload(uploadedImagePath, image, {
+          contentType: image.type,
+          upsert: false,
+        });
+        if (uploadError) throw new Error(`تعذر رفع صورة الميزان: ${uploadError.message}`);
+      }
+
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
       });
@@ -144,19 +170,29 @@ export const DriverApp: React.FC = () => {
         p_longitude: longitude,
         p_accuracy_m: accuracy,
         p_captured_at: new Date(position.timestamp).toISOString(),
+        p_actual_weight: actualWeight,
+        p_scale_image_path: uploadedImagePath,
         p_notes: null,
       });
       if (deliveryError) throw deliveryError;
-      if (!data?.confirmed) throw new Error('لم يؤكد النظام تسجيل التسليم.');
+      if (!data?.confirmed) throw new Error('لم يؤكد النظام تسجيل الوزن والتسليم.');
+      setDeliveryWeights(current => ({ ...current, [bookingId]: '' }));
+      setDeliveryScaleImages(current => ({ ...current, [bookingId]: null }));
       await refreshPortal();
-      setError('تم تسجيل تأكيد التسليم بنجاح. المكتب الرئيسي هو اللي هيعتمد الحالة النهائية.');
+      setError(`تم تسجيل التسليم والوزن الفعلي ${Number(data.actual_weight ?? actualWeight).toLocaleString('en-US', { maximumFractionDigits: 3 })} طن بنجاح. المكتب الرئيسي هيعتمد الحالة النهائية.`);
     } catch (e: any) {
       const raw = String(e?.message || '');
       if (raw.includes('LOCATION_ACCURACY_TOO_LOW')) setError('دقة GPS أقل من المطلوب. جرّب في مكان مفتوح وحدّث الموقع.');
       else if (raw.includes('LOCATION_TIMESTAMP_STALE_OR_INVALID')) setError('قراءة GPS قديمة. حاول تاني مع تحديث الموقع.');
       else if (raw.includes('BOOKING_NOT_IN_TRANSIT')) setError('تأكيد التسليم متاح بعد ما حالة النقلة تبقى في الطريق.');
       else if (raw.includes('BOOKING_NOT_YOURS')) setError('النقلة دي مش مرتبطة بحسابك.');
+      else if (raw.includes('POSITIVE_ACTUAL_WEIGHT_REQUIRED')) setError('اكتب وزنًا فعليًا أكبر من صفر قبل التأكيد.');
+      else if (raw.includes('ACTUAL_WEIGHT_ALREADY_RECORDED')) setError('تم تسجيل وزن مختلف للنقلة دي بالفعل. راجع المكتب قبل تغيير الوزن.');
       else setError(raw || 'تعذر تأكيد التسليم. فعّل GPS وحاول تاني.');
+      if (uploadedImagePath) {
+        const { error: cleanupError } = await supabase.storage.from('scale-tickets').remove([uploadedImagePath]);
+        if (cleanupError) console.warn('Optional scale image cleanup failed after delivery confirmation error.', cleanupError.message);
+      }
     } finally {
       setDeliveryBusyBookingId(null);
     }
@@ -609,7 +645,17 @@ export const DriverApp: React.FC = () => {
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center gap-2"><FileText className="text-red-700" size={22}/><h2 className="font-black">سجل النقلات السابقة</h2></div>
           <p className="mt-2 text-sm leading-6 text-slate-600">السجل ده متاح لك في أي مكان، ومش مرتبط بنطاق الـ 10 كم. النطاق خاص بالحمولات المتاحة وتسجيل الوصول وقائمة الانتظار فقط.</p>
-          {(portal?.my_bookings || []).length ? <div className="mt-4 space-y-3">{portal.my_bookings.map((booking: any) => <article key={booking.booking_id} className="rounded-2xl border border-slate-200 p-4"><div className="font-bold">{booking.factory_name || 'مصنع غير محدد'} ← {booking.quarry_name || 'محجر غير محدد'}</div><p className="mt-2 text-sm text-slate-600">الحالة: {({ASSIGNED:'تم الإسناد',ARRIVED:'وصل السائق',LOADING:'جاري التحميل',LOADED:'تم التحميل',IN_TRANSIT:'في الطريق',DELIVERED:'تم التسليم',CANCELLED:'ملغاة'} as Record<string,string>)[booking.raw_status] || booking.status}</p><p className="mt-1 text-xs text-slate-400">{booking.booked_at ? new Date(booking.booked_at).toLocaleString('ar-EG') : ''}</p>{booking.raw_status === 'IN_TRANSIT' && <button type="button" onClick={() => void confirmDelivery(booking.booking_id)} disabled={deliveryBusyBookingId !== null} className="mt-3 w-full rounded-xl bg-emerald-700 p-3 text-sm font-black text-white disabled:opacity-60">{deliveryBusyBookingId === booking.booking_id ? 'جارٍ تأكيد التسليم...' : 'تأكيد التسليم بالموقع الحالي'}</button>}</article>)}</div> : <p className="mt-2 rounded-xl bg-slate-50 p-3 text-sm leading-7 text-slate-500">مفيش نقلات سابقة مسجلة على حسابك حتى الآن.</p>}
+          {(portal?.my_bookings || []).length ? <div className="mt-4 space-y-3">{portal.my_bookings.map((booking: any) => <article key={booking.booking_id} className="rounded-2xl border border-slate-200 p-4"><div className="font-bold">{booking.factory_name || 'مصنع غير محدد'} ← {booking.quarry_name || 'محجر غير محدد'}</div><p className="mt-2 text-sm text-slate-600">الحالة: {({ASSIGNED:'تم الإسناد',ARRIVED:'وصل السائق',LOADING:'جاري التحميل',LOADED:'تم التحميل',IN_TRANSIT:'في الطريق',DELIVERED:'تم التسليم',CANCELLED:'ملغاة'} as Record<string,string>)[booking.raw_status] || booking.status}</p><p className="mt-1 text-xs text-slate-400">{booking.booked_at ? new Date(booking.booked_at).toLocaleString('ar-EG') : ''}</p>{booking.raw_status === 'IN_TRANSIT' && <div className="mt-4 space-y-3 rounded-xl border border-emerald-200 bg-emerald-50/60 p-3">
+            <label className="block text-sm font-bold text-slate-700">الوزن الفعلي بعد تنزيل الحمولة (طن) *
+              <input type="text" inputMode="decimal" value={deliveryWeights[booking.booking_id] ?? ''} onChange={e => setDeliveryWeights(current => ({ ...current, [booking.booking_id]: e.target.value.replace(/[^0-9.,]/g, '') }))} placeholder="مثال: 85.55" className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 text-base font-black" aria-label="الوزن الفعلي بالطن" />
+              <span className="mt-1 block text-xs font-normal text-slate-500">الوزن إلزامي، من أكبر من صفر وحتى 1000 طن، بدقة تصل إلى 3 أرقام عشرية.</span>
+            </label>
+            <label className="block text-sm font-bold text-slate-700">صورة الميزان (اختياري)
+              <input type="file" accept="image/jpeg,image/png,image/webp" onChange={e => setDeliveryScaleImages(current => ({ ...current, [booking.booking_id]: e.target.files?.[0] ?? null }))} className="mt-1.5 block w-full rounded-xl border border-slate-300 bg-white p-2 text-sm font-normal" />
+              <span className="mt-1 block text-xs font-normal text-slate-500">JPG أو PNG أو WEBP، بحد أقصى 10 ميجابايت.</span>
+            </label>
+            <button type="button" onClick={() => void confirmDelivery(booking.booking_id)} disabled={deliveryBusyBookingId !== null || !/^\\d+(\\.\\d{1,3})?$/.test((deliveryWeights[booking.booking_id] ?? '').trim().replace(',', '.')) || Number((deliveryWeights[booking.booking_id] ?? '').trim().replace(',', '.')) <= 0 || Number((deliveryWeights[booking.booking_id] ?? '').trim().replace(',', '.')) > 1000} className="w-full rounded-xl bg-emerald-700 p-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-40">{deliveryBusyBookingId === booking.booking_id ? 'جارٍ تسجيل الوزن والتسليم...' : 'تأكيد التسليم والوزن'}</button>
+          </div>}</article>)}</div> : <p className="mt-2 rounded-xl bg-slate-50 p-3 text-sm leading-7 text-slate-500">مفيش نقلات سابقة مسجلة على حسابك حتى الآن.</p>}
         </section>
         {!portal?.inside_geofence ? (
           <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
