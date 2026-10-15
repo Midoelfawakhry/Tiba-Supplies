@@ -8,7 +8,7 @@ declare v_actor uuid; v_office uuid; v_id uuid; v_code text; v_name text:=trim(c
 begin
  v_actor:=public.current_main_office_user();
  if v_name='' or v_phone='' or p_vehicle_id is null then raise exception 'DRIVER_NAME_PHONE_AND_VEHICLE_REQUIRED'; end if;
- if v_phone !~ '^(01[0125][0-9]{8}|\\+?20(10|11|12|15)[0-9]{8}|00?20(10|11|12|15)[0-9]{8})$' then raise exception 'DRIVER_PHONE_INVALID'; end if;
+ if v_phone !~ '^(01[0125][0-9]{8}|\+?20(10|11|12|15)[0-9]{8}|00?20(10|11|12|15)[0-9]{8})$' then raise exception 'DRIVER_PHONE_INVALID'; end if;
  if exists(select 1 from public.drivers d where regexp_replace(coalesce(d.phone,''),'[^0-9]','','g')=regexp_replace(v_phone,'[^0-9]','','g')) then raise exception 'DRIVER_PHONE_EXISTS'; end if;
  if not exists(select 1 from public.vehicles where vehicle_id=p_vehicle_id and is_active) then raise exception 'VEHICLE_NOT_AVAILABLE'; end if;
  select office_id into v_office from public.offices where office_code='RAS_SEDR' and office_type='BRANCH' and is_active;
@@ -27,7 +27,7 @@ declare v_actor uuid; v_driver public.drivers%rowtype; v_name text:=trim(coalesc
 begin
  v_actor:=public.current_main_office_user();
  if p_driver_id is null or v_name='' or v_phone='' or p_vehicle_id is null then raise exception 'DRIVER_ID_NAME_PHONE_AND_VEHICLE_REQUIRED'; end if;
- if v_phone !~ '^(01[0125][0-9]{8}|\\+?20(10|11|12|15)[0-9]{8}|00?20(10|11|12|15)[0-9]{8})$' then raise exception 'DRIVER_PHONE_INVALID'; end if;
+ if v_phone !~ '^(01[0125][0-9]{8}|\+?20(10|11|12|15)[0-9]{8}|00?20(10|11|12|15)[0-9]{8})$' then raise exception 'DRIVER_PHONE_INVALID'; end if;
  select * into v_driver from public.drivers where driver_id=p_driver_id for update;
  if not found then raise exception 'DRIVER_NOT_FOUND'; end if;
  if v_driver.auth_user_id is not null and v_phone is distinct from v_driver.phone then raise exception 'DRIVER_LOGIN_PHONE_CHANGE_REQUIRES_ACCOUNT_UPDATE'; end if;
