@@ -153,11 +153,27 @@ export const DriverApp: React.FC = () => {
         }
         const extension = image.type === 'image/png' ? 'png' : image.type === 'image/webp' ? 'webp' : 'jpg';
         uploadedImagePath = `${bookingId}/${Date.now()}.${extension}`;
-        const { error: uploadError } = await supabase.storage.from('scale-tickets').upload(uploadedImagePath, image, {
-          contentType: image.type,
-          upsert: false,
+        const { data: authData, error: authError } = await supabase.auth.getSession();
+        const accessToken = authData.session?.access_token;
+        const projectUrl = String(import.meta.env.VITE_SUPABASE_URL || '').replace(/\\/$/, '');
+        const publishableKey = String(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '');
+        if (authError || !accessToken || !projectUrl || !publishableKey) {
+          throw new Error('انتهت جلسة الدخول أو إعدادات رفع صورة الميزان غير مكتملة. احذف الصورة لو حابب تكمل من غيرها.');
+        }
+        const uploadResponse = await fetch(`${projectUrl}/storage/v1/object/scale-tickets/${uploadedImagePath}`, {
+          method: 'POST',
+          headers: {
+            apikey: publishableKey,
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': image.type,
+            'x-upsert': 'false',
+          },
+          body: image,
         });
-        if (uploadError) throw new Error(`تعذر رفع صورة الميزان: ${uploadError.message}`);
+        if (!uploadResponse.ok) {
+          const detail = await uploadResponse.text();
+          throw new Error(`تعذر رفع صورة الميزان: ${detail || uploadResponse.statusText}`);
+        }
       }
 
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
@@ -190,8 +206,21 @@ export const DriverApp: React.FC = () => {
       else if (raw.includes('ACTUAL_WEIGHT_ALREADY_RECORDED')) setError('تم تسجيل وزن مختلف للنقلة دي بالفعل. راجع المكتب قبل تغيير الوزن.');
       else setError(raw || 'تعذر تأكيد التسليم. فعّل GPS وحاول تاني.');
       if (uploadedImagePath) {
-        const { error: cleanupError } = await supabase.storage.from('scale-tickets').remove([uploadedImagePath]);
-        if (cleanupError) console.warn('Optional scale image cleanup failed after delivery confirmation error.', cleanupError.message);
+        try {
+          const { data: authData } = await supabase.auth.getSession();
+          const accessToken = authData.session?.access_token;
+          const projectUrl = String(import.meta.env.VITE_SUPABASE_URL || '').replace(/\\/$/, '');
+          const publishableKey = String(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '');
+          if (accessToken && projectUrl && publishableKey) {
+            const cleanupResponse = await fetch(`${projectUrl}/storage/v1/object/scale-tickets/${uploadedImagePath}`, {
+              method: 'DELETE',
+              headers: { apikey: publishableKey, Authorization: `Bearer ${accessToken}` },
+            });
+            if (!cleanupResponse.ok) console.warn('Optional scale image cleanup failed after delivery confirmation error.', cleanupResponse.status);
+          }
+        } catch (cleanupError) {
+          console.warn('Optional scale image cleanup failed after delivery confirmation error.', cleanupError);
+        }
       }
     } finally {
       setDeliveryBusyBookingId(null);
