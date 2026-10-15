@@ -30,6 +30,7 @@ DROP TRIGGER IF EXISTS actual_load_owner_snapshot_before_insert ON public.actual
 CREATE TRIGGER actual_load_owner_snapshot_before_insert
 BEFORE INSERT ON public.actual_loading_records
 FOR EACH ROW EXECUTE FUNCTION public.capture_actual_load_owner_snapshot();
+REVOKE ALL ON FUNCTION public.capture_actual_load_owner_snapshot() FROM PUBLIC, anon, authenticated;
 
 CREATE OR REPLACE FUNCTION public.get_vehicle_owner_reports(p_from date DEFAULT NULL, p_to date DEFAULT NULL)
 RETURNS jsonb
