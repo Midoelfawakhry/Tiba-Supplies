@@ -55,6 +55,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
   useEffect(() => { setShowMasterForm(false); setEditingMasterEntry(null); setEditingOwner(null); }, [active]);
   const [snapshot, setSnapshot] = useState<LiveSnapshot | null>(null);
   const [waiting, setWaiting] = useState<Row[]>([]);
+  const [waitingWindow, setWaitingWindow] = useState<Row | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -105,18 +106,21 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     setLoading(true);
     setError('');
     try {
-      const [data, directoryResult] = await Promise.all([
+      const [data, directoryResult, waitingResult] = await Promise.all([
         getLiveSnapshot(),
         supabase.rpc('main_office_get_directory'),
+        supabase.rpc('get_office_waiting_list'),
       ]);
       if (directoryResult.error) throw directoryResult.error;
+      if (waitingResult.error) throw waitingResult.error;
       const directory = directoryResult.data ?? {};
       const factories = (directory.factories ?? []).map((r: Row) => ({ factory_id: r.id, code: r.code, factory_code: r.code, name: r.name, notes: r.notes, is_active: r.is_active }));
       const quarries = (directory.quarries ?? []).map((r: Row) => ({ quarry_id: r.id, code: r.code, quarry_code: r.code, name: r.name, notes: r.notes, is_active: r.is_active, latitude: r.latitude, longitude: r.longitude }));
       const drivers = (directory.drivers ?? []).map((r: Row) => ({ driver_id: r.id, driver_code: r.code, code: r.code, name: r.name, phone: r.phone, office_id: r.office_id, is_active: r.is_active, vehicle_id: r.vehicle_id, vehicle_code: r.vehicle_code, plate_number: r.plate_number }));
       const vehicles = (directory.vehicles ?? []).map((r: Row) => ({ vehicle_id: r.id, vehicle_code: r.code, plate_number: r.plate_number, owner_id: r.owner_id, office_id: r.office_id, is_active: r.is_active, assigned_driver_id: r.assigned_driver_id, assigned_driver_name: r.assigned_driver_name }));
       setSnapshot({ ...data, factories, quarries, drivers, vehicles });
-      setWaiting([]);
+      setWaiting(Array.isArray(waitingResult.data?.entries) ? waitingResult.data.entries : []);
+      setWaitingWindow(waitingResult.data?.selection_window ?? null);
       setAvailableVehicles(vehicles.filter((v: Row) => v.is_active !== false));
       setOwnerDirectory((directory.owners ?? []).map((r: Row) => ({ owner_id: r.id, owner_code: r.code, name: r.name, phone: r.phone, is_active: r.is_active })));
     } catch (e: any) {
@@ -267,8 +271,21 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     } finally { setSavingEdit(false); }
   }
 
-  async function removeWaitingEntry(_row: Row) {
-    setError('قائمة الانتظار غير موجودة في نموذج Phase 1 الحالي؛ تم إيقاف الإجراء القديم لحماية البيانات.');
+  async function removeWaitingEntry(row: Row) {
+    if (!row.entry_id || row.status !== 'WAITING') return;
+    if (!window.confirm(`إزالة السائق ${row.driver_name || ''} من قائمة الانتظار؟`)) return;
+    setError(''); setSuccess(''); setSavingEdit(true);
+    try {
+      const { data, error: rpcError } = await supabase.rpc('main_office_remove_waiting_entry', { p_entry_id: row.entry_id });
+      if (rpcError) throw rpcError;
+      if (!data?.success || data?.status !== 'LEFT') throw new Error('لم يؤكد النظام إزالة السائق من قائمة الانتظار.');
+      setSuccess(`تمت إزالة ${row.driver_name || 'السائق'} من قائمة الانتظار مع الاحتفاظ بالسجل.`);
+      await load();
+    } catch (e: any) {
+      const raw = String(e?.message || '');
+      if (raw.includes('WAITING_ENTRY_NOT_ACTIVE')) setError('السائق لم يعد في قائمة الانتظار النشطة. حدّث البيانات.');
+      else setError(raw || 'تعذر إزالة السائق من قائمة الانتظار.');
+    } finally { setSavingEdit(false); }
   }
   async function beginDriverEdit(row: Row) {
     setEditingDriver(row);
@@ -581,6 +598,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
           </button>;
         })}
       </div>}
+      {active === 'waiting' && waitingWindow && <div className={`rounded-2xl border p-4 text-sm ${waitingWindow.status === 'OPEN' ? 'border-violet-200 bg-violet-50 text-violet-950' : 'border-slate-200 bg-slate-50 text-slate-700'}`}><strong>نافذة اختيار النقلات:</strong> {waitingWindow.status === 'OPEN' ? 'مفتوحة' : waitingWindow.status === 'CLOSED' ? 'مغلقة' : 'ملغاة'}{waitingWindow.selection_ends_at ? ` · تنتهي ${new Date(waitingWindow.selection_ends_at).toLocaleTimeString('ar-EG')}` : ''}{waitingWindow.opened_at ? ` · بدأت ${new Date(waitingWindow.opened_at).toLocaleTimeString('ar-EG')}` : ''}. التوزيع النهائي يتم على السيرفر بعد انتهاء الخمس دقائق.</div>}
       {success && <div role="status" className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{success}</div>}
       {error && <div role="alert" className="flex gap-2 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900"><AlertTriangle size={18} className="shrink-0"/><span>{error}</span></div>}
       {pendingAccount && <div className="flex flex-col gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="text-sm text-amber-950"><p className="font-black">بيانات السواق اتحفظت، ولسه إنشاء الحساب محتاج إعادة محاولة</p><p className="mt-1">{pendingAccount.name}</p><p className="mt-1 text-xs">رقم السجل: {pendingAccount.driverId}</p></div><button type="button" onClick={() => void retryDriverAccount()} disabled={retryingInvite} className="rounded-xl bg-amber-700 px-4 py-2.5 text-sm font-black text-white disabled:opacity-60">{retryingInvite ? 'جاري إنشاء الحساب...' : 'إعادة محاولة إنشاء الحساب'}</button></div>}
