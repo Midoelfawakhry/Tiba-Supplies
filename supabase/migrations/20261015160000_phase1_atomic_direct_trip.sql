@@ -17,6 +17,7 @@ declare
   v_quarry public.quarries%rowtype;
   v_driver public.drivers%rowtype;
   v_vehicle public.vehicles%rowtype;
+  v_vehicle_id uuid;
   v_order_id uuid;
   v_booking_id uuid;
   v_order_number bigint;
@@ -42,18 +43,18 @@ begin
   if not found or not v_driver.is_active then raise exception 'DRIVER_NOT_ACTIVE'; end if;
   if v_driver.office_id <> v_office_id then raise exception 'DRIVER_OR_VEHICLE_NOT_ASSIGNED_TO_RAS_SEDR'; end if;
 
-  select v.vehicle_id into v_vehicle.vehicle_id
+  select v.vehicle_id into v_vehicle_id
   from public.driver_vehicle_assignments a
   join public.vehicles v on v.vehicle_id=a.vehicle_id
   where a.driver_id=p_driver_id and a.ended_at is null
     and v.is_active=true and v.office_id=v_office_id
   for update of v;
-  if v_vehicle.vehicle_id is null then raise exception 'ACTIVE_LINKED_VEHICLE_REQUIRED'; end if;
-  select * into v_vehicle from public.vehicles where vehicle_id=v_vehicle.vehicle_id;
+  if v_vehicle_id is null then raise exception 'ACTIVE_LINKED_VEHICLE_REQUIRED'; end if;
+  select * into v_vehicle from public.vehicles where vehicle_id=v_vehicle_id;
   if exists(select 1 from public.bookings where driver_id=p_driver_id and status in ('ASSIGNED','ARRIVED','LOADING','LOADED','IN_TRANSIT')) then
     raise exception 'DRIVER_HAS_ACTIVE_BOOKING';
   end if;
-  if exists(select 1 from public.bookings where vehicle_id=v_vehicle.vehicle_id and status in ('ASSIGNED','ARRIVED','LOADING','LOADED','IN_TRANSIT')) then
+  if exists(select 1 from public.bookings where vehicle_id=v_vehicle_id and status in ('ASSIGNED','ARRIVED','LOADING','LOADED','IN_TRANSIT')) then
     raise exception 'VEHICLE_HAS_ACTIVE_BOOKING';
   end if;
 
@@ -64,7 +65,7 @@ begin
 
   v_trip_code := format('TIBA-%s', upper(substr(replace(gen_random_uuid()::text,'-',''),1,12)));
   insert into public.bookings(load_order_id,driver_id,vehicle_id,assigned_by,assignment_type,status,trip_code)
-  values(v_order_id,p_driver_id,v_vehicle.vehicle_id,v_actor,'DIRECT','ASSIGNED',v_trip_code)
+  values(v_order_id,p_driver_id,v_vehicle_id,v_actor,'DIRECT','ASSIGNED',v_trip_code)
   returning booking_id into v_booking_id;
 
   update public.load_orders set status='IN_PROGRESS',published_at=now(),updated_at=now()
@@ -78,10 +79,10 @@ begin
   perform public.write_audit_event('CREATE_DIRECT_TRIP','BOOKING',v_booking_id,
     jsonb_build_object('load_order_id',v_order_id,'order_number',v_order_number,
       'factory_id',p_factory_id,'quarry_id',p_quarry_id,'driver_id',p_driver_id,
-      'vehicle_id',v_vehicle.vehicle_id,'trip_code',v_trip_code));
+      'vehicle_id',v_vehicle_id,'trip_code',v_trip_code));
 
   return jsonb_build_object('booking_id',v_booking_id,'load_order_id',v_order_id,
-    'order_number',v_order_number,'driver_id',p_driver_id,'vehicle_id',v_vehicle.vehicle_id,
+    'order_number',v_order_number,'driver_id',p_driver_id,'vehicle_id',v_vehicle_id,
     'vehicle_code',v_vehicle.vehicle_code,'plate_number',v_vehicle.plate_number,
     'factory_id',p_factory_id,'factory_name',v_factory.name,'quarry_id',p_quarry_id,
     'quarry_name',v_quarry.name,'trip_code',v_trip_code,'status','ASSIGNED');
