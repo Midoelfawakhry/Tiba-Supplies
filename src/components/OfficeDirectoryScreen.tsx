@@ -44,7 +44,7 @@ function rowDetails(row: Row, key: ScreenKey) {
   if (key === 'drivers') return [row.phone, row.driver_code, row.is_active === false ? 'غير نشط' : 'نشط'].filter(Boolean).join(' · ');
   if (key === 'vehicles') return [row.owner_name ? 'المالك: ' + row.owner_name : '', row.truck_type ?? row.vehicle_type, row.capacity_tons ? row.capacity_tons + ' طن' : '', row.is_active === false ? 'غير نشطة' : 'نشطة'].filter(Boolean).join(' · ');
   if (key === 'owners') return [row.owner_code, row.phone, row.is_active === false ? 'غير نشط' : 'نشط'].filter(Boolean).join(' · ');
-  if (key === 'waiting') return [row.driver_name, row.status, row.arrived_at ? new Date(row.arrived_at).toLocaleString('ar-EG') : ''].filter(Boolean).join(' · ');
+  if (key === 'waiting') return [row.driver_name, row.status === 'WAITING' ? 'في الانتظار' : row.status === 'ASSIGNED' ? 'تم التخصيص' : row.status, row.selected_factory_name && row.selected_quarry_name ? `اختار: ${row.selected_factory_name} ← ${row.selected_quarry_name}` : '', row.choice_status === 'CHOSEN' ? 'الاختيار مسجل — في انتظار التوزيع' : row.choice_status === 'ALLOCATED' ? 'تم التوزيع النهائي' : row.choice_status === 'NOT_ALLOCATED' ? 'لم يتم تخصيص اختيارك' : '', row.trip_code ? `كود النقلة: ${row.trip_code}` : '', row.arrived_at ? new Date(row.arrived_at).toLocaleString('ar-EG') : ''].filter(Boolean).join(' · ');
   if (key === 'loads') return [row.status, row.requested_quantity ? 'المطلوب: ' + row.requested_quantity : '', row.created_at ? new Date(row.created_at).toLocaleString('ar-EG') : ''].filter(Boolean).join(' · ');
   return [row.loading_sequence_date || row.load_date, row.daily_load_number ? 'تحميل اليوم #' + row.daily_load_number : '', row.ticket_number ? 'تذكرة: ' + row.ticket_number : '', row.actual_weight != null ? 'الوزن: ' + row.actual_weight + ' طن' : 'الوزن لم يُسجل', row.driver_id ? 'معرّف السائق: ' + row.driver_id : '', row.vehicle_id ? 'معرّف العربية: ' + row.vehicle_id : '', row.created_at ? new Date(row.created_at).toLocaleString('ar-EG') : ''].filter(Boolean).join(' · ');
 }
@@ -130,6 +130,23 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     }
   }, []);
   useEffect(() => { void load(); }, [load]);
+
+  const refreshWaitingQueue = useCallback(async () => {
+    const { data, error: waitingError } = await supabase.rpc('get_office_waiting_list');
+    if (waitingError) {
+      setError(waitingError.message || 'تعذر تحديث قائمة الانتظار.');
+      return;
+    }
+    setWaiting(Array.isArray(data?.entries) ? data.entries : []);
+    setWaitingWindow(data?.selection_window ?? null);
+  }, []);
+
+  useEffect(() => {
+    if (active !== 'waiting') return;
+    void refreshWaitingQueue();
+    const timer = window.setInterval(() => void refreshWaitingQueue(), 10000);
+    return () => window.clearInterval(timer);
+  }, [active, refreshWaitingQueue]);
 
   async function addDirectoryEntity(kind: 'factories' | 'quarries') {
     const isFactory = kind === 'factories';
