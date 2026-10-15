@@ -107,6 +107,39 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
   }, []);
   useEffect(() => { void load(); }, [load]);
 
+  async function cancelEntity(type: 'driver' | 'factory' | 'quarry' | 'vehicle', row: Row) {
+    const id = type === 'driver' ? row.driver_id : type === 'factory' ? row.factory_id : type === 'quarry' ? row.quarry_id : row.vehicle_id;
+    const label = type === 'driver' ? (row.name ?? row.driver_name ?? 'السائق') : type === 'factory' ? liveName(row, 'المصنع') : type === 'quarry' ? liveName(row, 'المحجر') : (row.plate_number ?? 'العربية');
+    if (!id) { setError('تعذر تحديد السجل المطلوب إلغاؤه.'); return; }
+    if (!window.confirm(`تأكيد أول: هل تريد إلغاء ${label}؟ سيتم إيقافه عن الاستخدام الجديد مع الاحتفاظ بسجلاته السابقة.`)) return;
+    const phrase = window.prompt('تأكيد ثانٍ: اكتب كلمة إلغاء بالضبط لتنفيذ الأمر.');
+    if (phrase !== 'إلغاء') { setError('تم إلغاء العملية: كلمة التأكيد غير مطابقة.'); return; }
+    const reason = window.prompt('اكتب سبب الإلغاء لحفظه في سجل المراجعة:');
+    if (!reason?.trim()) { setError('تم إلغاء العملية: سبب الإلغاء مطلوب.'); return; }
+    setError(''); setSuccess('');
+    try {
+      const { data, error: rpcError } = await supabase.rpc('office_cancel_entity', {
+        p_entity_type: type, p_entity_id: id, p_entity_label: String(label),
+        p_reason: reason.trim(), p_confirmation_phrase: phrase,
+      });
+      if (rpcError) throw rpcError;
+      if (!data?.success) throw new Error('تعذر تأكيد إلغاء السجل.');
+      setSuccess(`تم إلغاء ${label} مع الاحتفاظ بالسجلات السابقة وتسجيل العملية للمراجعة.`);
+      await load();
+    } catch (e: any) {
+      const raw = String(e?.message || '');
+      const messages: Record<string, string> = {
+        AUTH_REQUIRED: 'انتهت جلسة الدخول. سجّل الدخول مرة أخرى.',
+        INSUFFICIENT_ROLE: 'الإلغاء متاح للإدارة الرئيسية فقط.',
+        ENTITY_HAS_ACTIVE_BOOKING: 'لا يمكن إلغاء هذا السجل لوجود نقلة نشطة مرتبطة به. أنهِ النقلة أولًا.',
+        ENTITY_NOT_FOUND_OR_ALREADY_INACTIVE: 'السجل غير موجود أو ملغي بالفعل.',
+        CANCELLATION_CONFIRMATION_REQUIRED: 'تأكيد الإلغاء غير مكتمل.',
+      };
+      const key = Object.keys(messages).find(code => raw.includes(code));
+      setError(key ? messages[key] : raw || 'تعذر إلغاء السجل.');
+    }
+  }
+
   async function beginDriverEdit(row: Row) {
     setError('');
     setSuccess('');
@@ -430,7 +463,8 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
                 <span className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${sectionPalette[active].wash} ${sectionPalette[active].accent}`}><ActiveIcon size={20} strokeWidth={2.1}/></span>
                 <div className="min-w-0"><h4 className="break-words font-black leading-6">{rowTitle(row, active)}</h4><p className="mt-1 break-words text-sm leading-6 text-slate-500">{rowDetails(active === 'vehicles' ? { ...row, owner_name: ownerDirectory.find(owner => String(owner.owner_id) === String(row.owner_id))?.name } : row, active) || 'لا توجد تفاصيل إضافية في السجل الحالي.'}</p></div>
               </div>
-              <div className="flex shrink-0 items-center gap-2">{(active === 'drivers' || active === 'vehicles') && <button type="button" onClick={() => active === 'drivers' ? void beginDriverEdit(row) : beginVehicleEdit(row)} aria-label={active === 'drivers' ? 'تعديل بيانات السائق' : 'تعديل بيانات العربية'} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"><Pencil size={14}/> تعديل</button>}
+              <div className="flex shrink-0 items-center gap-2">{(['drivers','vehicles','factories','quarries'] as ScreenKey[]).includes(active) && <button type="button" onClick={() => void cancelEntity(active as 'driver' | 'vehicle' | 'factory' | 'quarry', row)} className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-700">إلغاء</button>}
+              {(active === 'drivers' || active === 'vehicles') && <button type="button" onClick={() => active === 'drivers' ? void beginDriverEdit(row) : beginVehicleEdit(row)} aria-label={active === 'drivers' ? 'تعديل بيانات السائق' : 'تعديل بيانات العربية'} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"><Pencil size={14}/> تعديل</button>}
               {active === 'actual' && row.booking_id && snapshot?.bookings?.find((b: Row) => b.booking_id === row.booking_id)?.status !== 'IN_TRANSIT' && !row.delivery_confirmed_at && row.actual_weight == null && <button type="button" onClick={async () => {
                 const reason = window.prompt('اكتب سبب إلغاء النقلة:');
                 if (!reason?.trim()) return;
