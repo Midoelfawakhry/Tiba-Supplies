@@ -22,10 +22,11 @@ const NativeDriverTracking = registerPlugin<NativeDriverTrackingPlugin>('NativeD
 
 
 // Battery-efficient live-location prototype. Keep office/business workflows unchanged.
-const LOCATION_DISTANCE_FILTER_METERS = 25;
-const MOVING_LOCATION_UPLOAD_INTERVAL_MS = 10 * 60_000;
-const SLOW_LOCATION_UPLOAD_INTERVAL_MS = 15 * 60_000;
-const STATIONARY_LOCATION_UPLOAD_INTERVAL_MS = 30 * 60_000;
+const LOCATION_DISTANCE_FILTER_METERS = 15;
+// Keep uploads comfortably inside the server's 10-minute freshness window.
+const MOVING_LOCATION_UPLOAD_INTERVAL_MS = 2 * 60_000;
+const SLOW_LOCATION_UPLOAD_INTERVAL_MS = 5 * 60_000;
+const STATIONARY_LOCATION_UPLOAD_INTERVAL_MS = 8 * 60_000;
 const STATIONARY_SPEED_THRESHOLD_MPS = 0.5;
 const MAX_LOCATION_UPLOAD_ACCURACY_METERS = 100;
 
