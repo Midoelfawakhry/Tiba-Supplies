@@ -57,7 +57,7 @@ export const VehicleTrackingScreen: React.FC = () => {
 
   useEffect(() => {
     void loadLocations();
-    const timer = window.setInterval(() => void loadLocations(), 30000);
+    const timer = window.setInterval(() => void loadLocations(), 60000);
     return () => window.clearInterval(timer);
   }, [loadLocations]);
 
@@ -121,7 +121,7 @@ export const VehicleTrackingScreen: React.FC = () => {
       <div className="flex flex-col gap-3 rounded-3xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
         <div>
           <div className="flex items-center gap-2"><MapPin className="text-blue-700" size={22}/><h2 className="text-xl font-black">تتبع السيارات على الخريطة</h2></div>
-          <p className="mt-1 text-sm leading-6 text-slate-500">تُحدَّث المواقع كل 30 ثانية أثناء اتصال التطبيق. الموقع القديم يظهر بوضوح ولا يُعرض على أنه مباشر.</p>
+          <p className="mt-1 text-sm leading-6 text-slate-500">تُحدَّث الخريطة كل 60 ثانية، بالتزامن مع دورة إرسال موقع السائق. الموقع القديم يظهر بوضوح ولا يُعرض على أنه مباشر.</p>
         </div>
         <button onClick={() => void loadLocations(true)} disabled={refreshing} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 py-2 font-bold disabled:opacity-60">
           <RefreshCw size={17} className={refreshing ? 'animate-spin' : ''}/>{refreshing ? 'جاري التحديث' : 'تحديث المواقع'}
@@ -131,7 +131,7 @@ export const VehicleTrackingScreen: React.FC = () => {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <div className="rounded-2xl border border-slate-200 bg-white p-4"><Truck className="text-blue-700" size={20}/><div className="mt-2 text-2xl font-black">{locations.length}</div><div className="text-xs text-slate-500">سيارات لها موقع محفوظ</div></div>
         <div className="rounded-2xl border border-slate-200 bg-white p-4"><MapPin className="text-emerald-600" size={20}/><div className="mt-2 text-2xl font-black">{recentCount}</div><div className="text-xs text-slate-500">موقع حديث (أقل من 10 دقائق)</div></div>
-        <div className="col-span-2 rounded-2xl border border-slate-200 bg-white p-4 sm:col-span-1"><Clock3 className="text-amber-600" size={20}/><div className="mt-2 text-sm font-bold">{loading ? 'جاري التحميل...' : 'تحديث تلقائي كل 30 ثانية'}</div><div className="text-xs text-slate-500">الموقع يحتاج إذن السائق</div></div>
+        <div className="col-span-2 rounded-2xl border border-slate-200 bg-white p-4 sm:col-span-1"><Clock3 className="text-amber-600" size={20}/><div className="mt-2 text-sm font-bold">{loading ? 'جاري التحميل...' : 'تحديث تلقائي كل 60 ثانية'}</div><div className="text-xs text-slate-500">الموقع يحتاج إذن السائق</div></div>
       </div>
       <div className="rounded-3xl border border-slate-200 bg-white p-3"><label className="flex items-center gap-2 rounded-xl border border-slate-300 px-3 py-2.5"><Search size={18} className="text-slate-500"/><input value={vehicleSearch} onChange={e => setVehicleSearch(e.target.value)} className="min-w-0 flex-1 bg-transparent text-sm outline-none" placeholder="ابحث برقم اللوحة أو كود العربية أو اسم السائق" aria-label="البحث عن عربية على الخريطة"/>{vehicleSearch && <button type="button" onClick={() => setVehicleSearch('')} aria-label="مسح البحث"><X size={17}/></button>}</label><p className="mt-2 text-xs text-slate-500">العربيات الظاهرة: {visibleLocations.length} من {locations.length}</p></div>
       <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white">
