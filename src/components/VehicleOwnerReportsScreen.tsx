@@ -44,8 +44,9 @@ export const VehicleOwnerReportsScreen: React.FC = () => {
     (!factoryFilter || t.factory_name === factoryFilter) &&
     (!quarryFilter || t.quarry_name === quarryFilter)
   ), [completedTrips, tripCode, vehicleFilter, ownerFilter, factoryFilter, quarryFilter]);
-  const visibleVehicles = snapshot.vehicles.filter(v => (!ownerFilter || v.owner_id === ownerFilter) && `${v.plate_number} ${v.vehicle_code ?? ''} ${v.owner_name ?? ''}`.toLowerCase().includes(query.toLowerCase()));
-  const visibleOwners = snapshot.owners.filter(o => `${o.name} ${o.phone ?? ''}`.toLowerCase().includes(query.toLowerCase()));
+  const visibleVehicles = snapshot.vehicles.filter(v => (!ownerFilter || v.owner_id === ownerFilter || filteredTrips.some(t => t.owner_id === ownerFilter && t.vehicle_id === v.vehicle_id)) && `${v.plate_number} ${v.vehicle_code ?? ''} ${v.owner_name ?? ''}`.toLowerCase().includes(query.toLowerCase()));
+  const reportOwners = [...new Map([...snapshot.owners.map(o => [o.owner_id, o] as const), ...completedTrips.filter(t => t.owner_id && t.owner_name).map(t => [t.owner_id!, { owner_id: t.owner_id!, name: t.owner_name!, phone: null, vehicle_count: 0, is_active: false }] as const)]).values()];
+  const visibleOwners = reportOwners.filter(o => `${o.name} ${o.phone ?? ''}`.toLowerCase().includes(query.toLowerCase()));
   const vehicleTrips = filteredTrips.filter(t => t.vehicle_id === selectedVehicle);
   const ownerTrips = filteredTrips.filter(t => t.owner_id === selectedOwner && (!ownerVehicle || t.vehicle_id === ownerVehicle));
   const selectedVehicleInfo = snapshot.vehicles.find(v => v.vehicle_id === selectedVehicle);
