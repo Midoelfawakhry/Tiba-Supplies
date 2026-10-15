@@ -313,6 +313,8 @@ export const DriverApp: React.FC = () => {
       setPortal(data);
       const { data: pendingData } = await supabase.rpc('driver_get_pending_assignments');
       if (active) setPendingDirectAssignments(Array.isArray(pendingData) ? pendingData : []);
+      const { data: dispatchData } = await supabase.rpc('driver_get_dispatch_state');
+      if (active) setDispatchState(dispatchData);
       setError('');
       setDriverAuthorized(true);
     })();
@@ -328,6 +330,8 @@ export const DriverApp: React.FC = () => {
         setPortal(data);
         const { data: pendingData } = await supabase.rpc('driver_get_pending_assignments');
         setPendingDirectAssignments(Array.isArray(pendingData) ? pendingData : []);
+        const { data: dispatchData } = await supabase.rpc('driver_get_dispatch_state');
+        setDispatchState(dispatchData);
       })();
     }, 15000);
     return () => window.clearInterval(timer);
