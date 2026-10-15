@@ -1,4 +1,7 @@
 -- Phase 1: actual scale weight is required at driver delivery confirmation.
+-- Driver-recorded actual weights identify the driver separately from office-recorded legacy rows.
+alter table public.actual_loading_records alter column recorded_by drop not null;
+alter table public.actual_loading_records add column if not exists recorded_by_driver_id uuid references public.drivers(driver_id) on delete restrict;
 -- This is one atomic transaction: save the actual weight, confirm delivery, and audit.
 -- Also provide the reporting RPCs used by the current office screens; derive factory/quarry
 -- from the booking's load order because actual_loading_records is keyed by booking_id only.
@@ -51,10 +54,6 @@ begin
   if not found then raise exception 'BOOKING_NOT_YOURS'; end if;
   if v_booking.status <> 'IN_TRANSIT' then raise exception 'BOOKING_NOT_IN_TRANSIT'; end if;
 
-  select au.user_id into v_app_user_id from public.app_users au
-  where au.auth_user_id=auth.uid() and au.is_active=true limit 1;
-  if v_app_user_id is null then raise exception 'DRIVER_APP_USER_REQUIRED'; end if;
-
   select * into v_actual from public.actual_loading_records
   where booking_id=p_booking_id for update;
   if found then
@@ -69,10 +68,10 @@ begin
     end if;
   else
     insert into public.actual_loading_records(
-      booking_id,actual_weight,scale_image_path,recorded_by,notes,loaded_at
+      booking_id,actual_weight,scale_image_path,recorded_by,recorded_by_driver_id,notes,loaded_at
     ) values (
       p_booking_id,round(p_actual_weight,3),nullif(trim(p_scale_image_path),''),
-      v_app_user_id,nullif(trim(p_notes),''),now()
+      null,v_driver.driver_id,nullif(trim(p_notes),''),now()
     );
     v_inserted := true;
   end if;
@@ -95,7 +94,7 @@ begin
       and al.entity_id=p_booking_id
   ) then
     insert into public.audit_log(actor_auth_user_id,actor_app_user_id,action,entity_type,entity_id,details)
-    values(auth.uid(),v_app_user_id,'DRIVER_CONFIRM_DELIVERY','BOOKING',p_booking_id,
+    values(auth.uid(),null,'DRIVER_CONFIRM_DELIVERY','BOOKING',p_booking_id,
       jsonb_build_object('driver_id',v_driver.driver_id,'actual_weight',p_actual_weight,
         'scale_image_attached',p_scale_image_path is not null,
         'accuracy_m',p_accuracy_m,'captured_at',p_captured_at,
