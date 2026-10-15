@@ -5,6 +5,8 @@ import { supabase } from '../lib/supabase';
 type Vehicle = { vehicle_id: string; plate_number: string; vehicle_code?: string | null; owner_id?: string | null; owner_name?: string | null; owner_phone?: string | null; is_active: boolean };
 type Owner = { owner_id: string; name: string; phone?: string | null; vehicle_count: number; is_active: boolean };
 type Trip = { actual_load_id: string; trip_code?: string | null; daily_load_number?: number | null; loading_sequence_date?: string | null; booking_id?: string | null; load_date?: string | null; created_at: string; vehicle_id?: string | null; plate_number?: string | null; owner_id?: string | null; owner_name?: string | null; driver_name?: string | null; quarry_name?: string | null; factory_name?: string | null; ticket_number?: string | null; actual_weight?: number | string | null; delivery_confirmed_at?: string | null; is_completed: boolean };
+type FactoryOption = { id: string; name: string; is_active?: boolean };
+type QuarryOption = { id: string; name: string; is_active?: boolean };
 type Snapshot = { vehicles: Vehicle[]; owners: Owner[]; trips: Trip[] };
 const dateValue = (d: Date) => { const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000); return local.toISOString().slice(0, 10); };
 const dateOf = (t: Trip) => String(t.loading_sequence_date ?? t.load_date ?? t.created_at ?? '').slice(0, 10);
@@ -16,6 +18,8 @@ export const VehicleOwnerReportsScreen: React.FC = () => {
   const today = new Date(); const weekAgo = new Date(today); weekAgo.setDate(today.getDate() - 6);
   const [from, setFrom] = useState(dateValue(weekAgo)); const [to, setTo] = useState(dateValue(today));
   const [snapshot, setSnapshot] = useState<Snapshot>({ vehicles: [], owners: [], trips: [] });
+  const [factoryOptions, setFactoryOptions] = useState<FactoryOption[]>([]);
+  const [quarryOptions, setQuarryOptions] = useState<QuarryOption[]>([]);
   const [loading, setLoading] = useState(false); const [error, setError] = useState('');
   const [query, setQuery] = useState(''); const [tripCode, setTripCode] = useState('');
   const [vehicleFilter, setVehicleFilter] = useState(''); const [ownerFilter, setOwnerFilter] = useState('');
@@ -28,9 +32,17 @@ export const VehicleOwnerReportsScreen: React.FC = () => {
   async function refresh() {
     setLoading(true); setError('');
     try {
-      const { data, error: rpcError } = await supabase.rpc('get_vehicle_owner_reports', { p_from: from || null, p_to: to || null });
-      if (rpcError) throw rpcError;
+      const [reportsResult, directoryResult] = await Promise.all([
+        supabase.rpc('get_vehicle_owner_reports', { p_from: from || null, p_to: to || null }),
+        supabase.rpc('main_office_get_directory'),
+      ]);
+      if (reportsResult.error) throw reportsResult.error;
+      if (directoryResult.error) throw directoryResult.error;
+      const data = reportsResult.data;
+      const directory = directoryResult.data ?? {};
       setSnapshot({ vehicles: Array.isArray(data?.vehicles) ? data.vehicles : [], owners: Array.isArray(data?.owners) ? data.owners : [], trips: Array.isArray(data?.trips) ? data.trips : [] });
+      setFactoryOptions(Array.isArray(directory?.factories) ? directory.factories.filter((item: FactoryOption) => item.is_active !== false) : []);
+      setQuarryOptions(Array.isArray(directory?.quarries) ? directory.quarries.filter((item: QuarryOption) => item.is_active !== false) : []);
     } catch (e: any) { setError(e?.message || 'تعذر تحميل تقارير أوزان العربيات والملاك.'); }
     finally { setLoading(false); }
   }
@@ -51,8 +63,8 @@ export const VehicleOwnerReportsScreen: React.FC = () => {
   const selectedVehicleInfo = snapshot.vehicles.find(v => v.vehicle_id === selectedVehicle);
   const selectedOwnerInfo = snapshot.owners.find(o => o.owner_id === selectedOwner);
   const ownerVehicles = [...new Map([...snapshot.vehicles.filter(v => v.owner_id === selectedOwner), ...filteredTrips.filter(t => t.owner_id === selectedOwner && t.vehicle_id).map(t => ({ vehicle_id: t.vehicle_id!, plate_number: t.plate_number ?? 'عربية بدون رقم', vehicle_code: null, owner_id: t.owner_id, owner_name: t.owner_name ?? null, owner_phone: null, is_active: false }))].map(v => [v.vehicle_id, v])).values()];
-  const factories = [...new Set(completedTrips.map(t => t.factory_name).filter((v): v is string => !!v))].sort();
-  const quarries = [...new Set(completedTrips.map(t => t.quarry_name).filter((v): v is string => !!v))].sort();
+  const factories = [...new Set([...factoryOptions.map(item => item.name), ...completedTrips.map(t => t.factory_name).filter((v): v is string => !!v)])].sort((a, b) => a.localeCompare(b, 'ar'));
+  const quarries = [...new Set([...quarryOptions.map(item => item.name), ...completedTrips.map(t => t.quarry_name).filter((v): v is string => !!v)])].sort((a, b) => a.localeCompare(b, 'ar'));
 
   function TripTable({ trips }: { trips: Trip[] }) {
     if (!trips.length) return <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">مفيش نقلات مكتملة بوزن فعلي مطابقة للفلاتر.</p>;
