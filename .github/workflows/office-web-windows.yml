@@ -12,6 +12,7 @@ on:
       - 'vite.config.ts'
       - 'electron/**'
       - 'electron-builder.yml'
+      - 'supabase/functions/tiba-ai-assistant/**'
       - '.github/workflows/office-web-windows.yml'
   workflow_dispatch:
 
@@ -49,7 +50,7 @@ jobs:
           const dir = 'dist/assets';
           const files = fs.readdirSync(dir).filter(f => f.endsWith('.js'));
           if (!files.length) throw new Error('No JavaScript bundle found.');
-          const bundle = files.map(f => fs.readFileSync(path.join(dir, f), 'utf8')).join('\n');
+          const bundle = files.map(f => fs.readFileSync(path.join(dir, f), 'utf8')).join('\\n');
           if (!bundle.includes(process.env.VITE_SUPABASE_URL)) throw new Error('Supabase URL missing from web bundle.');
           if (!bundle.includes(process.env.VITE_SUPABASE_PUBLISHABLE_KEY)) throw new Error('Supabase publishable key missing from web bundle.');
           console.log('Office web bundle contains the configured Supabase project URL and publishable key.');
@@ -66,8 +67,10 @@ jobs:
     name: Build Shadow office Windows portable EXE
     runs-on: windows-latest
     steps:
-      - name: Checkout latest main
+      - name: Checkout Shadow branch
         uses: actions/checkout@v4
+        with:
+          ref: shadow/phase1-hardening
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
