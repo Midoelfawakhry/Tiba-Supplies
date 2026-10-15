@@ -69,7 +69,21 @@ BEGIN
   IF p_entity_type = 'driver' AND EXISTS (
     SELECT 1 FROM public.bookings b
     WHERE b.driver_id = p_entity_id
-      AND upper(coalesce(b.status::text,'')) IN ('BOOKED','IN_TRANSIT','ACCEPTED')
+      AND upper(coalesce(b.status::text,'')) IN ('BOOKED','LOADING_STATEMENT','IN_TRANSIT','ACCEPTED')
+  ) THEN RAISE EXCEPTION 'ENTITY_HAS_ACTIVE_BOOKING'; END IF;
+
+  IF p_entity_type = 'factory' AND EXISTS (
+    SELECT 1 FROM public.bookings b
+    JOIN public.load_orders lo ON lo.load_order_id = b.load_order_id
+    WHERE lo.factory_id = p_entity_id
+      AND upper(coalesce(b.status::text,'')) IN ('BOOKED','LOADING_STATEMENT','IN_TRANSIT','ACCEPTED')
+  ) THEN RAISE EXCEPTION 'ENTITY_HAS_ACTIVE_BOOKING'; END IF;
+
+  IF p_entity_type = 'quarry' AND EXISTS (
+    SELECT 1 FROM public.bookings b
+    JOIN public.load_orders lo ON lo.load_order_id = b.load_order_id
+    WHERE lo.quarry_id = p_entity_id
+      AND upper(coalesce(b.status::text,'')) IN ('BOOKED','LOADING_STATEMENT','IN_TRANSIT','ACCEPTED')
   ) THEN RAISE EXCEPTION 'ENTITY_HAS_ACTIVE_BOOKING'; END IF;
 
   EXECUTE format('UPDATE public.%I SET is_active = false WHERE %I = $1 AND is_active = true', v_table, v_key)
