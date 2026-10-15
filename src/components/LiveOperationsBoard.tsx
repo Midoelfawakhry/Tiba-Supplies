@@ -111,7 +111,18 @@ export const LiveOperationsBoard: React.FC = () => {
       }
 
       setDraftOrderId(draft.load_order_id);
-      setSuccessMessage('تم حفظ أمر التحميل كمسودة. راجع البيانات ثم اضغط «نشر الأمر» عند الجاهزية.');
+      const { data: published, error: publishError } = await supabase.rpc('main_office_publish_load_order', { p_load_order_id: draft.load_order_id });
+      if (publishError) {
+        setSuccessMessage('تم حفظ الأمر، لكن النشر لم يكتمل. استخدم إعادة محاولة النشر لنفس الأمر لتجنب التكرار.');
+        throw publishError;
+      }
+      if (published?.status !== 'PUBLISHED') {
+        setSuccessMessage('تم حفظ الأمر، لكن لم نتأكد من نشره. أعد محاولة نشر نفس الأمر.');
+        throw new Error('لم يتم تأكيد نشر أمر التحميل؛ الأمر محفوظ ولم يُعتبر متاحًا للسائقين.');
+      }
+      setDraftOrderId(null);
+      setSuccessMessage(`تم إنشاء ونشر أمر التحميل. نافذة الاختيار تنتهي ${published.selection_ends_at ? new Date(published.selection_ends_at).toLocaleTimeString('ar-EG') : 'بعد 5 دقائق'}، وتم إنشاء إشعار لـ ${Number(published.eligible_drivers_notified ?? 0)} سائق مؤهل داخل النطاق ومسجل في الانتظار.`);
+      setQuantity('1');
       await load();
     } catch (e: any) {
       setError(e?.message || 'تعذر إنشاء أمر التحميل.');
@@ -265,7 +276,7 @@ export const LiveOperationsBoard: React.FC = () => {
             </label>
             <div className="flex items-end">
               <button type="submit" disabled={savingOrder || !data?.factories.length || !data?.quarries.length || Boolean(draftOrderId)} className="w-full rounded-xl bg-orange-600 p-3 text-sm font-black text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50">
-                {savingOrder ? 'جاري حفظ المسودة...' : 'حفظ كمسودة'}
+                {savingOrder ? 'جاري إنشاء الأمر ونشره...' : 'إنشاء الطلب ونشره'}
               </button>
             </div>
           </form>
