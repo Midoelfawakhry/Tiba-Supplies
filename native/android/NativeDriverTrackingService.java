@@ -152,8 +152,13 @@ public final class NativeDriverTrackingService extends Service implements Locati
                 body.put("p_latitude", location.getLatitude());
                 body.put("p_longitude", location.getLongitude());
                 body.put("p_accuracy_m", location.hasAccuracy() ? location.getAccuracy() : JSONObject.NULL);
-                body.put("p_captured_at", new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US)
-                    .format(new java.util.Date(location.getTime())));
+                // Supabase validates captured_at against server UTC time. The literal 'Z'
+                // is only correct when the formatter itself is set to UTC; Android's default
+                // timezone is Egypt (UTC+2/UTC+3), which otherwise makes every fix look future-dated.
+                java.text.SimpleDateFormat capturedAtFormat =
+                    new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US);
+                capturedAtFormat.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+                body.put("p_captured_at", capturedAtFormat.format(new java.util.Date(location.getTime())));
                 JSONObject result = postJson(projectUrl + "/rest/v1/rpc/driver_update_live_location", body, accessToken);
                 if (result != null) { lastSentAt = System.currentTimeMillis(); persistEncryptedSession(); }
             } catch (Exception error) {
