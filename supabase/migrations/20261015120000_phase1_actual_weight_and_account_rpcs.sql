@@ -213,3 +213,48 @@ begin
 end; $$;
 revoke all on function public.get_account_statement_records(date,date) from public,anon;
 grant execute on function public.get_account_statement_records(date,date) to authenticated;
+
+
+-- Optional scale-ticket images. Private bucket; drivers can upload only to their own
+-- currently in-transit booking folder. Main Office can read images for reconciliation.
+insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types)
+values ('scale-tickets','scale-tickets',false,10485760,array['image/jpeg','image/png','image/webp'])
+on conflict (id) do update set public=false,file_size_limit=10485760,
+  allowed_mime_types=array['image/jpeg','image/png','image/webp'];
+
+drop policy if exists "driver_upload_own_scale_ticket" on storage.objects;
+create policy "driver_upload_own_scale_ticket" on storage.objects
+for insert to authenticated
+with check (
+  bucket_id='scale-tickets'
+  and (storage.foldername(name))[1] ~* '^[0-9a-f-]{36}$'
+  and exists (
+    select 1 from public.bookings b
+    join public.drivers d on d.driver_id=b.driver_id
+    where b.booking_id=(storage.foldername(name))[1]::uuid
+      and d.auth_user_id=auth.uid() and d.is_active=true
+      and b.status='IN_TRANSIT'
+  )
+);
+
+drop policy if exists "read_scale_tickets_for_driver_or_office" on storage.objects;
+create policy "read_scale_tickets_for_driver_or_office" on storage.objects
+for select to authenticated
+using (
+  bucket_id='scale-tickets'
+  and (
+    exists (
+      select 1 from public.bookings b
+      join public.drivers d on d.driver_id=b.driver_id
+      where b.booking_id=(storage.foldername(name))[1]::uuid
+        and d.auth_user_id=auth.uid()
+    )
+    or exists (
+      select 1 from public.app_users au
+      join public.user_roles ur on ur.user_id=au.user_id
+      join public.roles r on r.role_id=ur.role_id
+      where au.auth_user_id=auth.uid() and au.is_active=true
+        and r.name in ('ADMIN','HEAD_OFFICE')
+    )
+  )
+);
