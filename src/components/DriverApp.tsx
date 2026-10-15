@@ -74,6 +74,7 @@ export const DriverApp: React.FC = () => {
   const [portalLoading, setPortalLoading] = useState(false);
   const [pendingDirectAssignments, setPendingDirectAssignments] = useState<any[]>([]);
   const [acceptingBookingId, setAcceptingBookingId] = useState<string | null>(null);
+  const [acceptanceMessage, setAcceptanceMessage] = useState('');
   const [deliveryBusyBookingId, setDeliveryBusyBookingId] = useState<string | null>(null);
   const [deliveryWeights, setDeliveryWeights] = useState<Record<string, string>>({});
   const [deliveryScaleImages, setDeliveryScaleImages] = useState<Record<string, File | null>>({});
@@ -228,11 +229,31 @@ export const DriverApp: React.FC = () => {
     }
   }
 
-  async function acceptDirectAssignment(_bookingId: string) {
-    // Phase 1 assignments are active when the Main Office creates the booking.
-    // The legacy second-step acceptance RPC is intentionally not called.
-    setError('الإسناد في المرحلة الأولى بيظهر ضمن نقلاتك مباشرة، ومش محتاج قبول منفصل. حدّث حالة التشغيل لو مش ظاهر.');
-    await refreshPortal();
+  async function acceptDirectAssignment(bookingId: string) {
+    if (acceptingBookingId) return;
+    setAcceptingBookingId(bookingId);
+    setAcceptanceMessage('');
+    setError('');
+    try {
+      const { data, error: acceptanceError } = await supabase.rpc('accept_direct_assignment', {
+        p_booking_id: bookingId,
+      });
+      if (acceptanceError) throw acceptanceError;
+      if (!data?.accepted || data?.acceptance_status !== 'ACCEPTED' || !data?.accepted_at) {
+        throw new Error('لم يؤكد النظام تسجيل قبول التخصيص ووقته.');
+      }
+      setAcceptanceMessage(`تم قبول التخصيص بنجاح. كود النقلة: ${data.trip_code || '—'} · وقت القبول: ${new Date(data.accepted_at).toLocaleString('ar-EG')}.`);
+      await refreshPortal();
+    } catch (e: any) {
+      const raw = String(e?.message || '');
+      if (raw.includes('BOOKING_NOT_YOURS')) setError('التخصيص ده مش مرتبط بحسابك.');
+      else if (raw.includes('DIRECT_ASSIGNMENT_NOT_PENDING')) setError('التخصيص لم يعد في انتظار القبول. حدّث القائمة.');
+      else if (raw.includes('NOT_A_DIRECT_ASSIGNMENT')) setError('الطلب ده مش تخصيص مباشر.');
+      else if (raw.includes('BOOKING_NOT_FOUND')) setError('التخصيص غير موجود.');
+      else setError(raw || 'تعذر قبول التخصيص. حاول تحديث القائمة.');
+    } finally {
+      setAcceptingBookingId(null);
+    }
   }
 
   useEffect(() => {
@@ -657,10 +678,11 @@ export const DriverApp: React.FC = () => {
         </section>
         <section className="rounded-3xl border border-amber-300 bg-amber-50 p-5 shadow-sm">
           <div className="flex items-center gap-2"><FileText className="text-amber-800" size={22}/><h2 className="font-black">إسناد مباشر — في انتظار قبولك</h2></div>
-          <p className="mt-2 text-sm leading-6 text-amber-900">الأوامر دي اتسندت لك مباشرة من المكتب. راجع كود النقلة واضغط Confirm للموافقة؛ بعدها تدخل النقلة سجل Loading Data بنفس الكود.</p>
+          <p className="mt-2 text-sm leading-6 text-amber-900">الأوامر دي اتخصصت لك مباشرة من المكتب. راجع المصنع والمحجر وكود النقلة والعربية، واضغط «تأكيد القبول». وصول الإشعار وحده مش معناه إنك قبلت التخصيص، والنقلة لن تبدأ قبل تسجيل قبولك.</p>
+          {acceptanceMessage && <div role="status" className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold leading-6 text-emerald-900">{acceptanceMessage}</div>}
           {pendingDirectAssignments.length ? <div className="mt-4 space-y-3">{pendingDirectAssignments.map((assignment: any) => <article key={assignment.booking_id} className="rounded-2xl border border-amber-200 bg-white p-4">
             <div className="flex items-start gap-3"><div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-amber-100 text-xl font-black text-amber-900">{factoryGlyph(String(assignment.factory_name || 'م'))}</div><div className="min-w-0 flex-1"><h3 className="font-black">{assignment.factory_name || 'مصنع غير محدد'}</h3><p className="mt-1 text-sm text-slate-600">المحجر: {assignment.quarry_name || 'غير محدد'}</p><p className="mt-1 text-sm font-black text-indigo-700">كود النقلة: <span dir="ltr" className="font-mono">{assignment.trip_code || 'جارٍ تجهيز الكود'}</span></p><p className="mt-1 text-xs text-slate-400">رقم الإسناد اليومي: {assignment.assignment_daily_number ?? '—'} · {assignment.assigned_at ? new Date(assignment.assigned_at).toLocaleString('ar-EG') : ''}</p></div></div>
-            <button type="button" onClick={() => void acceptDirectAssignment(assignment.booking_id)} disabled={acceptingBookingId !== null} className="mt-4 w-full rounded-xl bg-emerald-700 p-3 font-black text-white disabled:opacity-60">{acceptingBookingId === assignment.booking_id ? 'جارٍ التأكيد...' : 'Confirm'}</button>
+            <button type="button" onClick={() => void acceptDirectAssignment(assignment.booking_id)} disabled={acceptingBookingId !== null} className="mt-4 w-full rounded-xl bg-emerald-700 p-3 font-black text-white disabled:opacity-60">{acceptingBookingId === assignment.booking_id ? 'جارٍ تسجيل القبول...' : 'تأكيد القبول'}</button>
           </article>)}</div> : <p className="mt-3 rounded-xl bg-white/80 p-3 text-sm text-slate-600">مفيش أوامر مباشرة معلّقة حاليًا.</p>}
         </section>
         {(portal?.my_bookings || []).filter((booking: any) => booking.is_direct_assignment && ['LOADING', 'LOADED', 'IN_TRANSIT'].includes(booking.raw_status)).length > 0 && <section className="rounded-3xl border border-emerald-300 bg-emerald-50 p-5 shadow-sm">
