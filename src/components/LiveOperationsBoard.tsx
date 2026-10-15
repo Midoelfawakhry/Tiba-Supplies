@@ -26,21 +26,21 @@ const statusLabel: Record<string, string> = {
 
 type OfficeScreen = 'dashboard' | 'tracking' | 'directory' | 'direct' | 'drivers' | 'vehicles' | 'waiting' | 'orders' | 'actual' | 'vehicleReports' | 'factoryStatement' | 'quarryStatement' | 'analytics' | 'employees' | 'assistant';
 const screenPalette: Record<OfficeScreen, { selected: string; wash: string }> = {
-  dashboard: { selected: 'bg-teal-600 hover:bg-teal-700', wash: 'bg-teal-50/40' },
-  drivers: { selected: 'bg-red-600 hover:bg-red-700', wash: 'bg-red-50/50' },
-  vehicles: { selected: 'bg-blue-600 hover:bg-blue-700', wash: 'bg-blue-50/50' },
-  waiting: { selected: 'bg-violet-600 hover:bg-violet-700', wash: 'bg-violet-50/50' },
-  orders: { selected: 'bg-orange-600 hover:bg-orange-700', wash: 'bg-orange-50/50' },
-  actual: { selected: 'bg-emerald-600 hover:bg-emerald-700', wash: 'bg-emerald-50/50' },
-  vehicleReports: { selected: 'bg-sky-700 hover:bg-sky-800', wash: 'bg-sky-50/50' },
-  factoryStatement: { selected: 'bg-cyan-700 hover:bg-cyan-800', wash: 'bg-cyan-50/50' },
-  quarryStatement: { selected: 'bg-amber-700 hover:bg-amber-800', wash: 'bg-amber-50/50' },
-  analytics: { selected: 'bg-indigo-700 hover:bg-indigo-800', wash: 'bg-indigo-50/50' },
-  tracking: { selected: 'bg-cyan-600 hover:bg-cyan-700', wash: 'bg-cyan-50/50' },
-  directory: { selected: 'bg-indigo-600 hover:bg-indigo-700', wash: 'bg-indigo-50/50' },
-  direct: { selected: 'bg-fuchsia-600 hover:bg-fuchsia-700', wash: 'bg-fuchsia-50/50' },
-  employees: { selected: 'bg-indigo-600 hover:bg-indigo-700', wash: 'bg-indigo-50/50' },
-  assistant: { selected: 'bg-violet-700 hover:bg-violet-800', wash: 'bg-violet-50/50' },
+  dashboard: { selected: 'bg-teal-700 hover:bg-teal-800', wash: 'bg-slate-50/70' },
+  drivers: { selected: 'bg-teal-700 hover:bg-teal-800', wash: 'bg-slate-50/70' },
+  vehicles: { selected: 'bg-teal-700 hover:bg-teal-800', wash: 'bg-slate-50/70' },
+  waiting: { selected: 'bg-teal-700 hover:bg-teal-800', wash: 'bg-slate-50/70' },
+  orders: { selected: 'bg-teal-700 hover:bg-teal-800', wash: 'bg-slate-50/70' },
+  actual: { selected: 'bg-teal-700 hover:bg-teal-800', wash: 'bg-slate-50/70' },
+  vehicleReports: { selected: 'bg-teal-700 hover:bg-teal-800', wash: 'bg-slate-50/70' },
+  factoryStatement: { selected: 'bg-teal-700 hover:bg-teal-800', wash: 'bg-slate-50/70' },
+  quarryStatement: { selected: 'bg-teal-700 hover:bg-teal-800', wash: 'bg-slate-50/70' },
+  analytics: { selected: 'bg-teal-700 hover:bg-teal-800', wash: 'bg-slate-50/70' },
+  tracking: { selected: 'bg-teal-700 hover:bg-teal-800', wash: 'bg-slate-50/70' },
+  directory: { selected: 'bg-teal-700 hover:bg-teal-800', wash: 'bg-slate-50/70' },
+  direct: { selected: 'bg-teal-700 hover:bg-teal-800', wash: 'bg-slate-50/70' },
+  employees: { selected: 'bg-teal-700 hover:bg-teal-800', wash: 'bg-slate-50/70' },
+  assistant: { selected: 'bg-teal-700 hover:bg-teal-800', wash: 'bg-slate-50/70' },
 };
 
 export const LiveOperationsBoard: React.FC = () => {
@@ -176,11 +176,11 @@ export const LiveOperationsBoard: React.FC = () => {
   return (
     <div dir="rtl" className="min-h-screen bg-slate-50 text-slate-900">
       <header className="relative sm:sticky sm:top-0 z-20 border-b border-slate-200 bg-white/95 shadow-sm shadow-slate-900/5 backdrop-blur">
-        <div className="max-w-7xl mx-auto px-4 sm:px-5 py-3 sm:py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 py-4 sm:py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="min-w-0 w-full sm:w-auto">
-            <div className="inline-flex items-center gap-2 text-[10px] leading-4 sm:text-xs font-black tracking-wide text-teal-700 whitespace-normal break-words"><span className="grid h-7 w-7 place-items-center rounded-lg bg-teal-50"><Truck className="h-4 w-4" /></span>TIBA SUPPLIES · LIVE CORE</div>
-            <h1 className="text-lg leading-7 sm:text-xl lg:text-2xl font-black break-words">مركز تشغيل طيبة للتوريدات</h1>
-            <div className="text-xs sm:text-sm leading-5 text-slate-500 mt-1 break-words">
+            <div className="inline-flex items-center gap-2.5 text-[11px] sm:text-xs font-black tracking-[0.12em] text-teal-800"><span className="grid h-10 w-10 place-items-center rounded-2xl bg-gradient-to-br from-teal-700 to-cyan-600 text-white shadow-md shadow-teal-900/15"><Truck className="h-5 w-5" /></span><span>TIBA SUPPLIES <span className="text-slate-400">·</span> <span className="text-cyan-700">LIVE CORE</span></span></div>
+            <h1 className="mt-2 text-xl leading-8 sm:text-2xl lg:text-[28px] font-black tracking-tight text-slate-950">مركز تشغيل طيبة للتوريدات</h1>
+            <div className="mt-2 max-w-3xl text-xs sm:text-sm leading-6 text-slate-500 break-words">
               <MapPin className="inline h-3 w-3 ml-1" />
               مكتب التشغيل: {operationalOffice?.name ?? 'طيبة للتوريدات - الإسماعيلية'}
               {' · '}
@@ -190,29 +190,29 @@ export const LiveOperationsBoard: React.FC = () => {
             </div>
           </div>
           <div className="flex w-full sm:w-auto shrink-0 gap-2 sm:self-auto">
-            <button onClick={load} className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold">
+            <button onClick={load} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm hover:border-teal-300 hover:text-teal-800">
               <RefreshCw className="inline h-4 w-4 ml-1" /> تحديث
             </button>
-            <button onClick={() => supabase.auth.signOut()} className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700">
+            <button onClick={() => supabase.auth.signOut()} className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-bold text-rose-700 hover:bg-rose-100">
               <LogOut className="inline h-4 w-4 ml-1" /> خروج
             </button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-5 py-6 space-y-5">
+      <main className="mx-auto max-w-[1440px] px-3 py-4 sm:px-6 sm:py-6 space-y-5 sm:space-y-6">
         {error && <div className="rounded-2xl border border-red-500/30 bg-red-50 p-4 text-sm text-red-800">خطأ: {error}</div>}
 
         {successMessage && <div className="rounded-2xl border border-emerald-500/30 bg-emerald-50 p-4 text-sm text-emerald-800">{successMessage}</div>}
 
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
-          <aside className="w-full shrink-0 rounded-3xl border border-slate-200 bg-white p-3 shadow-sm lg:sticky lg:top-28 lg:w-64" aria-label="القائمة الرئيسية للمكتب">
-            <div className="px-3 pb-3 pt-2">
-              <div className="text-[10px] font-black tracking-wider text-blue-700">TIBA SUPPLIES</div>
-              <h2 className="mt-1 text-base font-black">إدارة المكتب</h2>
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-start">
+          <aside className="w-full shrink-0 rounded-[28px] border border-slate-200/90 bg-white p-4 shadow-[0_12px_36px_rgba(15,40,60,0.06)] xl:sticky xl:top-28 xl:w-[285px]" aria-label="القائمة الرئيسية للمكتب">
+            <div className="mb-3 rounded-2xl bg-gradient-to-l from-teal-50 to-slate-50 px-4 py-4">
+              <div className="text-[10px] font-black tracking-[0.14em] text-teal-800">TIBA SUPPLIES</div>
+              <h2 className="mt-1 text-lg font-black text-slate-900">إدارة المكتب</h2>
               <p className="mt-1 text-xs leading-5 text-slate-500">كل شاشات التشغيل في مكان واحد</p>
             </div>
-            <nav className="grid grid-cols-2 gap-1 sm:grid-cols-3 lg:grid-cols-1" aria-label="التنقل بين شاشات المكتب">
+            <nav className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-1" aria-label="التنقل بين شاشات المكتب">
               {([
                 ['dashboard', 'مركز التشغيل', ClipboardList],
                 ['drivers', 'قائمة السائقين', Users],
@@ -230,9 +230,9 @@ export const LiveOperationsBoard: React.FC = () => {
                 ['assistant', 'مساعد النظام AI', Bot],
               ] as const).map(([key, label, Icon]) => {
                 const selected = activeScreen === key;
-                return <button key={key} type="button" onClick={() => setActiveScreen(key as typeof activeScreen)} className={selected ? `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-right text-sm font-black text-white shadow-sm transition ${screenPalette[key].selected}` : 'flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-right text-sm font-bold text-slate-600 transition hover:bg-slate-50 hover:text-slate-900'}>
-                  <Icon className="h-[18px] w-[18px] shrink-0" />
-                  <span className="min-w-0 flex-1">{label}</span>
+                return <button key={key} type="button" onClick={() => setActiveScreen(key as typeof activeScreen)} className={selected ? `flex min-h-[52px] items-center gap-3 rounded-2xl border border-teal-800 px-3.5 py-3 text-right text-sm font-black text-white shadow-md shadow-teal-900/15 transition ${screenPalette[key].selected}` : 'flex min-h-[52px] items-center gap-3 rounded-2xl border border-transparent px-3.5 py-3 text-right text-sm font-semibold text-slate-600 transition hover:border-slate-200 hover:bg-slate-50 hover:text-teal-900'}>
+                  <span className={selected ? "grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/15" : "grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-500"}><Icon className="h-[18px] w-[18px] shrink-0" /></span>
+                  <span className="min-w-0 flex-1 leading-5">{label}</span>
                   {selected && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
                 </button>;
               })}
@@ -240,7 +240,7 @@ export const LiveOperationsBoard: React.FC = () => {
           </aside>
           <section className={`min-w-0 flex-1 space-y-5 rounded-[2rem] p-2 transition-colors sm:p-3 ${screenPalette[activeScreen].wash}`}>
         {activeScreen === 'analytics' ? <section className="space-y-4 rounded-3xl border border-indigo-100 bg-white p-5 shadow-sm"><div><h2 className="text-xl font-black text-slate-900">تحليل البيانات والتقارير</h2><p className="mt-1 text-sm leading-6 text-slate-500">اختار التقرير المطلوب من تقارير التشغيل المسجلة.</p></div><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"><button type="button" onClick={() => setActiveScreen('vehicleReports')} className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-right"><Users className="mb-3 h-7 w-7 text-sky-700"/><h3 className="font-black">حسابات العربيات والملاك</h3></button><button type="button" onClick={() => setActiveScreen('factoryStatement')} className="rounded-2xl border border-cyan-200 bg-cyan-50 p-4 text-right"><Factory className="mb-3 h-7 w-7 text-cyan-700"/><h3 className="font-black">كشف حساب المصانع والعملاء</h3></button><button type="button" onClick={() => setActiveScreen('quarryStatement')} className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-right"><Mountain className="mb-3 h-7 w-7 text-amber-700"/><h3 className="font-black">كشف حساب المحاجر</h3></button></div></section> : activeScreen === 'assistant' ? <SystemAiAssistant audience="HEAD_OFFICE" context={{ office: data?.operational_office?.name ?? data?.office?.name ?? 'مكتب الإسماعيلية', check_in_office: data?.check_in_office?.name ?? 'مكتب رأس سدر', totals: { factories: data?.factories.length ?? 0, quarries: data?.quarries.length ?? 0, load_orders: data?.load_orders.length ?? 0, bookings: data?.bookings.length ?? 0, actual_loading_records: data?.actual_loading_records.length ?? 0, active_drivers: data?.drivers.filter(row => row.is_active !== false).length ?? 0, active_vehicles: data?.vehicles.filter(row => row.is_active !== false).length ?? 0 }, load_orders: (data?.load_orders ?? []).slice(0, 80).map(order => ({ factory: liveName(data?.factories.find(row => row.factory_id === order.factory_id)), quarry: liveName(data?.quarries.find(row => row.quarry_id === order.quarry_id)), status: order.status, requested_quantity: order.requested_quantity, priority: order.priority })), bookings_by_status: Object.entries((data?.bookings ?? []).reduce((acc: Record<string, number>, row) => { acc[row.status] = (acc[row.status] ?? 0) + 1; return acc; }, {})), actual_loads_today: todaysActualCount }} /> : activeScreen === 'employees' ? <BranchEmployeeManagementScreen /> : activeScreen === 'factoryStatement' ? <AccountStatementsScreen kind="factory" /> : activeScreen === 'quarryStatement' ? <AccountStatementsScreen kind="quarry" /> : activeScreen === 'vehicleReports' ? <VehicleOwnerReportsScreen /> : activeScreen === 'tracking' ? <VehicleTrackingScreen /> : activeScreen === 'drivers' ? <OfficeDirectoryScreen initialSection="drivers" showSectionTabs={false} /> : activeScreen === 'vehicles' ? <OfficeDirectoryScreen initialSection="vehicles" showSectionTabs={false} /> : activeScreen === 'waiting' ? <OfficeDirectoryScreen initialSection="waiting" showSectionTabs={false} /> : activeScreen === 'orders' ? <OfficeDirectoryScreen initialSection="loads" showSectionTabs={false} /> : activeScreen === 'actual' ? <OfficeDirectoryScreen initialSection="actual" showSectionTabs={false} /> : activeScreen === 'directory' ? <OfficeDirectoryScreen /> : activeScreen === 'direct' ? <DirectLoadAssignmentScreen /> : <>
-        <section className="rounded-3xl border border-orange-200/80 bg-gradient-to-br from-white via-white to-orange-50/70 p-5 shadow-sm shadow-orange-900/5">
+        <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_12px_36px_rgba(15,40,60,0.05)] sm:p-6">
           <div className="mb-4">
             <h2 className="text-lg font-black">إنشاء أمر تحميل جديد</h2>
             <p className="mt-1 text-xs text-slate-500">يُنشأ الأمر على مكتب الإسماعيلية ويُوجَّه تسجيل وصول السواقين إلى مكتب رأس سدر.</p>
@@ -275,7 +275,7 @@ export const LiveOperationsBoard: React.FC = () => {
               </select>
             </label>
             <div className="flex items-end">
-              <button type="submit" disabled={savingOrder || !data?.factories.length || !data?.quarries.length || Boolean(draftOrderId)} className="w-full rounded-xl bg-orange-600 p-3 text-sm font-black text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50">
+              <button type="submit" disabled={savingOrder || !data?.factories.length || !data?.quarries.length || Boolean(draftOrderId)} className="w-full rounded-xl bg-teal-700 p-3 text-sm font-black text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50">
                 {savingOrder ? 'جاري إنشاء الأمر ونشره...' : 'إنشاء الطلب ونشره'}
               </button>
             </div>
