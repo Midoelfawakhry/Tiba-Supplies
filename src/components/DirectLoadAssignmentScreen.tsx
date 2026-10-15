@@ -8,6 +8,7 @@ export const DirectLoadAssignmentScreen: React.FC = () => {
   const [factoryId, setFactoryId] = useState('');
   const [quarryId, setQuarryId] = useState('');
   const [vehicleId, setVehicleId] = useState('');
+  const [vehicleSearch, setVehicleSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -30,6 +31,11 @@ export const DirectLoadAssignmentScreen: React.FC = () => {
   const factories = snapshot?.factories ?? [];
   const quarries = snapshot?.quarries ?? [];
   const availableVehicles = snapshot?.vehicles ?? [];
+  const normalizedVehicleSearch = vehicleSearch.trim().toLocaleLowerCase('ar-EG');
+  const filteredVehicles = availableVehicles.filter(vehicle => {
+    const plate = String(vehicle.plate_number ?? '').toLocaleLowerCase('ar-EG');
+    return !normalizedVehicleSearch || plate.includes(normalizedVehicleSearch);
+  });
 
 
   async function assign() {
@@ -50,6 +56,7 @@ export const DirectLoadAssignmentScreen: React.FC = () => {
       if (!result?.success) throw new Error('تعذر تأكيد الإسناد المباشر.');
       setSuccess(`تم الإسناد المباشر بنجاح. المسافة من المكتب: ${result.distance_m} متر.`);
       setVehicleId('');
+      setVehicleSearch('');
       await refresh();
     } catch (e: any) {
       const raw = String(e?.message || '');
@@ -99,10 +106,12 @@ export const DirectLoadAssignmentScreen: React.FC = () => {
             {quarries.map(quarry => <option key={quarry.quarry_id} value={quarry.quarry_id}>{liveName(quarry)}</option>)}
           </select>
           <label className="mt-5 block text-sm font-bold text-slate-700">العربية</label>
+          <input type="search" value={vehicleSearch} onChange={e => { setVehicleSearch(e.target.value); setVehicleId(''); setError(''); setSuccess(''); }} placeholder="ابحث برقم العربية..." aria-label="ابحث برقم العربية" className="mt-2 w-full rounded-xl border border-slate-300 bg-slate-50 p-3 text-sm text-slate-900" />
           <select value={vehicleId} onChange={e => { setVehicleId(e.target.value); setError(''); setSuccess(''); }} className="mt-2 w-full rounded-xl border border-slate-300 bg-slate-50 p-3 text-sm text-slate-900">
             <option value="">اختار العربية</option>
-            {availableVehicles.map(vehicle => <option key={vehicle.vehicle_id} value={vehicle.vehicle_id}>{vehicle.plate_number ?? vehicle.vehicle_code ?? vehicle.vehicle_id}</option>)}
+            {filteredVehicles.map(vehicle => <option key={vehicle.vehicle_id} value={vehicle.vehicle_id}>{vehicle.plate_number ?? 'عربية بدون رقم لوحة'}</option>)}
           </select>
+          {!filteredVehicles.length && <p className="mt-2 text-sm text-slate-500">لا توجد عربيات مطابقة لرقم البحث.</p>}
           <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-900">
             <b>شروط التأكيد:</b> السائق مرتبط بالعربية، وموقع GPS حديث (آخر 10 دقائق)، والعربية داخل نطاق 10 كم من مكتب تسجيل الوصول. لا يمكن إسناد نقلة نشطة ثانية لنفس السائق أو العربية.
           </div>
@@ -115,7 +124,7 @@ export const DirectLoadAssignmentScreen: React.FC = () => {
             <div className="mt-4 space-y-3 text-sm">
               <div><span className="text-slate-500">المصنع</span><div className="mt-1 font-bold">{liveName(factories.find(f => f.factory_id === factoryId))}</div></div>
               <div><span className="text-slate-500">المحجر</span><div className="mt-1 font-bold">{liveName(quarries.find(q => q.quarry_id === quarryId))}</div></div>
-              <div><span className="text-slate-500">العربية</span><div className="mt-1 font-bold">{String(availableVehicles.find(v => v.vehicle_id === vehicleId)?.plate_number ?? availableVehicles.find(v => v.vehicle_id === vehicleId)?.vehicle_code ?? 'لم يتم الاختيار')}</div></div>
+              <div><span className="text-slate-500">العربية</span><div className="mt-1 font-bold">{String(availableVehicles.find(v => v.vehicle_id === vehicleId)?.plate_number ?? 'لم يتم الاختيار')}</div></div>
             </div>
           </section>
           <section className="rounded-3xl border border-slate-200 bg-slate-50 p-5"><h3 className="font-black">حالة البيانات</h3><div className="mt-3 text-sm leading-7 text-slate-600">{loading ? 'جاري تحميل البيانات...' : `مصانع: ${factories.length} · محاجر: ${quarries.length} · عربيات: ${availableVehicles.length}`}</div></section>
