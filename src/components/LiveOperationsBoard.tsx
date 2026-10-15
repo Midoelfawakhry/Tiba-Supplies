@@ -25,22 +25,22 @@ const statusLabel: Record<string, string> = {
 };
 
 type OfficeScreen = 'dashboard' | 'tracking' | 'directory' | 'direct' | 'drivers' | 'vehicles' | 'waiting' | 'orders' | 'actual' | 'vehicleReports' | 'factoryStatement' | 'quarryStatement' | 'analytics' | 'employees' | 'assistant';
-const screenPalette: Record<OfficeScreen, { selected: string; wash: string }> = {
-  dashboard: { selected: 'bg-teal-700 hover:bg-teal-800', wash: 'bg-slate-50/70' },
-  drivers: { selected: 'bg-teal-700 hover:bg-teal-800', wash: 'bg-slate-50/70' },
-  vehicles: { selected: 'bg-teal-700 hover:bg-teal-800', wash: 'bg-slate-50/70' },
-  waiting: { selected: 'bg-teal-700 hover:bg-teal-800', wash: 'bg-slate-50/70' },
-  orders: { selected: 'bg-teal-700 hover:bg-teal-800', wash: 'bg-slate-50/70' },
-  actual: { selected: 'bg-teal-700 hover:bg-teal-800', wash: 'bg-slate-50/70' },
-  vehicleReports: { selected: 'bg-teal-700 hover:bg-teal-800', wash: 'bg-slate-50/70' },
-  factoryStatement: { selected: 'bg-teal-700 hover:bg-teal-800', wash: 'bg-slate-50/70' },
-  quarryStatement: { selected: 'bg-teal-700 hover:bg-teal-800', wash: 'bg-slate-50/70' },
-  analytics: { selected: 'bg-teal-700 hover:bg-teal-800', wash: 'bg-slate-50/70' },
-  tracking: { selected: 'bg-teal-700 hover:bg-teal-800', wash: 'bg-slate-50/70' },
-  directory: { selected: 'bg-teal-700 hover:bg-teal-800', wash: 'bg-slate-50/70' },
-  direct: { selected: 'bg-teal-700 hover:bg-teal-800', wash: 'bg-slate-50/70' },
-  employees: { selected: 'bg-teal-700 hover:bg-teal-800', wash: 'bg-slate-50/70' },
-  assistant: { selected: 'bg-teal-700 hover:bg-teal-800', wash: 'bg-slate-50/70' },
+const screenPalette: Record<OfficeScreen, { selected: string; wash: string; icon: string; iconBg: string }> = {
+  dashboard: { selected: 'bg-teal-700 hover:bg-teal-800', wash: 'bg-slate-50/70', icon: 'text-teal-700', iconBg: 'bg-teal-50' },
+  drivers: { selected: 'bg-violet-700 hover:bg-violet-800', wash: 'bg-slate-50/70', icon: 'text-violet-700', iconBg: 'bg-violet-50' },
+  vehicles: { selected: 'bg-blue-700 hover:bg-blue-800', wash: 'bg-slate-50/70', icon: 'text-blue-700', iconBg: 'bg-blue-50' },
+  waiting: { selected: 'bg-amber-600 hover:bg-amber-700', wash: 'bg-slate-50/70', icon: 'text-amber-700', iconBg: 'bg-amber-50' },
+  orders: { selected: 'bg-orange-600 hover:bg-orange-700', wash: 'bg-slate-50/70', icon: 'text-orange-700', iconBg: 'bg-orange-50' },
+  actual: { selected: 'bg-emerald-700 hover:bg-emerald-800', wash: 'bg-slate-50/70', icon: 'text-emerald-700', iconBg: 'bg-emerald-50' },
+  vehicleReports: { selected: 'bg-sky-700 hover:bg-sky-800', wash: 'bg-slate-50/70', icon: 'text-sky-700', iconBg: 'bg-sky-50' },
+  factoryStatement: { selected: 'bg-cyan-700 hover:bg-cyan-800', wash: 'bg-slate-50/70', icon: 'text-cyan-700', iconBg: 'bg-cyan-50' },
+  quarryStatement: { selected: 'bg-lime-700 hover:bg-lime-800', wash: 'bg-slate-50/70', icon: 'text-lime-800', iconBg: 'bg-lime-50' },
+  analytics: { selected: 'bg-indigo-700 hover:bg-indigo-800', wash: 'bg-slate-50/70', icon: 'text-indigo-700', iconBg: 'bg-indigo-50' },
+  tracking: { selected: 'bg-cyan-700 hover:bg-cyan-800', wash: 'bg-slate-50/70', icon: 'text-cyan-700', iconBg: 'bg-cyan-50' },
+  directory: { selected: 'bg-slate-700 hover:bg-slate-800', wash: 'bg-slate-50/70', icon: 'text-slate-700', iconBg: 'bg-slate-100' },
+  direct: { selected: 'bg-fuchsia-700 hover:bg-fuchsia-800', wash: 'bg-slate-50/70', icon: 'text-fuchsia-700', iconBg: 'bg-fuchsia-50' },
+  employees: { selected: 'bg-purple-700 hover:bg-purple-800', wash: 'bg-slate-50/70', icon: 'text-purple-700', iconBg: 'bg-purple-50' },
+  assistant: { selected: 'bg-rose-700 hover:bg-rose-800', wash: 'bg-slate-50/70', icon: 'text-rose-700', iconBg: 'bg-rose-50' },
 };
 
 export const LiveOperationsBoard: React.FC = () => {
@@ -230,8 +230,8 @@ export const LiveOperationsBoard: React.FC = () => {
                 ['assistant', 'مساعد النظام AI', Bot],
               ] as const).map(([key, label, Icon]) => {
                 const selected = activeScreen === key;
-                return <button key={key} type="button" onClick={() => setActiveScreen(key as typeof activeScreen)} className={selected ? `flex min-h-[52px] items-center gap-3 rounded-2xl border border-teal-800 px-3.5 py-3 text-right text-sm font-black text-white shadow-md shadow-teal-900/15 transition ${screenPalette[key].selected}` : 'flex min-h-[52px] items-center gap-3 rounded-2xl border border-transparent px-3.5 py-3 text-right text-sm font-semibold text-slate-600 transition hover:border-slate-200 hover:bg-slate-50 hover:text-teal-900'}>
-                  <span className={selected ? "grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/15" : "grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-500"}><Icon className="h-[18px] w-[18px] shrink-0" /></span>
+                return <button key={key} type="button" onClick={() => setActiveScreen(key as typeof activeScreen)} className={selected ? `flex min-h-[48px] items-center gap-2.5 rounded-xl border border-teal-800 px-3 py-2.5 text-right text-sm font-black text-white shadow-md shadow-teal-900/15 transition ${screenPalette[key].selected}` : 'flex min-h-[48px] items-center gap-2.5 rounded-xl border border-transparent px-3 py-2.5 text-right text-sm font-semibold text-slate-600 transition hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900'}>
+                  <span className={selected ? "grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white/15" : `grid h-8 w-8 shrink-0 place-items-center rounded-lg ${screenPalette[key].iconBg} ${screenPalette[key].icon}`}><Icon className="h-4 w-4 shrink-0" /></span>
                   <span className="min-w-0 flex-1 leading-5">{label}</span>
                   {selected && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
                 </button>;
