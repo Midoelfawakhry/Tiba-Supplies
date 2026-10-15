@@ -26,6 +26,7 @@ export const VehicleOwnerReportsScreen: React.FC = () => {
   const [mode, setMode] = useState<'vehicles' | 'owners'>('vehicles');
   const [selectedVehicle, setSelectedVehicle] = useState<string | null>(null);
   const [selectedOwner, setSelectedOwner] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState('');
 
   async function refresh() {
     setLoading(true); setError('');
@@ -47,6 +48,35 @@ export const VehicleOwnerReportsScreen: React.FC = () => {
 
   useEffect(() => { void refresh(); }, []);
 
+  async function cancelOwner(owner: ReportOwner) {
+    if (!window.confirm(`تأكيد أول: هل تريد إلغاء المالك ${owner.name}؟ سيتم الاحتفاظ بالسجلات السابقة.`)) return;
+    const phrase = window.prompt('تأكيد ثانٍ: اكتب كلمة إلغاء بالضبط لتنفيذ الأمر.');
+    if (phrase !== 'إلغاء') { setActionMessage('تم إلغاء العملية: كلمة التأكيد غير مطابقة.'); return; }
+    const reason = window.prompt('اكتب سبب إلغاء المالك لحفظه في سجل المراجعة:');
+    if (!reason?.trim()) { setActionMessage('تم إلغاء العملية: سبب الإلغاء مطلوب.'); return; }
+    setActionMessage('');
+    try {
+      const { data, error: rpcError } = await supabase.rpc('office_cancel_entity', {
+        p_entity_type: 'owner', p_entity_id: owner.owner_id, p_entity_label: owner.name,
+        p_reason: reason.trim(), p_confirmation_phrase: phrase,
+      });
+      if (rpcError) throw rpcError;
+      if (!data?.success) throw new Error('تعذر تأكيد إلغاء المالك.');
+      setActionMessage(`تم إلغاء المالك ${owner.name} وتسجيل العملية للمراجعة.`);
+      await refresh();
+    } catch (e: any) {
+      const raw = String(e?.message || '');
+      const messages: Record<string, string> = {
+        AUTH_REQUIRED: 'انتهت جلسة الدخول. سجّل الدخول مرة أخرى.',
+        INSUFFICIENT_ROLE: 'إلغاء الملاك متاح للإدارة الرئيسية فقط.',
+        OWNER_HAS_ACTIVE_VEHICLES: 'لا يمكن إلغاء المالك قبل إيقاف أو نقل ملكية العربيات النشطة التابعة له.',
+        ENTITY_NOT_FOUND_OR_ALREADY_INACTIVE: 'المالك غير موجود أو ملغي بالفعل.',
+      };
+      const key = Object.keys(messages).find(code => raw.includes(code));
+      setActionMessage(key ? messages[key] : raw || 'تعذر إلغاء المالك.');
+    }
+  }
+
   const completedTrips = useMemo(() => snapshot.trips.filter(t => t.is_completed && t.actual_weight != null), [snapshot.trips]);
   const visibleVehicles = snapshot.vehicles.filter(v => `${v.plate_number} ${v.vehicle_code ?? ''} ${v.owner_name ?? ''}`.toLowerCase().includes(query.toLowerCase()));
   const visibleOwners = snapshot.owners.filter(o => `${o.name} ${o.phone ?? ''}`.toLowerCase().includes(query.toLowerCase()));
@@ -65,6 +95,7 @@ export const VehicleOwnerReportsScreen: React.FC = () => {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-xl font-black">حسابات العربيات والملاك</h2><p className="mt-1 text-sm text-slate-500">سجل واحد للتحميل الفعلي، بعرض منفصل لكل عربية أو لكل مالك. الأوزان تُحسب للنقلات المكتملة فقط.</p></div><button onClick={() => void refresh()} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-bold disabled:opacity-50"><RefreshCw size={16} className={loading ? 'animate-spin' : ''}/>{loading ? 'جاري التحديث' : 'تحديث'}</button></div>
       <div className="mt-4 grid gap-3 sm:grid-cols-3"><label className="text-xs font-bold text-slate-600">من تاريخ<input type="date" value={from} onChange={e => setFrom(e.target.value)} className="mt-1 block w-full rounded-xl border border-slate-300 p-2.5 text-sm"/></label><label className="text-xs font-bold text-slate-600">إلى تاريخ<input type="date" value={to} onChange={e => setTo(e.target.value)} className="mt-1 block w-full rounded-xl border border-slate-300 p-2.5 text-sm"/></label><div className="flex items-end"><button onClick={() => void refresh()} className="w-full rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-black text-white"><CalendarDays className="ml-2 inline" size={16}/>عرض الفترة</button></div></div>
       {error && <div role="alert" className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+      {actionMessage && <div role="status" className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{actionMessage}</div>}
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4"><div className="rounded-2xl bg-slate-50 p-3"><Truck size={18} className="text-blue-700"/><div className="mt-2 text-xl font-black">{snapshot.vehicles.length}</div><div className="text-xs text-slate-500">إجمالي العربيات</div></div><div className="rounded-2xl bg-slate-50 p-3"><Users size={18} className="text-violet-700"/><div className="mt-2 text-xl font-black">{snapshot.owners.length}</div><div className="text-xs text-slate-500">إجمالي الملاك</div></div><div className="rounded-2xl bg-slate-50 p-3"><Weight size={18} className="text-emerald-700"/><div className="mt-2 text-xl font-black">{completedTrips.length}</div><div className="text-xs text-slate-500">نقلات مكتملة بالفترة</div></div><div className="rounded-2xl bg-slate-50 p-3"><Weight size={18} className="text-emerald-700"/><div className="mt-2 text-xl font-black">{completedTrips.reduce((sum,t) => sum + weight(t.actual_weight),0).toLocaleString('en-US',{maximumFractionDigits:3})}</div><div className="text-xs text-slate-500">إجمالي الأوزان (طن)</div></div></div>
     </header>
     <div className="rounded-3xl border border-slate-200 bg-white p-4 sm:p-5">
@@ -72,6 +103,6 @@ export const VehicleOwnerReportsScreen: React.FC = () => {
       {mode==='vehicles' ? <div className="mt-4 grid gap-3 md:grid-cols-2">{visibleVehicles.map(v => {const trips=completedTrips.filter(t=>t.vehicle_id===v.vehicle_id); const total=trips.reduce((s,t)=>s+weight(t.actual_weight),0);return <button key={v.vehicle_id} onClick={()=>setSelectedVehicle(v.vehicle_id)} className={selectedVehicle===v.vehicle_id?'rounded-2xl border-2 border-blue-600 bg-blue-50 p-4 text-right':'rounded-2xl border border-slate-200 p-4 text-right hover:bg-slate-50'}><div className="flex items-center justify-between"><span className="font-black">{v.plate_number}</span><span className="text-xs text-slate-500">{v.vehicle_code??'بدون كود'}</span></div><div className="mt-1 text-sm text-slate-500">المالك: {v.owner_name??'غير مسجل'}</div><div className="mt-3 flex justify-between text-sm"><span>{trips.length} نقلة مكتملة</span><strong>{total.toLocaleString('en-US',{maximumFractionDigits:3})} طن</strong></div></button>})}</div> : <div className="mt-4 grid gap-3 md:grid-cols-2">{visibleOwners.map(o => {const trips=completedTrips.filter(t=>t.owner_id===o.owner_id);const total=trips.reduce((s,t)=>s+weight(t.actual_weight),0);return <button key={o.owner_id} onClick={()=>setSelectedOwner(o.owner_id)} className={selectedOwner===o.owner_id?'rounded-2xl border-2 border-violet-600 bg-violet-50 p-4 text-right':'rounded-2xl border border-slate-200 p-4 text-right hover:bg-slate-50'}><div className="font-black">{o.name}</div><div className="mt-1 text-sm text-slate-500">{o.phone??'بدون هاتف'} · {o.vehicle_count} عربية</div><div className="mt-3 flex justify-between text-sm"><span>{trips.length} نقلة مكتملة</span><strong>{total.toLocaleString('en-US',{maximumFractionDigits:3})} طن</strong></div></button>})}</div>}
     </div>
     {(selectedVehicle && selectedVehicleInfo) && <section className="rounded-3xl border border-blue-200 bg-white p-4 sm:p-5"><div className="mb-3"><h3 className="text-lg font-black">كشف حركة العربية {selectedVehicleInfo.plate_number}</h3><p className="text-sm text-slate-500">المالك: {selectedVehicleInfo.owner_name??'غير مسجل'} · للفترة المحددة</p></div><TripTable trips={vehicleTrips}/></section>}
-    {(selectedOwner && selectedOwnerInfo) && <section className="rounded-3xl border border-violet-200 bg-white p-4 sm:p-5"><div className="mb-3"><h3 className="text-lg font-black">كشف حركة المالك {selectedOwnerInfo.name}</h3><p className="text-sm text-slate-500">كل العربيات التابعة للمالك، مع تفاصيل كل رحلة</p></div><TripTable trips={ownerTrips}/></section>}
+    {(selectedOwner && selectedOwnerInfo) && <section className="rounded-3xl border border-violet-200 bg-white p-4 sm:p-5"><div className="mb-3 flex flex-wrap items-start justify-between gap-3"><div><h3 className="text-lg font-black">كشف حركة المالك {selectedOwnerInfo.name}</h3><p className="text-sm text-slate-500">كل العربيات التابعة للمالك، مع تفاصيل كل رحلة</p></div><button type="button" onClick={() => void cancelOwner(selectedOwnerInfo)} className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-bold text-red-700">إلغاء المالك</button></div><TripTable trips={ownerTrips}/></section>}
   </section>;
 };
