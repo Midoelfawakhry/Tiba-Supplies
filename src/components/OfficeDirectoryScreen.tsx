@@ -4,13 +4,14 @@ import { getLiveSnapshot, LiveSnapshot, liveName } from '../services/liveData';
 import { supabase } from '../lib/supabase';
 import { AddVehicleForm } from './AddVehicleForm';
 
-type ScreenKey = 'factories' | 'quarries' | 'drivers' | 'vehicles' | 'waiting' | 'loads' | 'actual';
+type ScreenKey = 'factories' | 'quarries' | 'drivers' | 'vehicles' | 'owners' | 'waiting' | 'loads' | 'actual';
 type Row = Record<string, any>;
 const tabs: { key: ScreenKey; label: string; icon: React.ElementType }[] = [
   { key: 'factories', label: 'المصانع والعملاء', icon: Building2 },
   { key: 'quarries', label: 'المحاجر والموردون', icon: Mountain },
   { key: 'drivers', label: 'السائقون', icon: Users },
   { key: 'vehicles', label: 'أسطول السيارات', icon: Truck },
+  { key: 'owners', label: 'ملاك العربيات', icon: Users },
   { key: 'waiting', label: 'قائمة انتظار رأس سدر', icon: Clock3 },
   { key: 'loads', label: 'أوامر التحميل', icon: ClipboardList },
   { key: 'actual', label: 'التحميل الفعلي', icon: ClipboardCheck },
@@ -21,6 +22,7 @@ const sectionPalette: Record<ScreenKey, { selected: string; accent: string; bord
   quarries: { selected: 'border-amber-600 bg-amber-600', accent: 'text-amber-700', border: 'border-amber-200', action: 'bg-amber-600 hover:bg-amber-700', row: 'border-r-amber-400', wash: 'bg-amber-50/50' },
   drivers: { selected: 'border-red-600 bg-red-600', accent: 'text-red-700', border: 'border-red-200', action: 'bg-red-600 hover:bg-red-700', row: 'border-r-red-400', wash: 'bg-red-50/50' },
   vehicles: { selected: 'border-blue-600 bg-blue-600', accent: 'text-blue-700', border: 'border-blue-200', action: 'bg-blue-600 hover:bg-blue-700', row: 'border-r-blue-400', wash: 'bg-blue-50/50' },
+  owners: { selected: 'border-teal-600 bg-teal-600', accent: 'text-teal-700', border: 'border-teal-200', action: 'bg-teal-600 hover:bg-teal-700', row: 'border-r-teal-400', wash: 'bg-teal-50/50' },
   waiting: { selected: 'border-violet-600 bg-violet-600', accent: 'text-violet-700', border: 'border-violet-200', action: 'bg-violet-600 hover:bg-violet-700', row: 'border-r-violet-400', wash: 'bg-violet-50/50' },
   loads: { selected: 'border-orange-600 bg-orange-600', accent: 'text-orange-700', border: 'border-orange-200', action: 'bg-orange-600 hover:bg-orange-700', row: 'border-r-orange-400', wash: 'bg-orange-50/50' },
   actual: { selected: 'border-emerald-600 bg-emerald-600', accent: 'text-emerald-700', border: 'border-emerald-200', action: 'bg-emerald-600 hover:bg-emerald-700', row: 'border-r-emerald-400', wash: 'bg-emerald-50/50' },
@@ -31,6 +33,7 @@ function rowTitle(row: Row, key: ScreenKey) {
   if (key === 'quarries') return liveName(row);
   if (key === 'drivers') return row.name ?? row.driver_name ?? 'سائق بدون اسم';
   if (key === 'vehicles') return row.plate_number ?? row.vehicle_code ?? 'عربية بدون لوحة';
+  if (key === 'owners') return row.name ?? 'مالك بدون اسم';
   if (key === 'waiting') return row.plate_number ?? row.driver_name ?? 'عنصر انتظار';
   if (key === 'loads') return liveName(row, row.load_order_id ?? 'أمر تحميل');
   return row.trip_code ?? row.ticket_number ?? row.record_number ?? row.actual_loading_record_id ?? 'سجل تحميل فعلي';
@@ -40,6 +43,7 @@ function rowDetails(row: Row, key: ScreenKey) {
   if (key === 'quarries') return [row.code, row.address, row.phone, row.is_active === false ? 'غير نشط' : 'نشط'].filter(Boolean).join(' · ');
   if (key === 'drivers') return [row.phone, row.driver_code, row.is_active === false ? 'غير نشط' : 'نشط'].filter(Boolean).join(' · ');
   if (key === 'vehicles') return [row.owner_name ? 'المالك: ' + row.owner_name : '', row.truck_type ?? row.vehicle_type, row.capacity_tons ? row.capacity_tons + ' طن' : '', row.is_active === false ? 'غير نشطة' : 'نشطة'].filter(Boolean).join(' · ');
+  if (key === 'owners') return [row.phone ? 'الموبايل: ' + row.phone : 'بدون رقم موبايل', row.is_active === false ? 'غير نشط' : 'نشط'].join(' · ');
   if (key === 'waiting') return [row.driver_name, row.status, row.arrived_at ? new Date(row.arrived_at).toLocaleString('ar-EG') : ''].filter(Boolean).join(' · ');
   if (key === 'loads') return [row.status, row.requested_quantity ? 'المطلوب: ' + row.requested_quantity : '', row.created_at ? new Date(row.created_at).toLocaleString('ar-EG') : ''].filter(Boolean).join(' · ');
   return [row.loading_sequence_date || row.load_date, row.daily_load_number ? 'تحميل اليوم #' + row.daily_load_number : '', row.ticket_number ? 'تذكرة: ' + row.ticket_number : '', row.actual_weight != null ? 'الوزن: ' + row.actual_weight + ' طن' : 'الوزن لم يُسجل', row.driver_id ? 'معرّف السائق: ' + row.driver_id : '', row.vehicle_id ? 'معرّف العربية: ' + row.vehicle_id : '', row.created_at ? new Date(row.created_at).toLocaleString('ar-EG') : ''].filter(Boolean).join(' · ');
@@ -478,6 +482,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     quarries: snapshot?.quarries ?? [],
     drivers: snapshot?.drivers ?? [],
     vehicles: snapshot?.vehicles ?? [],
+    owners: ownerDirectory,
     waiting,
     loads: snapshot?.load_orders ?? [],
     actual: snapshot?.actual_loading_records ?? [],
@@ -517,38 +522,38 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
           <button type="button" onClick={() => setShowVehicleForm(v => !v)} className={`rounded-xl px-4 py-2.5 text-sm font-black text-white transition ${sectionPalette[active].action}`}>{showVehicleForm ? 'إلغاء' : 'إضافة عربية'}</button>
         </div>
         {showVehicleForm && <div className="mt-4"><AddVehicleForm onSaved={() => { void load(); setSuccess('تمت إضافة العربية ومالكها.'); }} /></div>}
-        <div className="mt-5 border-t border-slate-200 pt-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div><h3 className="font-black">إدارة ملاك العربيات</h3><p className="mt-1 text-sm text-slate-500">إضافة مالك مستقلًا عن تسجيل عربية جديدة.</p></div>
-            <button type="button" onClick={() => { setShowOwnerForm(v => !v); setError(''); setSuccess(''); }} className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-black text-blue-800">{showOwnerForm ? 'إغلاق نموذج المالك' : 'إضافة مالك'}</button>
-          </div>
-          {showOwnerForm && <form onSubmit={async event => {
-            event.preventDefault();
-            setSavingOwner(true); setError(''); setSuccess('');
-            try {
-              const { data, error: ownerError } = await supabase.rpc('create_operational_vehicle_owner', { p_name: ownerName.trim(), p_phone: ownerPhone.trim() || null });
-              if (ownerError) throw ownerError;
-              if (!data?.success) throw new Error('تعذر تأكيد إضافة المالك.');
-              setOwnerName(''); setOwnerPhone(''); setShowOwnerForm(false);
-              setSuccess(data.already_exists ? 'المالك مسجل بالفعل، وتم تحديث دليل الملاك.' : 'تمت إضافة المالك بنجاح. يمكنك ربط عربياته من تعديل العربية.');
-              await load();
-            } catch (e: any) {
-              const raw = String(e?.message || '');
-              const messages: Record<string,string> = {
-                AUTH_REQUIRED: 'انتهت جلسة المكتب. سجّل الدخول مرة أخرى.',
-                INSUFFICIENT_ROLE: 'إضافة الملاك متاحة للمكتب الرئيسي فقط.',
-                OWNER_NAME_REQUIRED: 'اكتب اسم المالك.',
-                OWNER_PHONE_INVALID: 'رقم موبايل المالك غير صحيح.',
-              };
-              const key = Object.keys(messages).find(code => raw.includes(code));
-              setError(key ? messages[key] : raw || 'تعذرت إضافة المالك.');
-            } finally { setSavingOwner(false); }
-          }} className="mt-4 grid gap-3 rounded-2xl bg-slate-50 p-4 sm:grid-cols-2">
-            <label className="text-sm font-bold text-slate-700">اسم المالك *<input required maxLength={200} value={ownerName} onChange={e => setOwnerName(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal" /></label>
-            <label className="text-sm font-bold text-slate-700">رقم موبايل المالك (اختياري)<input type="tel" maxLength={40} value={ownerPhone} onChange={e => setOwnerPhone(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal" /></label>
-            <div className="sm:col-span-2"><button disabled={savingOwner} type="submit" className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-black text-white disabled:opacity-60">{savingOwner ? 'جاري حفظ المالك...' : 'حفظ المالك'}</button></div>
-          </form>}
+      </section>}
+      {active === 'owners' && <section className="rounded-3xl border border-teal-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div><h3 className="font-black">ملاك العربيات</h3><p className="mt-1 text-sm text-slate-500">إضافة مالك بشكل مستقل، ثم ربط عربياته من تعديل بيانات العربية.</p></div>
+          <button type="button" onClick={() => { setShowOwnerForm(v => !v); setError(''); setSuccess(''); }} className="rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-black text-white">{showOwnerForm ? 'إغلاق نموذج المالك' : 'إضافة مالك'}</button>
         </div>
+        {showOwnerForm && <form onSubmit={async event => {
+          event.preventDefault();
+          setSavingOwner(true); setError(''); setSuccess('');
+          try {
+            const { data, error: ownerError } = await supabase.rpc('create_operational_vehicle_owner', { p_name: ownerName.trim(), p_phone: ownerPhone.trim() || null });
+            if (ownerError) throw ownerError;
+            if (!data?.success) throw new Error('تعذر تأكيد إضافة المالك.');
+            setOwnerName(''); setOwnerPhone(''); setShowOwnerForm(false);
+            setSuccess(data.already_exists ? 'المالك مسجل بالفعل.' : 'تمت إضافة المالك بنجاح. يمكنك ربط عربياته من تعديل العربية.');
+            await load();
+          } catch (e: any) {
+            const raw = String(e?.message || '');
+            const messages: Record<string,string> = {
+              AUTH_REQUIRED: 'انتهت جلسة المكتب. سجّل الدخول مرة أخرى.',
+              INSUFFICIENT_ROLE: 'إضافة الملاك متاحة للمكتب الرئيسي فقط.',
+              OWNER_NAME_REQUIRED: 'اكتب اسم المالك.',
+              OWNER_PHONE_INVALID: 'رقم موبايل المالك غير صحيح.',
+            };
+            const key = Object.keys(messages).find(code => raw.includes(code));
+            setError(key ? messages[key] : raw || 'تعذرت إضافة المالك.');
+          } finally { setSavingOwner(false); }
+        }} className="mt-4 grid gap-3 rounded-2xl bg-slate-50 p-4 sm:grid-cols-2">
+          <label className="text-sm font-bold text-slate-700">اسم المالك *<input required maxLength={200} value={ownerName} onChange={e => setOwnerName(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal" /></label>
+          <label className="text-sm font-bold text-slate-700">رقم موبايل المالك (اختياري)<input type="tel" maxLength={40} value={ownerPhone} onChange={e => setOwnerPhone(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal" /></label>
+          <div className="sm:col-span-2"><button disabled={savingOwner} type="submit" className="rounded-xl bg-teal-600 px-5 py-3 text-sm font-black text-white disabled:opacity-60">{savingOwner ? 'جاري حفظ المالك...' : 'حفظ المالك'}</button></div>
+        </form>}
       </section>}
       {active === 'drivers' && <section className={`rounded-3xl border bg-white p-4 shadow-sm sm:p-5 ${sectionPalette[active].border}`}>
         <div className="flex flex-wrap items-center justify-between gap-3">
