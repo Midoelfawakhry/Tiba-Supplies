@@ -5,16 +5,18 @@ import { getLiveSnapshot, LiveSnapshot } from '../services/liveData';
 
 export const DirectLoadAssignmentScreen: React.FC = () => {
  const [snapshot,setSnapshot]=useState<LiveSnapshot|null>(null);
- const [factoryId,setFactoryId]=useState(''); const [quarryId,setQuarryId]=useState(''); const [driverId,setDriverId]=useState('');
+ const [factoryId,setFactoryId]=useState(''); const [quarryId,setQuarryId]=useState(''); const [driverId,setDriverId]=useState(''); const [vehicleId,setVehicleId]=useState('');
  const [loading,setLoading]=useState(true); const [saving,setSaving]=useState(false); const [busyBookingId,setBusyBookingId]=useState<string|null>(null); const [error,setError]=useState(''); const [success,setSuccess]=useState('');
  const refresh=useCallback(async()=>{setLoading(true);setError('');try{setSnapshot(await getLiveSnapshot());}catch(e:any){setError(e?.message||'تعذر تحميل بيانات الإسناد.');}finally{setLoading(false);}},[]);
  useEffect(()=>{void refresh();},[refresh]);
  const activeBookings=useMemo(()=>(snapshot?.bookings??[]).filter(b=>['ASSIGNED','ARRIVED','LOADING','LOADED','IN_TRANSIT'].includes(String(b.status).toUpperCase())),[snapshot]);
  const orders=(snapshot?.load_orders??[]).filter(o=>o.status==='PUBLISHED');
  const busyDrivers=new Set(activeBookings.map(b=>b.driver_id)); const busyVehicles=new Set(activeBookings.map(b=>b.vehicle_id));
- const drivers=(snapshot?.drivers??[]).filter(d=>d.is_active&&d.vehicle_id&&!busyDrivers.has(d.driver_id));
+ const vehicles=(snapshot?.vehicles??[]).filter(v=>v.is_active&&!busyVehicles.has(v.vehicle_id));
+ const drivers=(snapshot?.drivers??[]).filter(d=>d.is_active&&d.vehicle_id&&!busyDrivers.has(d.driver_id)&&!busyVehicles.has(d.vehicle_id));
+ const driversForSelectedVehicle=drivers.filter(d=>d.vehicle_id===vehicleId);
  const selectedDriver=(snapshot?.drivers??[]).find(d=>d.is_active&&d.driver_id===driverId);
- const selectedVehicle=(snapshot?.vehicles??[]).find(v=>v.vehicle_id===selectedDriver?.vehicle_id);
+ const selectedVehicle=(snapshot?.vehicles??[]).find(v=>v.vehicle_id===vehicleId);
  const factories=(snapshot?.factories??[]).filter(f=>f.is_active);
  const quarries=(snapshot?.quarries??[]).filter(q=>q.is_active);
  const selectedFactory=factories.find(f=>f.factory_id===factoryId);
@@ -67,16 +69,16 @@ export const DirectLoadAssignmentScreen: React.FC = () => {
   } finally { setBusyBookingId(null); }
  }
  async function assign(){
-  if(!factoryId||!quarryId||!driverId){setError('اختار المصنع والمحجر والسائق.');return;}
-  if(!selectedVehicle||!selectedVehicle.is_active){setError('السائق ليس له عربية نشطة مرتبطة به. راجع إدارة ربط السائقين بالعربيات.');return;}
-  if(busyDrivers.has(driverId)||busyVehicles.has(selectedVehicle.vehicle_id)){setError('السائق أو العربية عليه نقلة نشطة بالفعل. حدّث البيانات وحاول مرة أخرى.');return;}
+  if(!factoryId||!quarryId||!driverId||!vehicleId){setError('اختار المصنع والمحجر والعربية والسائق.');return;}
+  if(!selectedVehicle||!selectedVehicle.is_active||selectedDriver?.vehicle_id!==vehicleId){setError('اختيار السائق والعربية غير متطابق. اختار سائقًا مرتبطًا بالعربية المحددة.');return;}
+  if(busyDrivers.has(driverId)||busyVehicles.has(vehicleId)){setError('السائق أو العربية عليه نقلة نشطة بالفعل. حدّث البيانات وحاول مرة أخرى.');return;}
   setSaving(true);setError('');setSuccess('');
   try{
    const {data,error:rpcError}=await supabase.rpc('main_office_create_direct_trip',{p_factory_id:factoryId,p_quarry_id:quarryId,p_driver_id:driverId});
    if(rpcError)throw rpcError;
    if(!data?.booking_id||data?.status!=='ASSIGNED'||data?.direct_acceptance_status!=='PENDING'||!data?.trip_code||!data?.plate_number)throw new Error('لم يؤكد النظام إنشاء النقلة وإرسال طلب قبولها بالكامل.');
    setSuccess(`تم إنشاء النقلة وإرسال طلب قبول للسائق. النقلة لن تبدأ قبل ضغط «تأكيد» من السائق. كود النقلة: ${data.trip_code} · رقم الأمر: ${data.order_number} · المصنع: ${data.factory_name} · المحجر: ${data.quarry_name} · السائق: ${selectedDriver?.name||'—'} · العربية: ${data.plate_number} (${data.vehicle_code}).`);
-   setFactoryId('');setQuarryId('');setDriverId('');await refresh();
+   setFactoryId('');setQuarryId('');setDriverId('');setVehicleId('');await refresh();
   }catch(e:any){
    const raw=String(e?.message||'');const messages:Record<string,string>={FACTORY_QUARRY_DRIVER_REQUIRED:'اختار المصنع والمحجر والسائق.',FACTORY_NOT_ACTIVE:'المصنع غير نشط.',QUARRY_NOT_ACTIVE:'المحجر غير نشط.',ACTIVE_LINKED_VEHICLE_REQUIRED:'السائق ليس له عربية نشطة مرتبطة به.',DRIVER_NOT_ACTIVE:'السائق غير نشط.',DRIVER_OR_VEHICLE_NOT_ASSIGNED_TO_RAS_SEDR:'السائق أو العربية غير مرتبطين بمكتب رأس سدر.',DRIVER_HAS_ACTIVE_BOOKING:'السائق عليه نقلة نشطة بالفعل.',VEHICLE_HAS_ACTIVE_BOOKING:'العربية عليها نقلة نشطة بالفعل.',RAS_SEDR_BRANCH_CONFIGURATION_INVALID:'إعداد مكتب رأس سدر غير سليم.',MAIN_OFFICE_ACCESS_REQUIRED:'الإسناد متاح للمكتب الرئيسي فقط.'};
    const key=Object.keys(messages).find(k=>raw.includes(k));setError(key?messages[key]:raw||'تعذر تنفيذ الإسناد.');
@@ -107,14 +109,16 @@ export const DirectLoadAssignmentScreen: React.FC = () => {
     <label className="block text-sm font-bold">المصنع / العميل<select value={factoryId} onChange={e=>setFactoryId(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 bg-slate-50 p-3 font-normal" disabled={loading}><option value="">اختار المصنع</option>{factories.map(f=><option key={f.factory_id} value={f.factory_id}>{f.name} · {f.factory_code}</option>)}</select></label>
     <label className="block text-sm font-bold">المحجر / المورد<select value={quarryId} onChange={e=>setQuarryId(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 bg-slate-50 p-3 font-normal" disabled={loading}><option value="">اختار المحجر</option>{quarries.map(q=><option key={q.quarry_id} value={q.quarry_id}>{q.name} · {q.quarry_code}</option>)}</select></label>
    </div>
-   <label className="block text-sm font-bold">السائق<select value={driverId} onChange={e=>setDriverId(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 bg-slate-50 p-3 font-normal" disabled={loading}><option value="">اختار السائق</option>{drivers.map(d=><option key={d.driver_id} value={d.driver_id}>{d.name} · {d.driver_code}{busyDrivers.has(d.driver_id)?' · عليه نقلة نشطة':''}</option>)}</select></label>
-   {driverId&&<div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-2 text-sm">
-    <p className="font-black text-slate-800">العربية المرتبطة بالسائق — اختيار تلقائي</p>
-    {selectedVehicle&&selectedVehicle.is_active?<div className="grid gap-2 sm:grid-cols-2"><p>رقم اللوحة: <strong>{selectedVehicle.plate_number}</strong></p><p>كود العربية: <strong>{selectedVehicle.vehicle_code}</strong></p><p>حالة الإتاحة: <strong>{busyVehicles.has(selectedVehicle.vehicle_id)?'مشغولة بنقلة نشطة':'متاحة مبدئيًا'}</strong></p></div>:<p className="text-amber-800">لا توجد عربية نشطة مرتبطة بالسائق. راجع إدارة ربط السائقين بالعربيات.</p>}
+   <label className="block text-sm font-bold">العربية<select value={vehicleId} onChange={e=>{const nextVehicleId=e.target.value;setVehicleId(nextVehicleId);const linked=drivers.filter(d=>d.vehicle_id===nextVehicleId);setDriverId(linked.length===1?linked[0].driver_id:'');setError('');setSuccess('');}} className="mt-2 w-full rounded-xl border border-slate-300 bg-slate-50 p-3 font-normal" disabled={loading}><option value="">اختار العربية</option>{vehicles.map(v=><option key={v.vehicle_id} value={v.vehicle_id}>{v.plate_number||'بدون رقم لوحة'}{v.vehicle_code?' · كود '+v.vehicle_code:''}</option>)}</select></label>
+   <label className="block text-sm font-bold">السائق<select value={driverId} onChange={e=>{const nextDriverId=e.target.value;setDriverId(nextDriverId);const linkedDriver=drivers.find(d=>d.driver_id===nextDriverId);setVehicleId(linkedDriver?.vehicle_id||'');setError('');setSuccess('');}} className="mt-2 w-full rounded-xl border border-slate-300 bg-slate-50 p-3 font-normal" disabled={loading}><option value="">اختار السائق</option>{(vehicleId?driversForSelectedVehicle:drivers).map(d=><option key={d.driver_id} value={d.driver_id}>{d.name} · {d.driver_code}</option>)}</select></label>
+   {vehicleId&&<div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-2 text-sm">
+    <p className="font-black text-slate-800">بيانات العربية والسائق المرتبط</p>
+    {selectedVehicle?<div className="grid gap-2 sm:grid-cols-2"><p>رقم اللوحة: <strong>{selectedVehicle.plate_number||'—'}</strong></p><p>كود العربية: <strong>{selectedVehicle.vehicle_code||'—'}</strong></p><p>السائق المختار: <strong>{selectedDriver?.name||'اختار السائق المرتبط بالعربية'}</strong></p><p>حالة الإتاحة: <strong>متاحة مبدئيًا</strong></p></div>:<p className="text-amber-800">العربية المحددة غير متاحة. حدّث البيانات وحاول مرة أخرى.</p>}
+    {driversForSelectedVehicle.length===0&&<p className="text-amber-800">لا يوجد سائق نشط مرتبط بالعربية المحددة.</p>}
    </div>}
    {factories.length===0&&<p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">لا توجد مصانع نشطة متاحة.</p>}
    {quarries.length===0&&<p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">لا توجد محاجر نشطة متاحة.</p>}
-   <button type="button" disabled={saving||loading||!factoryId||!quarryId||!driverId||!selectedVehicle||!selectedVehicle.is_active||busyDrivers.has(driverId)||busyVehicles.has(selectedVehicle?.vehicle_id)} onClick={()=>void assign()} className="w-full rounded-xl bg-emerald-600 p-4 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-50">{saving?'جارٍ التحقق وإنشاء النقلة وإسنادها...':'إنشاء النقلة وتأكيد الإسناد'}</button>
+   <button type="button" disabled={saving||loading||!factoryId||!quarryId||!driverId||!vehicleId||!selectedVehicle||!selectedVehicle.is_active||selectedDriver?.vehicle_id!==vehicleId||busyDrivers.has(driverId)||busyVehicles.has(vehicleId)} onClick={()=>void assign()} className="w-full rounded-xl bg-emerald-600 p-4 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-50">{saving?'جارٍ التحقق وإنشاء النقلة وإسنادها...':'إنشاء النقلة وتأكيد الإسناد'}</button>
   </div>
  </section>;
 };
