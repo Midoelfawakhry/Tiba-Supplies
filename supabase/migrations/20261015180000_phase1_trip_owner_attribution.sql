@@ -2,7 +2,7 @@
 -- Historical rows are intentionally NOT backfilled from current vehicle ownership:
 -- that would silently reassign old trips when a vehicle's owner has changed.
 ALTER TABLE public.actual_loading_records
-  ADD COLUMN IF NOT EXISTS vehicle_owner_id_snapshot uuid REFERENCES public.vehicle_owners(owner_id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS vehicle_owner_id_snapshot uuid,
   ADD COLUMN IF NOT EXISTS vehicle_owner_name_snapshot text;
 
 CREATE OR REPLACE FUNCTION public.capture_actual_load_owner_snapshot()
