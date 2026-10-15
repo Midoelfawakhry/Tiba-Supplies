@@ -48,12 +48,11 @@ public final class NativeDriverTrackingService extends Service implements Locati
     private static final String SESSION = "encrypted_session";
     private static final String TAG = "TibaDriverTracking";
     private static final long RETRY_MS = 60_000L;
-    // Keep the server's 10-minute freshness gate comfortably below its limit.
-    private static final long MOVING_UPLOAD_INTERVAL_MS = 60_000L;
-    private static final long SLOW_UPLOAD_INTERVAL_MS = 2 * 60_000L;
-    private static final long STATIONARY_UPLOAD_INTERVAL_MS = 5 * 60_000L;
+    // Keep driver uploads aligned with the office map's 60-second refresh cadence.
+    private static final long UPLOAD_INTERVAL_MS = 60_000L;
     private static final long LOCATION_REQUEST_INTERVAL_MS = 30_000L;
-    private static final float LOCATION_DISTANCE_FILTER_M = 25f;
+    // Do not suppress stationary fixes by distance; the office still needs a fresh heartbeat.
+    private static final float LOCATION_DISTANCE_FILTER_M = 0f;
     private static final float MAX_ACCURACY_M = 100f;
     private LocationManager locationManager;
     private long lastSentAt;
@@ -141,9 +140,7 @@ public final class NativeDriverTrackingService extends Service implements Locati
     @Override public void onLocationChanged(Location location) {
         if (stopped || location == null || !location.hasAccuracy() || location.getAccuracy() > MAX_ACCURACY_M) return;
         long now = System.currentTimeMillis();
-        float speed = location.hasSpeed() ? location.getSpeed() : 0f;
-        long interval = speed >= 2f ? MOVING_UPLOAD_INTERVAL_MS : speed >= 0.5f ? SLOW_UPLOAD_INTERVAL_MS : STATIONARY_UPLOAD_INTERVAL_MS;
-        if (now - lastSentAt < interval || now - lastAttemptAt < RETRY_MS) return;
+        if (now - lastSentAt < UPLOAD_INTERVAL_MS || now - lastAttemptAt < RETRY_MS) return;
         lastAttemptAt = now;
         new Thread(() -> {
             try {
