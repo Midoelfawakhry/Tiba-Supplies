@@ -16,6 +16,7 @@ import android.os.Build;
 import android.os.IBinder;
 import android.os.Looper;
 import android.util.Base64;
+import android.util.Log;
 import androidx.annotation.Nullable;
 import androidx.core.app.ActivityCompat;
 import org.json.JSONObject;
@@ -45,7 +46,14 @@ public final class NativeDriverTrackingService extends Service implements Locati
     private static final String KEY_ALIAS = "tiba_driver_tracking_session_v1";
     private static final String PREFS = "native_driver_tracking";
     private static final String SESSION = "encrypted_session";
+    private static final String TAG = "TibaDriverTracking";
     private static final long RETRY_MS = 60_000L;
+    // Keep the server's 10-minute freshness gate comfortably below its limit.
+    private static final long MOVING_UPLOAD_INTERVAL_MS = 60_000L;
+    private static final long SLOW_UPLOAD_INTERVAL_MS = 2 * 60_000L;
+    private static final long STATIONARY_UPLOAD_INTERVAL_MS = 5 * 60_000L;
+    private static final long LOCATION_REQUEST_INTERVAL_MS = 30_000L;
+    private static final float LOCATION_DISTANCE_FILTER_M = 25f;
     private static final float MAX_ACCURACY_M = 100f;
     private LocationManager locationManager;
     private long lastSentAt;
@@ -124,17 +132,17 @@ public final class NativeDriverTrackingService extends Service implements Locati
         locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
         try {
             if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER))
-                locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 60_000L, 25f, this, Looper.getMainLooper());
+                locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, LOCATION_REQUEST_INTERVAL_MS, LOCATION_DISTANCE_FILTER_M, this, Looper.getMainLooper());
             if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER))
-                locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 60_000L, 25f, this, Looper.getMainLooper());
+                locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, LOCATION_REQUEST_INTERVAL_MS, LOCATION_DISTANCE_FILTER_M, this, Looper.getMainLooper());
         } catch (SecurityException e) { stopAndClear(); }
     }
 
     @Override public void onLocationChanged(Location location) {
-        if (stopped || location == null || location.hasAccuracy() && location.getAccuracy() > MAX_ACCURACY_M) return;
+        if (stopped || location == null || !location.hasAccuracy() || location.getAccuracy() > MAX_ACCURACY_M) return;
         long now = System.currentTimeMillis();
         float speed = location.hasSpeed() ? location.getSpeed() : 0f;
-        long interval = speed >= 2f ? 10 * 60_000L : speed >= 0.5f ? 15 * 60_000L : 30 * 60_000L;
+        long interval = speed >= 2f ? MOVING_UPLOAD_INTERVAL_MS : speed >= 0.5f ? SLOW_UPLOAD_INTERVAL_MS : STATIONARY_UPLOAD_INTERVAL_MS;
         if (now - lastSentAt < interval || now - lastAttemptAt < RETRY_MS) return;
         lastAttemptAt = now;
         new Thread(() -> {
@@ -148,8 +156,9 @@ public final class NativeDriverTrackingService extends Service implements Locati
                     .format(new java.util.Date(location.getTime())));
                 JSONObject result = postJson(projectUrl + "/rest/v1/rpc/driver_update_live_location", body, accessToken);
                 if (result != null) { lastSentAt = System.currentTimeMillis(); persistEncryptedSession(); }
-            } catch (Exception ignored) {
-                // Keep the service running; retry only on the next eligible location fix.
+            } catch (Exception error) {
+                // Keep tracking alive, but retain a diagnostic for Android log capture.
+                Log.e(TAG, "Location upload failed; will retry on a later GPS fix", error);
             }
         }, "tiba-location-upload").start();
     }
