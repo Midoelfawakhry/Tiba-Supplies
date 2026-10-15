@@ -135,7 +135,7 @@ export const DriverApp: React.FC = () => {
     if (deliveryBusyBookingId) return;
     const weightText = (deliveryWeights[bookingId] ?? '').trim().replace(',', '.');
     const actualWeight = Number(weightText);
-    if (!weightText || !Number.isFinite(actualWeight) || actualWeight <= 0 || actualWeight > 1000 || !/^\\d+(\\.\\d{1,3})?$/.test(weightText)) {
+    if (!weightText || !Number.isFinite(actualWeight) || actualWeight <= 0 || actualWeight > 1000 || !/^\d+(\\.\d{1,3})?$/.test(weightText)) {
       setError('اكتب الوزن الفعلي بالطن، مثل 85.55، بحد أقصى 3 أرقام عشرية. تأكيد التسليم مش هيتفعل من غير وزن صحيح.');
       return;
     }
@@ -654,7 +654,7 @@ export const DriverApp: React.FC = () => {
               <input type="file" accept="image/jpeg,image/png,image/webp" onChange={e => setDeliveryScaleImages(current => ({ ...current, [booking.booking_id]: e.target.files?.[0] ?? null }))} className="mt-1.5 block w-full rounded-xl border border-slate-300 bg-white p-2 text-sm font-normal" />
               <span className="mt-1 block text-xs font-normal text-slate-500">JPG أو PNG أو WEBP، بحد أقصى 10 ميجابايت.</span>
             </label>
-            <button type="button" onClick={() => void confirmDelivery(booking.booking_id)} disabled={deliveryBusyBookingId !== null || !/^\\d+(\\.\\d{1,3})?$/.test((deliveryWeights[booking.booking_id] ?? '').trim().replace(',', '.')) || Number((deliveryWeights[booking.booking_id] ?? '').trim().replace(',', '.')) <= 0 || Number((deliveryWeights[booking.booking_id] ?? '').trim().replace(',', '.')) > 1000} className="w-full rounded-xl bg-emerald-700 p-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-40">{deliveryBusyBookingId === booking.booking_id ? 'جارٍ تسجيل الوزن والتسليم...' : 'تأكيد التسليم والوزن'}</button>
+            <button type="button" onClick={() => void confirmDelivery(booking.booking_id)} disabled={deliveryBusyBookingId !== null || !/^\d+(\\.\d{1,3})?$/.test((deliveryWeights[booking.booking_id] ?? '').trim().replace(',', '.')) || Number((deliveryWeights[booking.booking_id] ?? '').trim().replace(',', '.')) <= 0 || Number((deliveryWeights[booking.booking_id] ?? '').trim().replace(',', '.')) > 1000} className="w-full rounded-xl bg-emerald-700 p-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-40">{deliveryBusyBookingId === booking.booking_id ? 'جارٍ تسجيل الوزن والتسليم...' : 'تأكيد التسليم والوزن'}</button>
           </div>}</article>)}</div> : <p className="mt-2 rounded-xl bg-slate-50 p-3 text-sm leading-7 text-slate-500">مفيش نقلات سابقة مسجلة على حسابك حتى الآن.</p>}
         </section>
         {!portal?.inside_geofence ? (
