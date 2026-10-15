@@ -11,6 +11,7 @@ on:
       - 'package-lock.json'
       - 'capacitor.config.json'
       - 'supabase/migrations/**'
+      - 'supabase/functions/tiba-ai-assistant/**'
       - '.github/workflows/android-signed-release.yml'
   workflow_dispatch:
 
