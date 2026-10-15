@@ -3,37 +3,35 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
-const [reportingMigration, vehicleReportsUi, accountStatementsUi] = await Promise.all([
-  read("../supabase/migrations/20261015180000_phase1_trip_owner_attribution.sql"),
+const [vehicleOwnerSql, reportsMigration, statementsMigration, vehicleReportsUi, accountStatementsUi] = await Promise.all([
+  read("../supabase/migrations/20261014340000_phase1_vehicle_owner_and_vehicle_creation.sql"),
+  read("../supabase/migrations/20261011001729_vehicle_owner_reports.sql"),
+  read("../supabase/migrations/20261011105953_account_statement_records_head_only.sql"),
   read("../src/components/VehicleOwnerReportsScreen.tsx"),
   read("../src/components/AccountStatementsScreen.tsx"),
 ]);
 
-test("trip owner attribution is captured once and legacy rows are not backfilled from current ownership", () => {
-  assert.match(reportingMigration, /ADD COLUMN IF NOT EXISTS vehicle_owner_id_snapshot uuid/);
-  assert.match(reportingMigration, /ADD COLUMN IF NOT EXISTS vehicle_owner_name_snapshot text/);
-  assert.match(reportingMigration, /BEFORE INSERT ON public\.actual_loading_records/);
-  assert.match(reportingMigration, /Never overwrite an existing snapshot during later edits/);
-  assert.doesNotMatch(reportingMigration, /UPDATE public\.actual_loading_records[\s\S]{0,300}vehicle_owner_id_snapshot\s*=/i);
-  assert.match(reportingMigration, /'owner_attribution_status',[\s\S]*?'UNKNOWN_LEGACY'/);
-  assert.match(reportingMigration, /'owner_id', alr\.vehicle_owner_id_snapshot/);
-  assert.match(reportingMigration, /'vehicle_owner_id', alr\.vehicle_owner_id_snapshot/);
+test("vehicle identity is generated and permanently associated with its registered owner", () => {
+  assert.match(vehicleOwnerSql, /v_code:='VH-'\|\|lpad\(nextval\('public\.vehicle_code_seq'/);
+  assert.match(vehicleOwnerSql, /insert into public\.vehicles\(vehicle_code,plate_number,owner_id,office_id/);
+  assert.match(vehicleOwnerSql, /'vehicle_code',v_code,'plate_number',v_plate,'owner_id',p_owner_id/);
 });
 
-test("vehicle and owner report supports trip-level drilldown and shows historical owner attribution", () => {
+test("owner and vehicle reports drill down to completed trips and actual tons", () => {
+  assert.match(reportsMigration, /left join public\.vehicles v on v\.vehicle_id=alr\.vehicle_id/i);
+  assert.match(reportsMigration, /left join public\.vehicle_owners vo on vo\.owner_id=v\.owner_id/i);
   assert.match(vehicleReportsUi, /setOwnerVehicle/);
-  assert.match(vehicleReportsUi, /owner_attribution_status/);
-  assert.match(vehicleReportsUi, /مالك وقت النقلة/);
-  assert.match(vehicleReportsUi, /غير معروف تاريخيًا/);
   assert.match(vehicleReportsUi, /tripCode/);
   assert.match(vehicleReportsUi, /factoryFilter/);
   assert.match(vehicleReportsUi, /quarryFilter/);
+  assert.match(vehicleReportsUi, /مالك العربية/);
 });
 
-test("factory and quarry statements filter by the owner captured for the trip", () => {
-  assert.match(accountStatementsUi, /row\.vehicle_owner_id/);
+test("factory and quarry statements filter by vehicle, its registered owner, and trip code", () => {
+  assert.match(statementsMigration, /'vehicle_id', v\.vehicle_id/i);
+  assert.match(accountStatementsUi, /row\.trip_code/);
   assert.match(accountStatementsUi, /setOwnerId/);
+  assert.match(accountStatementsUi, /vehicles\.find\(v => String\(v\.vehicle_id\) === String\(row\.vehicle_id\)\)\?\.owner_id/);
   assert.match(accountStatementsUi, /مالك العربية/);
-  assert.match(accountStatementsUi, /row\.vehicle_owner_name/);
-  assert.match(accountStatementsUi, /غير معروف تاريخيًا/);
+  assert.match(accountStatementsUi, /كود النقلة/);
 });
