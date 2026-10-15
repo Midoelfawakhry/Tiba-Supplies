@@ -153,6 +153,37 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     }
   }
 
+  async function setMasterDirectoryActive(row: Row) {
+    const isFactory = active === 'factories';
+    const entityType = isFactory ? 'FACTORY' : 'QUARRY';
+    const entityId = isFactory ? row.factory_id : row.quarry_id;
+    const label = isFactory ? 'العميل / المصنع' : 'المحجر / المورد';
+    const nextActive = row.is_active === false;
+    if (!entityId) { setError('تعذر تحديد السجل المطلوب. حدّث القائمة وحاول مرة أخرى.'); return; }
+    if (!window.confirm(nextActive
+      ? `تأكيد إعادة تفعيل ${label} ${liveName(row)}؟`
+      : `تأكيد إيقاف ${label} ${liveName(row)}؟ سيظل محفوظًا في تاريخ النقلات القديمة، ولن يظهر ضمن السجلات النشطة.`)) return;
+    setError(''); setSuccess(''); setSavingEdit(true);
+    try {
+      const { data, error: rpcError } = await supabase.rpc('main_office_set_directory_active', {
+        p_entity_type: entityType, p_entity_id: entityId, p_is_active: nextActive,
+      });
+      if (rpcError) throw rpcError;
+      if (!data?.id || data.is_active !== nextActive) throw new Error('تعذر تأكيد تغيير حالة السجل.');
+      setSuccess(nextActive ? `تم تفعيل ${label}.` : `تم إيقاف ${label} مع الاحتفاظ بالسجلات التاريخية.`);
+      await load();
+    } catch (e: any) {
+      const raw = String(e?.message || '');
+      const messages: Record<string, string> = {
+        ENTITY_NOT_FOUND: 'السجل غير موجود. حدّث القائمة وحاول مرة أخرى.',
+        MAIN_OFFICE_ACCESS_REQUIRED: 'تغيير حالة السجل متاح للمكتب الرئيسي فقط.',
+        AUTH_REQUIRED: 'انتهت جلسة المكتب. سجّل الدخول مرة أخرى.',
+      };
+      const key = Object.keys(messages).find(code => raw.includes(code));
+      setError(key ? messages[key] : (raw || 'تعذر تغيير حالة السجل.'));
+    } finally { setSavingEdit(false); }
+  }
+
   async function setOwnerActive(row: Row) {
     const nextActive = row.is_active === false;
     if (!nextActive && !window.confirm(`تأكيد إيقاف المالك ${row.name}؟ لا يمكن إيقافه طالما عنده عربيات نشطة.`)) return;
@@ -635,7 +666,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
                   const key = Object.keys(messages).find(code => raw.includes(code));
                   setError(Object.entries(messages).find(([code]) => raw.includes(code))?.[1] ?? (raw || 'تعذر تغيير حالة العربية.'));
                 } finally { setSavingEdit(false); }
-              }} className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold disabled:opacity-50 ${row.is_active === false ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-700'}`}>{row.is_active === false ? 'تفعيل العربية' : 'إيقاف العربية'}</button>}{active === 'owners' && <button type="button" disabled={savingEdit} onClick={() => void setOwnerActive(row)} className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold disabled:opacity-50 ${row.is_active === false ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-700'}`}>{row.is_active === false ? 'تفعيل المالك' : 'إيقاف المالك'}</button>}{active === 'drivers' && row.is_active !== false && row.auth_user_id && <button type="button" onClick={() => { setPasswordResetDriver(row); setNewDriverPassword(''); setConfirmDriverPassword(''); setEditingDriver(null); setError(''); setSuccess(''); }} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-800">كلمة المرور</button>}{active === "drivers" && row.is_active !== false && <button type="button" disabled={savingEdit} onClick={() => void deactivateDriver(row)} aria-label="إيقاف السائق" className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-700 disabled:opacity-50"><UserX size={10}/> إيقاف</button>}{(active === 'drivers' || active === 'vehicles') && <button type="button" onClick={() => active === 'drivers' ? void beginDriverEdit(row) : beginVehicleEdit(row)} aria-label={active === 'drivers' ? 'تعديل بيانات السائق' : 'تعديل بيانات العربية'} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"><Pencil size={10}/> تعديل</button>}
+              }} className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold disabled:opacity-50 ${row.is_active === false ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-700'}`}>{row.is_active === false ? 'تفعيل العربية' : 'إيقاف العربية'}</button>}{(['factories', 'quarries'].includes(active)) && <button type="button" disabled={savingEdit} onClick={() => void setMasterDirectoryActive(row)} aria-label={row.is_active === false ? 'تفعيل السجل' : 'إيقاف السجل'} className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold disabled:opacity-50 ${row.is_active === false ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-700'}`}>{row.is_active === false ? 'تفعيل' : 'إيقاف'}</button>}{active === 'owners' && <button type="button" disabled={savingEdit} onClick={() => void setOwnerActive(row)} className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold disabled:opacity-50 ${row.is_active === false ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-700'}`}>{row.is_active === false ? 'تفعيل المالك' : 'إيقاف المالك'}</button>}{active === 'drivers' && row.is_active !== false && row.auth_user_id && <button type="button" onClick={() => { setPasswordResetDriver(row); setNewDriverPassword(''); setConfirmDriverPassword(''); setEditingDriver(null); setError(''); setSuccess(''); }} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-800">كلمة المرور</button>}{active === "drivers" && row.is_active !== false && <button type="button" disabled={savingEdit} onClick={() => void deactivateDriver(row)} aria-label="إيقاف السائق" className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-700 disabled:opacity-50"><UserX size={10}/> إيقاف</button>}{(active === 'drivers' || active === 'vehicles') && <button type="button" onClick={() => active === 'drivers' ? void beginDriverEdit(row) : beginVehicleEdit(row)} aria-label={active === 'drivers' ? 'تعديل بيانات السائق' : 'تعديل بيانات العربية'} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"><Pencil size={10}/> تعديل</button>}
               {active === 'actual' && row.booking_id && !['CANCELLED', 'DELIVERED', 'COMPLETED'].includes(snapshot?.bookings?.find((b: Row) => b.booking_id === row.booking_id)?.status) && !row.delivery_confirmed_at && row.actual_weight == null && <button type="button" onClick={async () => {
                 setError('إلغاء الحجز القديم غير مدعوم في Phase 1. استخدم إلغاء أمر التحميل إذا كانت حالته تسمح بذلك.');
               }} className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-700">إلغاء النقلة</button>}
