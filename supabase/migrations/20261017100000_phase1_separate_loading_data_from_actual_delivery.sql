@@ -56,6 +56,15 @@ alter table public.actual_loading_records
   add column if not exists actual_weight_recorded_at timestamptz;
 alter table public.actual_loading_records
   add column if not exists record_source text;
+alter table public.actual_loading_records
+  add column if not exists source_record_id text;
+alter table public.actual_loading_records
+  add column if not exists source_file_name text;
+alter table public.actual_loading_records
+  add column if not exists source_row_number integer;
+alter table public.actual_loading_records
+  add column if not exists imported_at timestamptz;
+
 
 -- Preserve pre-existing rows as legacy evidence; do not relabel old office-entered weights
 -- as driver-confirmed factory deliveries.
@@ -254,6 +263,9 @@ create index if not exists actual_loading_records_vehicle_date_idx
   on public.actual_loading_records(vehicle_id, load_date desc);
 create index if not exists actual_loading_records_factory_quarry_date_idx
   on public.actual_loading_records(factory_id, quarry_id, load_date desc);
+create unique index if not exists actual_loading_records_import_source_unique
+  on public.actual_loading_records(source_file_name,source_row_number)
+  where source_file_name is not null and source_row_number is not null;
 create unique index if not exists actual_loading_records_trip_code_unique
   on public.actual_loading_records(trip_code) where trip_code is not null;
 
@@ -615,7 +627,7 @@ begin
         'ticket_number',alr.ticket_number,'actual_weight',alr.actual_weight,
         'scale_image_path',alr.scale_image_path,'delivery_confirmed_at',dc.confirmed_at,
         'actual_weight_recorded_at',alr.actual_weight_recorded_at,
-        'record_source',alr.record_source,
+        'record_source',alr.record_source,'source_record_id',alr.source_record_id,\n        'source_file_name',alr.source_file_name,'source_row_number',alr.source_row_number,'imported_at',alr.imported_at,
         'is_completed',(alr.actual_weight is not null and (b.booking_id is null or dc.confirmed_at is not null))
       ) order by coalesce(alr.load_date,alr.loaded_at::date,alr.created_at::date) desc,alr.created_at desc)
       from public.actual_loading_records alr
@@ -665,7 +677,7 @@ begin
     'factory_name',f.name,'quarry_id',coalesce(alr.quarry_id,lo.quarry_id),
     'quarry_name',q.name,'scale_image_path',alr.scale_image_path,
     'delivery_confirmed_at',dc.confirmed_at,
-    'actual_weight_recorded_at',alr.actual_weight_recorded_at,'record_source',alr.record_source
+    'actual_weight_recorded_at',alr.actual_weight_recorded_at,'record_source',alr.record_source,\n    'source_record_id',alr.source_record_id,'source_file_name',alr.source_file_name,\n    'source_row_number',alr.source_row_number,'imported_at',alr.imported_at
   ) order by coalesce(alr.load_date,alr.loaded_at::date,alr.created_at::date) desc,alr.created_at desc),'[]'::jsonb)
   into v_result
   from public.actual_loading_records alr
