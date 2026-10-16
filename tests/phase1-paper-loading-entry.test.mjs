@@ -30,15 +30,17 @@ test("paper loading form validates weight and uses the scoped server RPC", () =>
 });
 
 test("CSV import validates source rows and has an idempotent Main Office RPC", () => {
-  assert.match(importMigration, /v_actor := public\\.current_main_office_user\\(\\)/i);
-  assert.match(importMigration, /jsonb_array_length\\(p_rows\\) > 2000/);
+  assert.match(importMigration, /v_actor := public\.current_main_office_user\(\)/i);
+  assert.match(importMigration, /jsonb_array_length\(p_rows\) > 2000/);
   assert.match(importMigration, /VEHICLE_CODE_NOT_FOUND/);
   assert.match(importMigration, /DRIVER_CODE_NOT_FOUND/);
   assert.match(importMigration, /FACTORY_CODE_NOT_FOUND/);
   assert.match(importMigration, /QUARRY_CODE_NOT_FOUND/);
   assert.match(importMigration, /actual_loading_records_import_source_id_unique/);
   assert.match(importMigration, /record_source,source_record_id,source_file_name,source_row_number,imported_at/);
-  assert.match(importMigration, /grant execute on function public\\.main_office_import_paper_loads\\(text,jsonb\\) to authenticated/i);
+  assert.match(importMigration, /grant execute on function public\.main_office_import_paper_loads\(text,jsonb\) to authenticated/i);
   assert.match(screen, /main_office_import_paper_loads/);
   assert.match(screen, /source_row_number: index \+ 2/);
+  assert.match(directoryScreen, /get_vehicle_owner_reports/);
+  assert.match(directoryScreen, /actual_loading_records: Array\.isArray\(reportsResult\.data\?\.trips\)/);
 });
