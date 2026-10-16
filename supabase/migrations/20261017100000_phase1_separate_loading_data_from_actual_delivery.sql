@@ -14,7 +14,7 @@ create table if not exists public.loading_data_records (
   assigned_by uuid not null references public.app_users(user_id) on delete restrict,
   trip_code text not null unique,
   assignment_type text not null check (assignment_type in ('QUEUE','DIRECT')),
-  booking_status text not null check (booking_status in ('ASSIGNED','ARRIVED','LOADING','LOADED','IN_TRANSIT','DELIVERED','CANCELLED')),
+  booking_status text not null,
   load_order_number bigint,
   load_date date not null,
   assigned_at timestamptz not null,
@@ -366,13 +366,37 @@ begin
   select * into v_actual from public.actual_loading_records
   where booking_id=p_booking_id for update;
   if found then
-    if v_actual.actual_weight is not null and v_actual.actual_weight <> v_weight then
-      raise exception 'ACTUAL_WEIGHT_ALREADY_RECORDED';
+    -- Legacy rows were created at the office's LOADED transition in the old
+    -- lifecycle. At factory delivery, promote that legacy row to the authoritative
+    -- driver-confirmed weight while retaining the prior value in the audit event.
+    if v_actual.record_source = 'LEGACY' then
+      update public.actual_loading_records
+      set actual_weight=v_weight,
+          scale_image_path=coalesce(nullif(trim(p_scale_image_path),''),scale_image_path),
+          recorded_by_driver_id=v_driver.driver_id,
+          driver_id=v_driver.driver_id,
+          vehicle_id=v_booking.vehicle_id,
+          quarry_id=v_order.quarry_id,
+          factory_id=v_order.factory_id,
+          trip_code=v_booking.trip_code,
+          load_date=current_date,
+          loading_sequence_date=current_date,
+          actual_weight_recorded_at=now(),
+          record_source='DRIVER_DELIVERY',
+          loaded_at=now(),
+          notes=coalesce(nullif(trim(p_notes),''),notes)
+      where actual_load_id=v_actual.actual_load_id;
+    else
+      if v_actual.actual_weight is not null and v_actual.actual_weight <> v_weight then
+        raise exception 'ACTUAL_WEIGHT_ALREADY_RECORDED';
+      end if;
+      update public.actual_loading_records
+      set scale_image_path=coalesce(nullif(trim(p_scale_image_path),''),scale_image_path),
+          recorded_by_driver_id=coalesce(recorded_by_driver_id,v_driver.driver_id),
+          actual_weight_recorded_at=coalesce(actual_weight_recorded_at,now()),
+          notes=coalesce(nullif(trim(p_notes),''),notes)
+      where actual_load_id=v_actual.actual_load_id;
     end if;
-    update public.actual_loading_records
-    set scale_image_path=coalesce(scale_image_path,nullif(trim(p_scale_image_path),'')),
-        notes=coalesce(nullif(trim(p_notes),''),notes)
-    where actual_load_id=v_actual.actual_load_id;
   else
     insert into public.actual_loading_records(
       booking_id, actual_weight, ticket_number, scale_image_path, loaded_at,
@@ -410,7 +434,7 @@ begin
       jsonb_build_object('driver_id',v_driver.driver_id,'actual_weight',v_weight,
         'scale_image_attached',p_scale_image_path is not null,'accuracy_m',p_accuracy_m,
         'captured_at',p_captured_at,'confirmed_at',v_confirmation.confirmed_at,
-        'record_source','DRIVER_DELIVERY'));
+        'record_source','DRIVER_DELIVERY','previous_record_source',v_actual.record_source,\n        'previous_actual_weight',v_actual.actual_weight));
   end if;
 
   select * into v_actual from public.actual_loading_records where booking_id=p_booking_id;
