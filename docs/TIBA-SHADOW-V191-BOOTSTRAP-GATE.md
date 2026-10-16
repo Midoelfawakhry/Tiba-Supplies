@@ -74,10 +74,17 @@ GitHub Actions run [Phase 1 Shadow CI #38974294393](https://github.com/Midoelfaw
 - The prior RLS event-trigger permission remediation is applied and verified on Shadow, but it does not make the application schema ready.
 
 
-## Confirmed contract blocker — delivery and paper actual-loading (2026-10-17)
+## Confirmed lifecycle blocker — assignment data versus factory actual weight (2026-10-17)
 
-Static comparison of the current v191 `DriverApp.tsx` with the clean-chain delivery migration confirmed that the client passes eight named arguments to `driver_confirm_delivery`, including actual weight and scale image path, while `20261014300000_phase1_harden_driver_delivery_confirmation.sql` defines only six arguments and does not persist or return actual weight. The standalone v191 contract gate is not currently run in the inspected CI workflow, so the green chain smoke does not catch this mismatch.
+Correction to the initial static review: the six-argument function in `20261014300000_phase1_harden_driver_delivery_confirmation.sql` is superseded by later migrations `20261015120000` and `20261015120001`, which define the eight-argument `driver_confirm_delivery` contract required by v191. The final chain's signature is therefore compatible.
 
-The clean baseline also requires `actual_loading_records.booking_id` and `recorded_by` to be non-null and ties each record uniquely to a booking; this does not model paper actual-loading entries independent of bookings as seen in the Production inventory. Resolution must cover storage, identity, atomicity, and idempotency—not merely add unused RPC parameters.
+The actual remaining defect is lifecycle semantics: `20261015173000_phase1_direct_assignment_acceptance.sql` records actual weight during the office's `LOADED` transition, while the established requirement is to capture actual weight when the vehicle delivers to the factory. The driver RPC then treats the earlier office row as an existing actual weight and can reject a different factory-delivery weight.
 
-Detailed evidence and acceptance criteria: [Delivery and actual-loading gap report](TIBA-V191-CONTRACT-DELIVERY-AND-STANDALONE-LOAD-GAP-2026-10-17.md). Keep this a release blocker until the contract is reconciled and tested.
+A new review-branch migration, `20261017100000_phase1_separate_loading_data_from_actual_delivery.sql`, now:
+- Adds a separate `loading_data_records` relation synced from booking assignment/lifecycle.
+- Keeps the office `LOADED` transition from writing actual weight and rejects legacy weight/ticket input at that stage.
+- Allows `actual_loading_records` to represent paper actual-loading entries without a booking, with vehicle/driver/factory/quarry/date/trip fields.
+- Makes the eight-argument driver delivery RPC the current-flow writer of actual weight and scale evidence.
+- Updates reporting RPCs to include standalone paper records.
+
+The standalone SQL contract gate is now included in the clean PostgreSQL CI workflow. The new migration and gate must pass the latest CI run before this change can be treated as validated. Detailed report: [Delivery and actual-loading lifecycle review](TIBA-V191-CONTRACT-DELIVERY-AND-STANDALONE-LOAD-GAP-2026-10-17.md). Do not apply this migration to Production or the live Shadow project during this review.
