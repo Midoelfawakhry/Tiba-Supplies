@@ -46,6 +46,10 @@ It:
 
 This is a **candidate migration on the review branch**, not an applied or production-approved migration.
 
+### Paper-import provenance added
+
+The candidate actual-loading schema also now retains `source_record_id`, `source_file_name`, `source_row_number`, and `imported_at`, with a partial unique key on source file plus row number to prevent importing the same source row twice. These fields support traceability but do **not** mean a bulk import screen/RPC or data reconciliation workflow has been completed; that remains a separate task requiring cleaned source files and explicit matching rules.
+
 ### Daily loading identity added
 
 The source handover and schema export show that actual-loading rows need a stable `trip_code`, `daily_load_number`, and `loading_sequence_date`; the historical production schema also used a per-date counter. The candidate migration now adds a protected `daily_loading_counters` table and a trigger that allocates a per-day number atomically, derives a stable `TIBA-YYYYMMDD-XNNNNNN` code for standalone paper records, uses the booking trip code for booked records, and prevents identity changes after insertion. Existing rows are backfilled first; ambiguous duplicate trip codes or daily numbers fail the migration for manual reconciliation instead of being silently rewritten.
