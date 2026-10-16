@@ -38,8 +38,8 @@ jobs:
     env:
       VITE_APP_MODE: ${{ matrix.app_mode }}
       TIBA_APP_MODE: ${{ matrix.app_mode }}
-      VITE_SUPABASE_URL: https://awgppfjxegognuqozldl.supabase.co
-      VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_k78B7hdU7uSnAtvfA18iWQ_BxzVmdmz
+      VITE_SUPABASE_URL: https://bvyxiahpxogblkmtjxyx.supabase.co
+      VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_xiPfODQDOUSsTbgRQH9z6Q_izM6SFKn
       ANDROID_VERSION_CODE: 42
       ANDROID_VERSION_NAME: 1.0.42
     steps:
