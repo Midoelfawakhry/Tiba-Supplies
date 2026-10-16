@@ -437,12 +437,8 @@ set search_path = pg_catalog, public
 as $$
 declare v_result jsonb;
 begin
-  if auth.uid() is null then raise exception 'AUTH_REQUIRED'; end if;
-  if not exists (
-    select 1 from public.app_users au
-    where au.auth_user_id=auth.uid() and au.is_active=true
-      and au.role in ('ADMIN','HEAD_OFFICE','BRANCH')
-  ) then raise exception 'INSUFFICIENT_ROLE'; end if;
+  -- Preserve office-scope hardening: this global report is Main Office only.
+  perform public.current_main_office_user();
   if p_from is not null and p_to is not null and p_from>p_to then
     raise exception 'INVALID_DATE_RANGE';
   end if;
@@ -505,12 +501,8 @@ set search_path = pg_catalog, public
 as $$
 declare v_result jsonb;
 begin
-  if auth.uid() is null then raise exception 'AUTH_REQUIRED'; end if;
-  if not exists (
-    select 1 from public.app_users au
-    where au.auth_user_id=auth.uid() and au.is_active=true
-      and au.role in ('ADMIN','HEAD_OFFICE')
-  ) then raise exception 'INSUFFICIENT_ROLE'; end if;
+  -- Account statements are Main Office only; a role label alone is insufficient.
+  perform public.current_main_office_user();
   if p_from is not null and p_to is not null and p_from>p_to then
     raise exception 'INVALID_DATE_RANGE';
   end if;
