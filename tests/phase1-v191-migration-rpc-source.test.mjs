@@ -20,11 +20,12 @@ const queueHardening = migration('20261015181000_phase1_queue_ui_and_concurrency
 const queueNotifications = migration('20261015182000_phase1_queue_driver_notifications.sql');
 const queueVehicleCompatibility = migration('20261015184000_phase1_queue_vehicle_compatibility.sql');
 const queueOfficeVisibility = migration('20261015185000_phase1_queue_office_selection_visibility.sql');
+const loadingDeliverySeparation = migration('20261017100000_phase1_separate_loading_data_from_actual_delivery.sql');
 
 const chain = [
   baseline, mainOffice, locationArrival, driverSnapshot, assignmentModel,
   delivery, deliveryIdempotency, directAssignment, queue, queueHardening,
-  queueNotifications, queueVehicleCompatibility, queueOfficeVisibility,
+  queueNotifications, queueVehicleCompatibility, queueOfficeVisibility, loadingDeliverySeparation,
 ].join('\n');
 
 test('reviewed migration source defines every v191 driver RPC name', () => {
@@ -114,4 +115,15 @@ test('baseline is not treated as a complete v191 bootstrap by itself', () => {
   assert.ok(bookingTable, 'clean baseline should define public.bookings');
   assert.ok(/\btrip_code\s+text\s+not\s+null\s+unique\b/i.test(bookingTable[1]), 'baseline bookings must retain its declared trip_code contract');
   assert.ok(!baseline.includes('create table public.dispatch_windows'));
+});
+
+
+test('final loading-data migration keeps assignment records separate from factory actual weight', () => {
+  assert.ok(loadingDeliverySeparation.includes('create table if not exists public.loading_data_records'));
+  assert.ok(loadingDeliverySeparation.includes('create trigger bookings_sync_loading_data'));
+  assert.ok(loadingDeliverySeparation.includes('ACTUAL_WEIGHT_CAPTURED_AT_DELIVERY'));
+  assert.ok(loadingDeliverySeparation.includes("'DRIVER_DELIVERY'"));
+  assert.ok(loadingDeliverySeparation.includes('alter column booking_id drop not null'));
+  assert.ok(loadingDeliverySeparation.includes('actual_weight_recorded_at'));
+  assert.ok(loadingDeliverySeparation.includes('left join public.bookings b on b.booking_id=alr.booking_id'));
 });
