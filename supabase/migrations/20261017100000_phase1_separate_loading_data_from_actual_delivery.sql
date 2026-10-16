@@ -679,7 +679,8 @@ begin
     'quarry_name',q.name,'scale_image_path',alr.scale_image_path,
     'delivery_confirmed_at',dc.confirmed_at,
     'actual_weight_recorded_at',alr.actual_weight_recorded_at,'record_source',alr.record_source,
-    'source_record_id',alr.source_record_id,'source_file_name',alr.source_file_name,\n    'source_row_number',alr.source_row_number,'imported_at',alr.imported_at
+    'source_record_id',alr.source_record_id,'source_file_name',alr.source_file_name,
+    'source_row_number',alr.source_row_number,'imported_at',alr.imported_at
   ) order by coalesce(alr.load_date,alr.loaded_at::date,alr.created_at::date) desc,alr.created_at desc),'[]'::jsonb)
   into v_result
   from public.actual_loading_records alr
