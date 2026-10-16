@@ -584,6 +584,133 @@ $$;
 revoke all on function public.driver_confirm_delivery(uuid,double precision,double precision,double precision,timestamptz,numeric,text,text) from public, anon, authenticated;
 grant execute on function public.driver_confirm_delivery(uuid,double precision,double precision,double precision,timestamptz,numeric,text,text) to authenticated;
 
+-- Storage policies must not query RPC-only tables as the authenticated role.
+-- These narrowly scoped SECURITY DEFINER predicates perform the ownership check
+-- without granting direct SELECT access to bookings, drivers, offices, or app_users.
+create or replace function public.can_upload_scale_ticket(p_object_name text)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog, public
+as $policy$
+declare
+  v_booking_text text;
+  v_booking_id uuid;
+begin
+  if auth.uid() is null or p_object_name is null then return false; end if;
+  v_booking_text := split_part(p_object_name, '/', 1);
+  if v_booking_text !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
+    return false;
+  end if;
+  v_booking_id := v_booking_text::uuid;
+  return exists (
+    select 1
+    from public.bookings b
+    join public.drivers d on d.driver_id=b.driver_id
+    where b.booking_id=v_booking_id
+      and d.auth_user_id=auth.uid() and d.is_active=true
+      and b.status='IN_TRANSIT'
+  );
+end;
+$policy$;
+
+create or replace function public.can_read_scale_ticket(p_object_name text)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog, public
+as $policy$
+declare
+  v_booking_text text;
+  v_booking_id uuid;
+begin
+  if auth.uid() is null or p_object_name is null then return false; end if;
+  v_booking_text := split_part(p_object_name, '/', 1);
+  if v_booking_text !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
+    return false;
+  end if;
+  v_booking_id := v_booking_text::uuid;
+  return exists (
+    select 1
+    from public.bookings b
+    join public.drivers d on d.driver_id=b.driver_id
+    where b.booking_id=v_booking_id and d.auth_user_id=auth.uid() and d.is_active=true
+  ) or exists (
+    select 1
+    from public.app_users au
+    join public.offices o on o.office_id=au.office_id
+    where au.auth_user_id=auth.uid() and au.is_active=true
+      and au.role in ('ADMIN','HEAD_OFFICE')
+      and o.office_code='MAIN' and o.office_type='HEAD_OFFICE' and o.is_active=true
+  );
+end;
+$policy$;
+
+create or replace function public.can_delete_scale_ticket(p_object_name text)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog, public
+as $policy$
+declare
+  v_booking_text text;
+  v_booking_id uuid;
+begin
+  if auth.uid() is null or p_object_name is null then return false; end if;
+  v_booking_text := split_part(p_object_name, '/', 1);
+  if v_booking_text !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
+    return false;
+  end if;
+  v_booking_id := v_booking_text::uuid;
+  return exists (
+    select 1
+    from public.bookings b
+    join public.drivers d on d.driver_id=b.driver_id
+    where b.booking_id=v_booking_id
+      and d.auth_user_id=auth.uid() and d.is_active=true
+      and b.status='IN_TRANSIT'
+      and not exists (
+        select 1 from public.delivery_confirmations dc
+        where dc.booking_id=b.booking_id
+      )
+  );
+end;
+$policy$;
+
+revoke all on function public.can_upload_scale_ticket(text) from public, anon, authenticated;
+revoke all on function public.can_read_scale_ticket(text) from public, anon, authenticated;
+revoke all on function public.can_delete_scale_ticket(text) from public, anon, authenticated;
+grant execute on function public.can_upload_scale_ticket(text) to authenticated;
+grant execute on function public.can_read_scale_ticket(text) to authenticated;
+grant execute on function public.can_delete_scale_ticket(text) to authenticated;
+
+drop policy if exists "driver_upload_own_scale_ticket" on storage.objects;
+create policy "driver_upload_own_scale_ticket" on storage.objects
+for insert to authenticated
+with check (
+  bucket_id='scale-tickets'
+  and public.can_upload_scale_ticket(name)
+);
+
+drop policy if exists "read_scale_tickets_for_driver_or_office" on storage.objects;
+create policy "read_scale_tickets_for_driver_or_office" on storage.objects
+for select to authenticated
+using (
+  bucket_id='scale-tickets'
+  and public.can_read_scale_ticket(name)
+);
+
+drop policy if exists "driver_delete_unconfirmed_scale_ticket" on storage.objects;
+create policy "driver_delete_unconfirmed_scale_ticket" on storage.objects
+for delete to authenticated
+using (
+  bucket_id='scale-tickets'
+  and public.can_delete_scale_ticket(name)
+);
+
 -- Reporting RPCs include both booked trips and standalone paper actual-loading records.
 create or replace function public.get_vehicle_owner_reports(
   p_from date default null,
