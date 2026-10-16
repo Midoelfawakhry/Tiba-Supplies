@@ -158,24 +158,25 @@ jobs:
           PGPASSWORD: postgres
         run: |
           set -euo pipefail
-          for migration in \
-            20261014190000_phase1_clean_baseline.sql \
-            20261014200000_phase1_main_office_rpcs.sql \
-            20261014240000_phase1_driver_location_and_arrival.sql \
-            20261014290000_phase1_driver_portal_snapshot.sql \
-            20261014370000_phase1_driver_vehicle_assignments.sql \
-            20261015120000_phase1_actual_weight_and_account_rpcs.sql \
-            20261015120001_phase1_actual_weight_idempotency.sql \
-            20261015173000_phase1_direct_assignment_acceptance.sql \
-            20261015180000_phase1_queue_selection_and_atomic_dispatch.sql \
-            20261015181000_phase1_queue_ui_and_concurrency_hardening.sql \
-            20261015182000_phase1_queue_driver_notifications.sql \
-            20261015184000_phase1_queue_vehicle_compatibility.sql \
-            20261015185000_phase1_queue_office_selection_visibility.sql
-          do
+          # Replay every migration based on the clean v191 baseline in version order.
+          # The pg_cron scheduler is intentionally excluded: it requires Supabase's managed extension/runtime.
+          while IFS= read -r migration; do
             echo "Applying $migration"
             psql -h localhost -U postgres -d tiba_chain_test -v ON_ERROR_STOP=1 -f "supabase/migrations/$migration"
-          done
+          done < <(
+            python3 - <<'PY'
+          from pathlib import Path
+          import re
+          baseline = 20261014190000
+          for path in sorted(Path("supabase/migrations").glob("*.sql")):
+              match = re.match(r"^(\d+)_", path.name)
+              if not match or int(match.group(1)) < baseline:
+                  continue
+              if path.name == "20261015186000_phase1_queue_scheduler.sql":
+                  continue
+              print(path.name)
+          PY
+          )
       - name: Assert v191 RPC and queue objects exist
         env:
           PGPASSWORD: postgres
