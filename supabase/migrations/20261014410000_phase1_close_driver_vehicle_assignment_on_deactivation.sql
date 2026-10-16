@@ -9,7 +9,7 @@ begin
  return new;
 end $$;
 revoke all on function public.close_driver_vehicle_assignment_on_deactivation() from public,anon,authenticated;
-drop trigger if exists close_driver_vehicle_assignment_after_deactivation on public.drivers;
+-- Clean-baseline chain creates this trigger only once; no DROP is needed.
 create trigger close_driver_vehicle_assignment_after_deactivation
 after update of is_active on public.drivers
 for each row execute function public.close_driver_vehicle_assignment_on_deactivation();
