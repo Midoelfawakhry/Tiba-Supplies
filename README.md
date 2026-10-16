@@ -2,15 +2,19 @@
 
 **Updated:** 2026-10-17  
 **Working branch:** `shadow/phase1-hardening`  
-**Latest Phase 1 CI/build commit:** `ab3f7b3d64e3d52f0ad66f853adaaed2da05867b`  
-**Latest README update before this revision:** `d2f921757ca4d80090a776a0437c9b89576ca843`
+**Latest commit at this update:** `a394531ee796e2f86b4b3144cf51394282444170`  
+**Target Shadow project:** `bvyxiahpxogblkmtjxyx` (`Tiba Shadow`, `eu-west-1`)
 
 ## Latest work completed
 
-- Updated the project handover with the implementation summary, build status, artifacts, safety boundaries, and remaining tasks.
-- Rechecked that Phase 1 Shadow CI and Phase 1 build succeeded on commit `ab3f7b3d`.
-- Verified that migration-integrity, signed Android, and Windows packaging workflows completed successfully on commit `ecd39f6d`.
-- Changes remain on `shadow/phase1-hardening`; no merge to `main` was performed.
+- Applied the clean Phase 1 migration chain to the intended Shadow project, including the paper-load entry/import RPCs and the managed `pg_cron` dispatch-window scheduler. The existing migration-ledger remediation row was preserved; no database reset was performed.
+- Verified 20 public tables exist and all 20 have RLS enabled; required dashboard, delivery, and paper-import RPCs exist; direct client table grants remain revoked; `ensure_rls` remains installed.
+- Confirmed the scheduler job `tiba-finalize-expired-dispatch-windows` is scheduled every minute.
+- Seeded only the two baseline office reference rows: Main Office and Ras Sedr. Business directories, auth users, bookings, and loading records remain empty; no synthetic business records or Production data were copied.
+- Paper-load manual entry and CSV import UI/RPC are present on the review branch. The import RPC validates the file before inserts, preserves row/file provenance, and reports duplicates/conflicts.
+- Updated the Windows Main Office build workflow to target the same Shadow project as the Android review builds.
+- Phase 1 Shadow CI and Phase 1 build passed on commit `41da9940`; the newer Windows-targeting commit `a394531e` is under final build verification.
+- Changes remain on `shadow/phase1-hardening`; no merge to `main` and no Production writes were performed.
 
 ### CI links
 
@@ -58,25 +62,26 @@ Successful build jobs do not replace installation/device smoke tests or authenti
 
 ## Remaining work — prioritized
 
-### P0 — paper-load entry and import
+### P0 — real directory data and access provisioning
 
-The schema is prepared, but the complete office-facing workflow is still missing.
+1. Import/validate real factory and quarry master data, then vehicle owners, vehicles, and drivers using the source records. Do not invent missing codes or names.
+2. Provision the actual Supabase Auth users and matching `app_users`/driver identities through the approved account-setup flow; there are currently no application users in this new project.
+3. Run authenticated acceptance tests for Main Office, Ras Sedr Branch, and Driver roles, including paper entry/import, duplicate re-import, delivery confirmation, reports, and scale-ticket access.
+4. Define and test correction/re-import behavior, row-level failures, duplicate files, and concurrent daily numbering.
 
-1. Build a Main Office screen for manual paper-load entry and CSV/spreadsheet import.
-2. Add a server-authorized RPC; do not grant broad direct client write access to actual-load tables.
-3. Validate Main Office role, load date, weight, vehicle, driver, factory, quarry, and source identity.
-4. Add import preview, row-level validation errors, and audit metadata.
-5. Make imports idempotent using stable source/file-row identity; report duplicates instead of silently inserting them.
-6. Define correction/re-import behavior and test daily-number concurrency.
-7. Test invalid references, unauthorized users, duplicate rows/files, partial failures, and concurrent inserts.
+### P1 — release validation
 
-### P1 — safe Shadow database reconciliation
+1. Finish the Windows package build and signed Driver APK build against this Shadow project.
+2. Install and smoke-test Driver, Main Office, and Ras Sedr Branch APKs on Android.
+3. Verify login/logout, location permissions, background tracking, stale/inaccurate location behavior, driver/vehicle assignment, and paper import.
+4. Rebuild final artifacts from the final candidate commit and check each build's embedded Supabase URL.
+5. Recheck the v191 AI assistant and native driver tracking remain intact.
 
-1. Re-read the intended Shadow schema and migration ledger.
-2. Compare schema/ledger with the repository migration chain and document drift before repair.
-3. Run migrations and database acceptance tests on disposable PostgreSQL first.
-4. Only after review, decide whether to apply changes to the intended Shadow project.
-5. Test office scope, driver delivery, reporting, scale-ticket upload/read/delete, and paper-import authorization with authenticated sessions.
+### P2 — controlled data rollout
+
+- Preserve source files and row-level provenance when importing real paper records.
+- Use isolated synthetic fixtures for volume tests; never seed shared databases with fake business records.
+- Prepare rollback/recovery and a separate Production review before any live rollout.
 
 ### P1 — release validation
 
@@ -113,12 +118,14 @@ The schema is prepared, but the complete office-facing workflow is still missing
 - [x] Scoped scale-ticket authorization helpers and contract checks added.
 - [x] No Production database writes or migration were performed.
 - [x] No merge to `main` was performed.
-- [ ] Paper-load entry/import UI and secure RPC implemented.
-- [ ] Duplicate prevention and import validation tests pass.
-- [ ] Shadow schema/ledger reconciled and migration tested safely.
+- [x] Paper-load entry/import UI and secure RPC implemented on the review branch.
+- [x] Paper-load RPCs and current migration chain applied to intended Shadow.
+- [x] Core schema, required RPCs, RLS, Storage policies, and dispatch scheduler verified.
+- [x] Phase 1 CI, disposable PostgreSQL baseline, and v191 clean-chain tests passed on commit `a394531e`.
+- [ ] Provision real application users and import validated real directory data.
 - [ ] Authenticated database acceptance tests pass against intended Shadow.
-- [ ] Android and Windows smoke tests pass.
-- [ ] Final release artifacts rebuilt and checked.
+- [ ] Android and Windows device/package smoke tests pass.
+- [ ] Final release artifacts rebuilt from the final candidate commit and checked.
 - [ ] Separate Production review and explicit authorization completed.
 
-**Next action:** implement the secure Main Office paper-load entry/import workflow, then validate it against disposable PostgreSQL before changing Shadow.
+**Next action:** provision real users and load validated factory/quarry/owner/vehicle/driver directories, then run authenticated acceptance tests and device smoke tests. Do not import synthetic business data or merge to `main`.
