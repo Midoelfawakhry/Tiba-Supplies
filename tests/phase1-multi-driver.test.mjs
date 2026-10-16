@@ -36,6 +36,8 @@ test("create and edit flows permit shared active vehicles without weakening book
   assert.doesNotMatch(directoryUi, /filteredAvailableVehicles\.filter\(\(vehicle: Row\) => !vehicle\.assigned_driver_id\)/);
   assert.doesNotMatch(directoryUi, /العربية مرتبطة بسائق آخر/);
   assert.match(directoryUi, /تعارض النقلات الفعلية/);
+  assert.match(directoryUi, /DRIVER_HAS_ACTIVE_BOOKING/);
+  assert.match(directoryUi, /vehicle\.assigned_drivers\.length > 1/);
 });
 
 test("multi-driver support does not permit double-booking a vehicle or driver", () => {
