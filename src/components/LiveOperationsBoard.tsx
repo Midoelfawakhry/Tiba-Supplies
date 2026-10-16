@@ -226,6 +226,15 @@ export const LiveOperationsBoard: React.FC = () => {
 
         {successMessage && <div className="rounded-2xl border border-emerald-500/30 bg-emerald-50 p-4 text-sm text-emerald-800">{successMessage}</div>}
 
+        {activeScreen === 'dashboard' && (data?.office_notifications ?? []).length > 0 && <section aria-label="تنبيهات المكتب" className="rounded-2xl border border-amber-200 bg-white p-4 shadow-sm sm:p-5">
+          <div className="mb-3 flex items-center gap-2"><CheckCircle2 className="text-amber-700" size={21}/><h2 className="font-black text-slate-900">تنبيهات التشغيل والوزن الفعلي</h2></div>
+          <div className="space-y-2">{(data?.office_notifications ?? []).slice(0, 10).map((notice: Record<string, any>) => <article key={notice.id} className="rounded-xl border border-amber-100 bg-amber-50/60 p-3">
+            <div className="font-bold">{notice.title}</div>
+            <p className="mt-1 text-sm leading-6 text-slate-700">{notice.body}</p>
+            <div className="mt-1 text-xs text-slate-500">{notice.created_at ? new Date(notice.created_at).toLocaleString('ar-EG') : ''}</div>
+          </article>)}</div>
+        </section>}
+
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
           <aside className="w-full shrink-0 rounded-[26px] border border-slate-200 bg-white p-3 shadow-[0_14px_38px_rgba(15,40,60,0.07)] xl:sticky xl:top-28 xl:w-[290px] xl:p-4" aria-label="القائمة الرئيسية للمكتب">
             <div className="mb-3 rounded-2xl border border-slate-100 bg-gradient-to-l from-[#e4f7fa] via-white to-[#edf3ff] px-4 py-4">
