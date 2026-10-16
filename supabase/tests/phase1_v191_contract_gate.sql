@@ -129,6 +129,8 @@ do $lifecycle$
 declare
   v_office_def text;
   v_delivery_def text;
+  v_vehicle_report_def text;
+  v_account_statement_def text;
   v_booking_id_nullable text;
 begin
   if to_regclass('public.loading_data_records') is null then
@@ -167,6 +169,17 @@ begin
   end if;
   if position('ACTUAL_WEIGHT_CAPTURED_AT_DELIVERY' in v_office_def) = 0 then
     raise exception 'V191_LEGACY_OFFICE_WEIGHT_INPUT_NOT_RETIRED';
+  end if;
+
+  v_vehicle_report_def := upper(pg_get_functiondef(
+    'public.get_vehicle_owner_reports(date,date)'::regprocedure
+  ));
+  v_account_statement_def := upper(pg_get_functiondef(
+    'public.get_account_statement_records(date,date)'::regprocedure
+  ));
+  if position('CURRENT_MAIN_OFFICE_USER' in v_vehicle_report_def) = 0
+     or position('CURRENT_MAIN_OFFICE_USER' in v_account_statement_def) = 0 then
+    raise exception 'V191_REPORTING_OFFICE_SCOPE_HARDENING_MISSING';
   end if;
 
   v_delivery_def := upper(pg_get_functiondef(
