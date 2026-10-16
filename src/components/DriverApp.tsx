@@ -783,10 +783,6 @@ export const DriverApp: React.FC = () => {
               <div className="flex items-center gap-2"><ShieldCheck className="text-emerald-700" size={22}/><h2 className="font-black">أنت داخل نطاق المكتب</h2></div>
               <p className="mt-2 text-sm text-slate-600">المسافة التقريبية: {Math.round(Number(portal.distance_m || 0))} متر من مكتب {portal.office_name || 'رأس سدر'}.</p>
             </section>
-            {(dispatchState?.notifications || []).length > 0 && <section className="rounded-3xl border border-sky-200 bg-sky-50 p-5 shadow-sm">
-              <div className="flex items-center gap-2"><FileText className="text-sky-800" size={22}/><h2 className="font-black text-sky-950">إشعارات التوزيع</h2></div>
-              <div className="mt-3 space-y-2">{dispatchState.notifications.map((notice: any) => <article key={notice.notification_id} className="rounded-xl border border-sky-100 bg-white p-3"><p className="font-black text-slate-900">{notice.title}</p><p className="mt-1 text-sm leading-6 text-slate-600">{notice.body}</p><p className="mt-1 text-[11px] text-slate-400">{notice.created_at ? new Date(notice.created_at).toLocaleString('ar-EG') : ''}</p></article>)}</div>
-            </section>}
             <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-center gap-2"><Clock3 className="text-red-700" size={22}/><h2 className="font-black">رقمك في الانتظار</h2></div>
               {dispatchState?.queue_status === 'WAITING' ? <><p className="mt-3 text-2xl font-black text-red-700">الدور رقم {dispatchState.queue_position || '—'}</p><p className="mt-1 text-xs text-slate-500">وقت دخول القائمة: {dispatchState.queue_arrived_at ? new Date(dispatchState.queue_arrived_at).toLocaleString('ar-EG') : '—'}</p></> : dispatchState?.queue_status === 'ASSIGNED' ? <p className="mt-2 text-sm font-bold text-emerald-700">تم تخصيص نقلة لك. راجع سجل النقلات واتبع خطوات الوصول والتحميل.</p> : <p className="mt-2 text-sm leading-7 text-slate-600">أنت داخل النطاق لكنك غير مسجل حاليًا في قائمة الانتظار. اضغط «أنا وصلت» لتسجيل وقت دخولك على السيرفر.</p>}
@@ -801,6 +797,12 @@ export const DriverApp: React.FC = () => {
             </section>
           </>
         )}
+
+        {(dispatchState?.notifications || []).length > 0 && <section className="rounded-3xl border border-sky-200 bg-sky-50 p-5 shadow-sm">
+          <div className="flex items-center gap-2"><FileText className="text-sky-800" size={22}/><h2 className="font-black text-sky-950">إشعارات التوزيع</h2></div>
+          <p className="mt-1 text-xs text-sky-800">تظهر إشعارات نتيجة التوزيع حتى لو كنت خارج نطاق الـ 10 كم؛ النطاق يظل شرطًا لاختيار النقلات الجديدة فقط.</p>
+          <div className="mt-3 space-y-2">{dispatchState.notifications.map((notice: any) => <article key={notice.notification_id} className="rounded-xl border border-sky-100 bg-white p-3"><p className="font-black text-slate-900">{notice.title}</p><p className="mt-1 text-sm leading-6 text-slate-600">{notice.body}</p><p className="mt-1 text-[11px] text-slate-400">{notice.created_at ? new Date(notice.created_at).toLocaleString('ar-EG') : ''}</p></article>)}</div>
+        </section>}
       </div>
     </main>
   );
