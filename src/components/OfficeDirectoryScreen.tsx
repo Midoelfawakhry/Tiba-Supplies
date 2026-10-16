@@ -39,14 +39,14 @@ function rowTitle(row: Row, key: ScreenKey) {
   return row.trip_code ?? row.ticket_number ?? row.record_number ?? row.actual_loading_record_id ?? 'سجل تحميل فعلي';
 }
 function rowDetails(row: Row, key: ScreenKey) {
-  if (key === 'factories') return [row.code, row.address, row.phone, row.is_active === false ? 'غير نشط' : 'نشط'].filter(Boolean).join(' · ');
+  if (key === 'factories') return [row.address, row.phone, row.is_active === false ? 'غير نشط' : 'نشط'].filter(Boolean).join(' · ');
   if (key === 'quarries') return [row.code, row.address, row.phone, row.is_active === false ? 'غير نشط' : 'نشط'].filter(Boolean).join(' · ');
-  if (key === 'drivers') return [row.phone, row.driver_code, row.is_active === false ? 'غير نشط' : 'نشط'].filter(Boolean).join(' · ');
+  if (key === 'drivers') return [row.phone, row.is_active === false ? 'غير نشط' : 'نشط'].filter(Boolean).join(' · ');
   if (key === 'vehicles') return [row.owner_name ? 'المالك: ' + row.owner_name : '', Array.isArray(row.assigned_drivers) && row.assigned_drivers.length ? 'السائقون: ' + row.assigned_drivers.map((driver: Row) => driver.name).filter(Boolean).join('، ') : 'لا يوجد سائقون مرتبطون', row.truck_type ?? row.vehicle_type, row.capacity_tons ? row.capacity_tons + ' طن' : '', row.is_active === false ? 'غير نشطة' : 'نشطة'].filter(Boolean).join(' · ');
-  if (key === 'owners') return [row.owner_code, row.phone, row.is_active === false ? 'غير نشط' : 'نشط'].filter(Boolean).join(' · ');
+  if (key === 'owners') return [row.phone, row.is_active === false ? 'غير نشط' : 'نشط'].filter(Boolean).join(' · ');
   if (key === 'waiting') return [row.driver_name, row.status === 'WAITING' ? 'في الانتظار' : row.status === 'ASSIGNED' ? 'تم التخصيص' : row.status, row.selected_factory_name && row.selected_quarry_name ? `اختار: ${row.selected_factory_name} ← ${row.selected_quarry_name}` : '', row.choice_status === 'CHOSEN' ? 'الاختيار مسجل — في انتظار التوزيع' : row.choice_status === 'ALLOCATED' ? 'تم التوزيع النهائي' : row.choice_status === 'NOT_ALLOCATED' ? 'لم يتم تخصيص اختيارك' : '', row.trip_code ? `كود النقلة: ${row.trip_code}` : '', row.arrived_at ? new Date(row.arrived_at).toLocaleString('ar-EG') : ''].filter(Boolean).join(' · ');
   if (key === 'loads') return [row.status, row.requested_quantity ? 'المطلوب: ' + row.requested_quantity : '', row.created_at ? new Date(row.created_at).toLocaleString('ar-EG') : ''].filter(Boolean).join(' · ');
-  return [row.loading_sequence_date || row.load_date, row.daily_load_number ? 'تحميل اليوم #' + row.daily_load_number : '', row.ticket_number ? 'تذكرة: ' + row.ticket_number : '', row.actual_weight != null ? 'الوزن: ' + row.actual_weight + ' طن' : 'الوزن لم يُسجل', row.driver_id ? 'معرّف السائق: ' + row.driver_id : '', row.vehicle_id ? 'معرّف العربية: ' + row.vehicle_id : '', row.created_at ? new Date(row.created_at).toLocaleString('ar-EG') : ''].filter(Boolean).join(' · ');
+  return [row.loading_sequence_date || row.load_date, row.daily_load_number ? 'تحميل اليوم #' + row.daily_load_number : '', row.ticket_number ? 'تذكرة: ' + row.ticket_number : '', row.actual_weight != null ? 'الوزن: ' + row.actual_weight + ' طن' : 'الوزن لم يُسجل', row.created_at ? new Date(row.created_at).toLocaleString('ar-EG') : ''].filter(Boolean).join(' · ');
 }
 
 export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showSectionTabs?: boolean }> = ({ initialSection = 'factories', showSectionTabs = true }) => {
@@ -641,7 +641,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
             <label className="relative mt-1.5 block"><span className="sr-only">ابحث عن العربية</span><input value={vehicleSearch} onChange={e => { setVehicleSearch(e.target.value); setSelectedVehicleId(''); }} className="w-full rounded-xl border border-slate-300 bg-white p-3 pr-10 font-normal" placeholder="ابحث برقم اللوحة أو كود العربية..."/><span className="absolute right-3 top-3 text-slate-400"><Truck size={18}/></span></label>
             <select required value={selectedVehicleId} onChange={e => setSelectedVehicleId(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal">
               <option value="">اختار عربية متاحة</option>
-              {filteredAvailableVehicles.filter((vehicle: Row) => !vehicle.assigned_driver_id).map((vehicle: Row) => <option key={vehicle.vehicle_id} value={vehicle.vehicle_id}>{vehicle.plate_number}{vehicle.vehicle_code ? ` · ${vehicle.vehicle_code}` : ''}</option>)}
+              {filteredAvailableVehicles.filter((vehicle: Row) => !vehicle.assigned_driver_id).map((vehicle: Row) => <option key={vehicle.vehicle_id} value={vehicle.vehicle_id}>{vehicle.plate_number}</option>)}
             </select>
             <span className="mt-1 block text-xs font-normal text-slate-500">{filteredAvailableVehicles.filter((vehicle: Row) => !vehicle.assigned_driver_id).length} عربية نشطة غير مرتبطة بسائق</span>
           </div>
@@ -690,7 +690,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
           <label className="sm:col-span-2 text-sm font-bold text-slate-700">المالك المسجل والنشط
             <select required value={vehicleEditOwnerId} onChange={e => setVehicleEditOwnerId(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 font-normal">
               <option value="">اختر المالك</option>
-              {ownerDirectory.map(owner => <option key={owner.owner_id} value={owner.owner_id} disabled={!owner.is_active}>{owner.name}{owner.owner_code ? ` · ${owner.owner_code}` : ''}{!owner.is_active ? ' · غير نشط' : ''}</option>)}
+              {ownerDirectory.map(owner => <option key={owner.owner_id} value={owner.owner_id} disabled={!owner.is_active}>{owner.name}{!owner.is_active ? ' · غير نشط' : ''}</option>)}
             </select>
             <span className="mt-1 block text-xs font-normal text-slate-500">لإضافة مالك جديد، استخدم تبويب «ملاك العربيات» أولًا.</span>
           </label>
