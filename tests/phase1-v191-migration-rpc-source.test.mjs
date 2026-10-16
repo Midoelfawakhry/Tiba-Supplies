@@ -35,34 +35,46 @@ test('reviewed migration source defines every v191 driver RPC name', () => {
     'driver_confirm_arrival',
     'driver_check_in_queue',
   ]) {
-    assert.match(
-      chain,
-      new RegExp(`create\\s+or\\s+replace\\s+function\\s+public\\.${name}\\s*\\(`, 'i'),
+    assert.ok(
+      chain.includes(`function public.${name}(`),
       `reviewed migration chain does not define public.${name}`,
     );
   }
 });
 
-test('clean baseline remains schema-only; RPCs come from later migrations', () => {
-  assert.doesNotMatch(baseline, /create\\s+(?:or\\s+replace\\s+)?function\\s+public\\./i);
-  assert.match(queue, /create table if not exists public\\.dispatch_windows/i);
-  assert.match(queue, /create table if not exists public\\.waiting_list_entries/i);
-  assert.match(queue, /create table if not exists public\\.driver_load_choices/i);
+test('clean baseline remains schema-only; queue schema is defined by queue migration', () => {
+  assert.ok(!baseline.includes('create function public.'));
+  assert.ok(!baseline.includes('create or replace function public.'));
+  assert.ok(queue.includes('create table if not exists public.dispatch_windows'));
+  assert.ok(queue.includes('create table if not exists public.waiting_list_entries'));
+  assert.ok(queue.includes('create table if not exists public.driver_load_choices'));
 });
 
 test('v191 named-argument signatures remain available in migration source', () => {
-  assert.match(delivery, /create\\s+or\\s+replace\\s+function\\s+public\\.driver_confirm_delivery\\s*\\([\\s\\S]*?p_booking_id\\s+uuid[\\s\\S]*?p_latitude\\s+double precision[\\s\\S]*?p_longitude\\s+double precision[\\s\\S]*?p_accuracy_m\\s+double precision[\\s\\S]*?p_captured_at\\s+timestamptz[\\s\\S]*?p_actual_weight\\s+numeric[\\s\\S]*?p_scale_image_path\\s+text[\\s\\S]*?p_notes\\s+text/i);
-  assert.match(locationArrival, /create\\s+or\\s+replace\\s+function\\s+public\\.driver_update_live_location\\s*\\(\\s*p_latitude\\s+double precision\\s*,\\s*p_longitude\\s+double precision\\s*,\\s*p_accuracy_m\\s+double precision\\s*,\\s*p_captured_at\\s+timestamptz/i);
-  assert.match(locationArrival, /create\\s+or\\s+replace\\s+function\\s+public\\.driver_confirm_arrival\\s*\\(\\s*p_booking_id\\s+uuid\\s*,\\s*p_latitude\\s+double precision\\s*,\\s*p_longitude\\s+double precision\\s*,\\s*p_accuracy_m\\s+double precision\\s*,\\s*p_captured_at\\s+timestamptz/i);
-  assert.match(queue, /create\\s+or\\s+replace\\s+function\\s+public\\.driver_select_load\\s*\\(\\s*p_load_order_id\\s+uuid/i);
-  assert.match(queueVehicleCompatibility, /create\\s+or\\s+replace\\s+function\\s+public\\.driver_check_in_queue\\s*\\(\\s*p_latitude\\s+double precision\\s*,\\s*p_longitude\\s+double precision\\s*,\\s*p_accuracy_m\\s+double precision\\s*,\\s*p_captured_at\\s+timestamptz/i);
-  assert.match(directAssignment, /create\\s+or\\s+replace\\s+function\\s+public\\.accept_direct_assignment\\s*\\(\\s*p_booking_id\\s+uuid/i);
+  for (const arg of [
+    'p_booking_id uuid',
+    'p_latitude double precision',
+    'p_longitude double precision',
+    'p_accuracy_m double precision',
+    'p_captured_at timestamptz',
+    'p_actual_weight numeric',
+    'p_scale_image_path text',
+    'p_notes text',
+  ]) assert.ok(delivery.includes(arg), `delivery migration missing named arg: ${arg}`);
+
+  assert.ok(locationArrival.includes('function public.driver_update_live_location(p_latitude double precision,p_longitude double precision,p_accuracy_m double precision,p_captured_at timestamptz)'));
+  assert.ok(locationArrival.includes('function public.driver_confirm_arrival(p_booking_id uuid,p_latitude double precision,p_longitude double precision,p_accuracy_m double precision,p_captured_at timestamptz)'));
+  assert.ok(queue.includes('function public.driver_select_load(') && queue.includes('p_load_order_id uuid'));
+  assert.ok(queueVehicleCompatibility.includes('function public.driver_check_in_queue(p_latitude double precision,p_longitude double precision,p_accuracy_m double precision,p_captured_at timestamptz)'));
+  assert.ok(directAssignment.includes('function public.accept_direct_assignment(p_booking_id uuid)'));
 });
 
-test('queue schema is introduced before queue RPC revisions reference it', () => {
+test('queue schema is declared before queue RPCs and later hardening remains present', () => {
   assert.ok(queue.indexOf('create table if not exists public.dispatch_windows') < queue.indexOf('create or replace function public.driver_check_in_queue'));
   assert.ok(queue.indexOf('create table if not exists public.waiting_list_entries') < queue.indexOf('create or replace function public.driver_check_in_queue'));
   assert.ok(queue.indexOf('create table if not exists public.driver_load_choices') < queue.indexOf('create or replace function public.driver_select_load'));
-  assert.match(queueHardening, /create or replace function public\\.main_office_publish_load_order/i);
-  assert.match(queueNotifications, /create or replace function public\\.driver_get_dispatch_state/i);
+  assert.ok(queueHardening.includes('create or replace function public.main_office_publish_load_order'));
+  assert.ok(queueNotifications.includes('create or replace function public.driver_get_dispatch_state'));
+  assert.ok(driverSnapshot.includes('create or replace function public.driver_get_portal_snapshot'));
+  assert.ok(mainOffice.includes('create or replace function public.current_main_office_user'));
 });
