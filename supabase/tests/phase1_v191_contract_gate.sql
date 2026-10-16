@@ -92,6 +92,7 @@ declare
     array['public','actual_loading_records','quarry_id'],
     array['public','actual_loading_records','factory_id'],
     array['public','actual_loading_records','trip_code'],
+    array['public','actual_loading_records','daily_load_number'],
     array['public','actual_loading_records','loading_sequence_date'],
     array['public','actual_loading_records','actual_weight_recorded_at'],
     array['public','actual_loading_records','record_source'],
@@ -152,6 +153,24 @@ begin
       and not tgisinternal and tgenabled <> 'D'
   ) then
     raise exception 'V191_LOADING_DATA_SYNC_TRIGGER_MISSING';
+  end if;
+
+  if to_regclass('public.daily_loading_counters') is null then
+    raise exception 'V191_DAILY_LOADING_COUNTER_MISSING';
+  end if;
+  if not exists (
+    select 1 from pg_trigger
+    where tgrelid='public.actual_loading_records'::regclass
+      and tgname='actual_loading_assign_trip_identity'
+      and not tgisinternal and tgenabled <> 'D'
+  ) then
+    raise exception 'V191_ACTUAL_LOADING_IDENTITY_TRIGGER_MISSING';
+  end if;
+  if has_table_privilege('anon','public.daily_loading_counters','SELECT')
+     or has_table_privilege('authenticated','public.daily_loading_counters','SELECT')
+     or has_table_privilege('anon','public.daily_loading_counters','UPDATE')
+     or has_table_privilege('authenticated','public.daily_loading_counters','UPDATE') then
+    raise exception 'V191_DAILY_LOADING_COUNTER_DIRECT_ACCESS_EXPOSED';
   end if;
 
   if has_table_privilege('anon','public.loading_data_records','SELECT')
