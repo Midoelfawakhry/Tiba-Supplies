@@ -54,6 +54,11 @@ test("LOADED is a workflow state; actual weight is recorded only at factory deli
 test("assignment loading data is separate and paper actual records can exist without bookings", () => {
   assert.match(separation, /create table if not exists public\.loading_data_records/i);
   assert.match(separation, /create trigger bookings_sync_loading_data/i);
+  assert.match(separation, /create table if not exists public\.daily_loading_counters/i);
+  assert.match(separation, /create trigger actual_loading_assign_trip_identity/i);
+  assert.match(separation, /TRIP_IDENTITY_IS_IMMUTABLE/);
+  assert.match(separation, /actual_loading_records_daily_number_unique/);
+  assert.match(separation, /alter column trip_code set not null/);
   assert.match(separation, /alter column booking_id drop not null/i);
   assert.match(separation, /record_source in \('DRIVER_DELIVERY','PAPER_IMPORT','OFFICE_CORRECTION','LEGACY'\)/i);
   assert.match(separation, /booking_id is not null\s+or \(load_date is not null and vehicle_id is not null and driver_id is not null/i);
