@@ -3,13 +3,14 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
-const [multiDriverMigration, assignmentsMigration, baseline, directoryUi, assignmentGuard, guardFixMigration] = await Promise.all([
+const [multiDriverMigration, assignmentsMigration, baseline, directoryUi, assignmentGuard, guardFixMigration, retireLegacyMigration] = await Promise.all([
   read("../supabase/migrations/20261015190000_phase1_multi_driver_per_vehicle.sql"),
   read("../supabase/migrations/20261014370000_phase1_driver_vehicle_assignments.sql"),
   read("../supabase/migrations/20261014190000_phase1_clean_baseline.sql"),
   read("../src/components/OfficeDirectoryScreen.tsx"),
   read("../supabase/migrations/20261014430000_phase1_enforce_assigned_vehicle_on_booking.sql"),
   read("../supabase/migrations/20261016083000_phase1_multi_driver_assignment_guard_fix.sql"),
+  read("../supabase/migrations/20261016104000_phase1_retire_legacy_vehicle_rpcs.sql"),
 ]);
 
 test("a vehicle can have multiple active driver assignments while a driver has only one", () => {
@@ -38,6 +39,13 @@ test("create and edit flows permit shared active vehicles without weakening book
   assert.match(directoryUi, /تعارض النقلات الفعلية/);
   assert.match(directoryUi, /DRIVER_HAS_ACTIVE_BOOKING/);
   assert.match(directoryUi, /vehicle\.assigned_drivers\.length > 1/);
+});
+
+test("legacy single-driver RPCs are retired from client roles", () => {
+  assert.match(retireLegacyMigration, /public\.get_available_vehicles\(\)/);
+  assert.match(retireLegacyMigration, /public\.create_operational_driver\(text,text,uuid,text\)/);
+  assert.match(retireLegacyMigration, /public\.create_operational_vehicle\(text,text,text\)/);
+  assert.match(retireLegacyMigration, /REVOKE ALL ON FUNCTION .* FROM PUBLIC, anon, authenticated/i);
 });
 
 test("multi-driver support does not permit double-booking a vehicle or driver", () => {
