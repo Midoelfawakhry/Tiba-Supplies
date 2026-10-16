@@ -2,7 +2,7 @@
 
 **Updated:** 2026-10-17  
 **Working branch:** `shadow/phase1-hardening`  
-**Latest commit at this update:** `a394531ee796e2f86b4b3144cf51394282444170`  
+**Latest implementation commit (excluding this handover edit):** `a394531ee796e2f86b4b3144cf51394282444170`  
 **Target Shadow project:** `bvyxiahpxogblkmtjxyx` (`Tiba Shadow`, `eu-west-1`)
 
 ## Latest work completed
@@ -51,14 +51,14 @@ Migration: `supabase/migrations/20261017100000_phase1_separate_loading_data_from
 
 ## Build artifacts
 
-These artifacts were built from commit `ecd39f6d3af107f55ee13c4906997775d05188a2`, not the later contract-test commit `ab3f7b3d`.
+The latest signed Android artifacts below were built from commit `41da994054fd531c3bdad68885dbada21a368775`. The Android build workflow pins the app to the intended Shadow project `bvyxiahpxogblkmtjxyx`.
 
-- [Driver signed APK artifact](https://api.github.com/repos/Midoelfawakhry/Tiba-Supplies/actions/artifacts/12079515399)
-- [Main Office signed APK artifact](https://api.github.com/repos/Midoelfawakhry/Tiba-Supplies/actions/artifacts/12079227414)
-- [Ras Sedr Branch signed APK artifact](https://api.github.com/repos/Midoelfawakhry/Tiba-Supplies/actions/artifacts/12078613955)
-- [Main Office Windows x64 artifact](https://api.github.com/repos/Midoelfawakhry/Tiba-Supplies/actions/artifacts/12078024834)
+- [Ras Sedr Branch signed APK artifact](https://api.github.com/repos/Midoelfawakhry/Tiba-Supplies/actions/artifacts/12081411038)
+- [Main Office signed APK artifact](https://api.github.com/repos/Midoelfawakhry/Tiba-Supplies/actions/artifacts/12081212472)
+- [Driver signed APK artifact](https://api.github.com/repos/Midoelfawakhry/Tiba-Supplies/actions/artifacts/12080993649)
+- [Latest Windows Main Office build — in progress](https://github.com/Midoelfawakhry/Tiba-Supplies/actions/runs/38981528252)
 
-Successful build jobs do not replace installation/device smoke tests or authenticated database acceptance tests. GitHub artifact retention is time-limited.
+Do not use older Windows artifacts built before `.github/workflows/windows-office-build.yml` was updated to the intended Shadow URL. The newer Windows artifact must finish and then be smoke-tested. Successful build jobs do not replace installation/device smoke tests or authenticated database acceptance tests. GitHub artifact retention is time-limited.
 
 ## Remaining work — prioritized
 
