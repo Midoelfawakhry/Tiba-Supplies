@@ -459,7 +459,7 @@ begin
       select jsonb_agg(jsonb_build_object(
         'actual_load_id',alr.actual_load_id,'booking_id',alr.booking_id,
         'trip_code',coalesce(alr.trip_code,b.trip_code),
-        'daily_load_number',alr.daily_load_number,
+        'daily_load_number',coalesce(alr.daily_load_number,lo.order_number),
         'loading_sequence_date',coalesce(alr.loading_sequence_date,alr.load_date,alr.loaded_at::date),
         'load_date',coalesce(alr.load_date,alr.loaded_at::date),
         'created_at',alr.created_at,
@@ -512,7 +512,7 @@ begin
     'load_date',coalesce(alr.load_date,alr.loaded_at::date),
     'loading_sequence_date',coalesce(alr.loading_sequence_date,alr.load_date,alr.loaded_at::date),
     'created_at',alr.created_at,'trip_code',coalesce(alr.trip_code,b.trip_code),
-    'daily_load_number',alr.daily_load_number,'ticket_number',alr.ticket_number,
+    'daily_load_number',coalesce(alr.daily_load_number,lo.order_number),'ticket_number',alr.ticket_number,
     'actual_weight',alr.actual_weight,'vehicle_id',coalesce(alr.vehicle_id,b.vehicle_id),
     'plate_number',v.plate_number,'driver_id',coalesce(alr.driver_id,b.driver_id),
     'driver_name',d.name,'factory_id',coalesce(alr.factory_id,lo.factory_id),
