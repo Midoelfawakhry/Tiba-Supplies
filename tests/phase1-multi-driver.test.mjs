@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
-const [multiDriverMigration, assignmentsMigration, baseline, directoryUi, assignmentGuard, guardFixMigration, retireLegacyMigration, nativeLocation, definerSearchPathMigration] = await Promise.all([
+const [multiDriverMigration, assignmentsMigration, baseline, directoryUi, assignmentGuard, guardFixMigration, retireLegacyMigration, nativeLocation, definerSearchPathMigration, activeVehicleIndexMigration] = await Promise.all([
   read("../supabase/migrations/20261015190000_phase1_multi_driver_per_vehicle.sql"),
   read("../supabase/migrations/20261014370000_phase1_driver_vehicle_assignments.sql"),
   read("../supabase/migrations/20261014190000_phase1_clean_baseline.sql"),
@@ -13,6 +13,7 @@ const [multiDriverMigration, assignmentsMigration, baseline, directoryUi, assign
   read("../supabase/migrations/20261016083502_phase1_retire_legacy_vehicle_rpcs.sql"),
   read("../supabase/functions/driver-native-location/index.ts"),
   read("../supabase/migrations/20261016133951_phase1_harden_definer_search_path.sql"),
+  read("../supabase/migrations/20261016134105_phase1_index_active_vehicle_assignments.sql"),
 ]);
 
 test("a vehicle can have multiple active driver assignments while a driver has only one", () => {
@@ -77,4 +78,11 @@ test("driver reassignment and directory updates remain audited and protected", (
 test("SECURITY DEFINER vehicle directory functions pin search_path", () => {
   assert.match(definerSearchPathMigration, /ALTER FUNCTION public\.get_vehicle_live_locations\(\)\s+SET search_path = pg_catalog, public/i);
   assert.match(definerSearchPathMigration, /ALTER FUNCTION public\.get_vehicle_owner_directory\(\)\s+SET search_path = pg_catalog, public/i);
+});
+
+
+test("active vehicle assignments have a lookup index", () => {
+  assert.match(activeVehicleIndexMigration, /CREATE INDEX IF NOT EXISTS driver_vehicle_assignments_active_vehicle_idx/i);
+  assert.match(activeVehicleIndexMigration, /ON public\.driver_vehicle_assignments \(vehicle_id\)/i);
+  assert.match(activeVehicleIndexMigration, /WHERE ended_at IS NULL/i);
 });
