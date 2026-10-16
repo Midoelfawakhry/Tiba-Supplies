@@ -89,3 +89,58 @@ test("Queue dispatch state requires a valid driver and scopes notifications to t
   assert.match(fn, /where driver_id=v_driver\.driver_id and office_id=v_office\.office_id/i);
   assert.match(fn, /n\.recipient_driver_id=v_driver\.driver_id/i);
 });
+
+const [driverLocation, queueCompatibility, atomicDirectTrip, finalDirectAssign] = await Promise.all([
+  read("../supabase/migrations/20261014240000_phase1_driver_location_and_arrival.sql"),
+  read("../supabase/migrations/20261015184000_phase1_queue_vehicle_compatibility.sql"),
+  read("../supabase/migrations/20261015160000_phase1_atomic_direct_trip.sql"),
+  read("../supabase/migrations/20261014430000_phase1_enforce_assigned_vehicle_on_booking.sql"),
+]);
+
+test("Driver location writes validate coordinates, timestamp, accuracy, and active driver identity", () => {
+  const fn = body(driverLocation, "driver_update_live_location");
+  assert.match(fn, /auth\.uid\(\)/i);
+  assert.match(fn, /auth_user_id=auth\.uid\(\) and is_active=true/i);
+  assert.match(fn, /INVALID_COORDINATES/);
+  assert.match(fn, /LOCATION_ACCURACY_TOO_LOW/);
+  assert.match(fn, /LOCATION_TIMESTAMP_STALE_OR_INVALID/);
+  assert.match(fn, /on conflict\(driver_id\) do update/i);
+  assert.match(fn, /where public\.driver_live_locations\.captured_at <= excluded\.captured_at/i);
+});
+
+test("Arrival confirmation checks booking ownership and geofence before changing status", () => {
+  const fn = body(driverLocation, "driver_confirm_arrival");
+  assert.match(fn, /where booking_id=p_booking_id and driver_id=v_driver\.driver_id for update/i);
+  assert.match(fn, /BOOKING_NOT_YOURS/);
+  assert.match(fn, /v_booking\.status<>'ASSIGNED'/i);
+  assert.match(fn, /v_distance_m>v_office\.geofence_radius_m/i);
+  assert.ok(fn.indexOf("OUTSIDE_RAS_SEDR_GEOFENCE") < fn.indexOf("update public.bookings set status='ARRIVED'"));
+});
+
+test("Queue check-in requires the driver's active linked vehicle and geofence", () => {
+  const fn = body(queueCompatibility, "driver_check_in_queue");
+  assert.match(fn, /auth_user_id=auth\.uid\(\) and is_active=true/i);
+  assert.match(fn, /DRIVER_HAS_ACTIVE_BOOKING/);
+  assert.match(fn, /a\.driver_id=v_driver\.driver_id and a\.ended_at is null/i);
+  assert.match(fn, /ACTIVE_LINKED_VEHICLE_REQUIRED/);
+  assert.match(fn, /OUTSIDE_RAS_SEDR_GEOFENCE/);
+  assert.match(fn, /where public\.driver_live_locations\.captured_at<=excluded\.captured_at/i);
+});
+
+test("Atomic direct-trip creation checks Main Office authority and blocks active driver or vehicle conflicts", () => {
+  const fn = body(atomicDirectTrip, "main_office_create_direct_trip");
+  assert.match(fn, /public\.current_main_office_user\(\)/i);
+  assert.match(fn, /DRIVER_HAS_ACTIVE_BOOKING/);
+  assert.match(fn, /VEHICLE_HAS_ACTIVE_BOOKING/);
+  assert.match(fn, /driver_vehicle_assignments/i);
+  assert.match(fn, /a\.driver_id=p_driver_id and a\.ended_at is null/i);
+});
+
+test("Final direct-assignment RPC verifies the chosen vehicle is the driver's active assignment", () => {
+  const fn = body(finalDirectAssign, "main_office_direct_assign");
+  assert.match(fn, /public\.current_main_office_user\(\)/i);
+  assert.match(fn, /driver_vehicle_assignments/i);
+  assert.match(fn, /a\.driver_id=p_driver_id and a\.vehicle_id=p_vehicle_id and a\.ended_at is null/i);
+  assert.match(fn, /DRIVER_HAS_ACTIVE_BOOKING/);
+  assert.match(fn, /VEHICLE_HAS_ACTIVE_BOOKING/);
+});
