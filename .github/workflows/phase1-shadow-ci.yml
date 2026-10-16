@@ -26,3 +26,53 @@ jobs:
         run: npm run lint
       - name: Production build
         run: npm run build
+
+  baseline-postgres-smoke:
+    name: Disposable PostgreSQL baseline smoke
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: tiba_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d tiba_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Create minimal Supabase Auth fixture
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d tiba_test -v ON_ERROR_STOP=1 <<'SQL'
+          create schema auth;
+          create table auth.users (id uuid primary key);
+          SQL
+      - name: Apply clean baseline to disposable PostgreSQL
+        env:
+          PGPASSWORD: postgres
+        run: psql -h localhost -U postgres -d tiba_test -v ON_ERROR_STOP=1 -f supabase/migrations/20261014190000_phase1_clean_baseline.sql
+      - name: Assert core baseline tables exist
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d tiba_test -v ON_ERROR_STOP=1 <<'SQL'
+          do $$
+          declare
+            expected text[] := array['offices','app_users','factories','quarries','vehicle_owners','vehicles','drivers','load_orders','bookings','actual_loading_records','delivery_confirmations','driver_live_locations','notifications','audit_log'];
+            missing text[];
+          begin
+            select array_agg(t) into missing
+            from unnest(expected) as t
+            where to_regclass('public.' || t) is null;
+            if missing is not null then
+              raise exception 'BASELINE_TABLES_MISSING: %', array_to_string(missing, ', ');
+            end if;
+          end $$;
+          SQL
