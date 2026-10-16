@@ -88,7 +88,7 @@ The signed Android workflow produced these artifacts (built from `ecd39f6d`; art
 
 ## 4. Remaining work — recommended order
 
-### P0 — finish the paper-loading workflow
+### P0 — paper-loading UI and RPCs added; runtime validation remains
 
 The schema supports paper-only actual-load records, but a complete office-facing entry/import workflow is still missing. Implement:
 
