@@ -36,6 +36,23 @@ None of those names is implemented by the clean baseline migration. The baseline
 - Branch (`RAS_SEDR`) is a geofence/reference location, not an operational write authority. Main Office remains the write authority. Enforce this server-side in RPCs.
 - Location-sensitive RPCs must validate capture time, accuracy, and geofence server-side. The client expects specific error identifiers, including `OUTSIDE_RAS_SEDR_GEOFENCE`, `LOCATION_TIMESTAMP_STALE_OR_INVALID`, `LOCATION_ACCURACY_TOO_LOW`, `DRIVER_ACCEPTANCE_REQUIRED`, and `BOOKING_NOT_AWAITING_ARRIVAL`.
 
+
+
+## Additional canonical-schema blockers confirmed — 2026-10-17
+
+Static comparison of the candidate baseline against the read-only Production schema and the historical operational migrations shows these are not cosmetic naming differences:
+
+| Concern | Candidate baseline | Production / operational source | Required decision |
+|---|---|---|---|
+| Office identity | `office_code IN ('MAIN','RAS_SEDR')`; `office_type IN ('HEAD_OFFICE','BRANCH')`; unique office type | Production `office_type` enum uses `HEAD` / `BRANCH`; operational SQL selects `office_type='HEAD'` and `office_type='BRANCH'` | Choose canonical code/type values and update all seed, RPC, and UI assumptions together |
+| App-user authorization | Single `app_users.role` text column, limited to `ADMIN` / `HEAD_OFFICE` | Production uses normalized `roles` + `user_roles` and active `app_users` profiles | Preserve normalized authorization model or explicitly justify a reviewed migration; do not maintain two role sources |
+| Booking lifecycle | Text check with `ASSIGNED`, `ARRIVED`, `LOADING`, `LOADED`, `IN_TRANSIT`, `DELIVERED`, `CANCELLED` | Production `load_status` enum includes `BOOKED`, `LOADING_STATEMENT`, `COMPLETED`, `REJECTED`, `NO_SHOW`, `FAILED`, `ON_HOLD`, and other states | Define one explicit state transition map before writing assignment, cancellation, or delivery RPCs |
+| Actual loading | `booking_id NOT NULL UNIQUE`; booking-centric columns | Production allows `booking_id NULL` for standalone paper actual loading and stores `load_date`, vehicle/driver/factory/quarry IDs, trip code, daily load number, and sequence date | Keep actual paper loading and standalone direct loads representable; do not force every row into a booking |
+| Driver/vehicle history | Baseline does not establish the historical relation consistently | Production uses `vehicle_driver_assignments(vehicle_id,driver_id,assigned_from,assigned_to)`; queue/native tracking sources reference `driver_vehicle_assignments` with `assigned_at/ended_at` semantics | Choose one canonical relation and translate all RPC/native tracking access in one reviewed change |
+| Queue scheduler | Queue schema/RPC migration and scheduler are separate | Optional scheduler migration installs `pg_cron` and schedules a minute-level finalizer | Keep scheduler opt-in; run plain PostgreSQL bootstrap tests without `pg_cron`, then separately validate target support |
+
+The current candidate baseline creates 14 tables and no v191 RPCs. It is a planning artifact, not a source-faithful Production clone. The queue migration is now present on the review branch, but its availability does not resolve the core-schema or assignment-model conflicts.
+
 ## Required implementation sequence
 
 1. Freeze the v191 RPC names and exact argument/result contracts from the client and tests.
