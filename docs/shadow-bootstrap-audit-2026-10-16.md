@@ -11,7 +11,7 @@ This is a read-only inventory of the dedicated Supabase Shadow project `bvyxiahp
 - Supabase migration ledger: empty.
 - Edge Functions: none listed in the Shadow project.
 - Installed extensions include `pgcrypto`, `uuid-ossp`, `plpgsql`, `pg_stat_statements`, and `supabase_vault`.
-- Supabase Security Advisor reported one finding for `public.rls_auto_enable()`: a SECURITY DEFINER event-trigger function was reported executable by `anon` and `authenticated`. Its definition loops over DDL events and enables RLS for new public tables. This appears to be project/bootstrap infrastructure, not an application RPC. Do not revoke grants or replace it until its ownership, event-trigger binding, and expected platform behavior are confirmed.
+- Supabase Security Advisor reported two warnings for `public.rls_auto_enable()`: SECURITY DEFINER function executable by `anon` and `authenticated`. Read-only catalog inspection confirmed it is owned by `postgres`, is bound to the `ensure_rls` event trigger on `ddl_command_end`, and has no explicit ACL (PostgreSQL default function execute privileges apply). Its body enables RLS on newly created public tables. This is database bootstrap infrastructure, not a normal application RPC; do not alter it based on the advisor warning alone. Confirm the platform's intended default before changing grants.
 
 The absence of app tables and migration records means the Shadow database is not yet initialized with Tiba-Supplies' application schema. Do not seed operational records or apply isolated hardening migrations before a clean bootstrap is reviewed.
 
