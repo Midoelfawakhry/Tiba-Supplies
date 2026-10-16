@@ -144,3 +144,35 @@ test("Final direct-assignment RPC verifies the chosen vehicle is the driver's ac
   assert.match(fn, /DRIVER_HAS_ACTIVE_BOOKING/);
   assert.match(fn, /VEHICLE_HAS_ACTIVE_BOOKING/);
 });
+
+const [reportingRpcs, waitingListRpc] = await Promise.all([
+  read("../supabase/migrations/20261015120000_phase1_actual_weight_and_account_rpcs.sql"),
+  read("../supabase/migrations/20261015185000_phase1_queue_office_selection_visibility.sql"),
+]);
+
+test("Account statements are restricted to active Main Office roles", () => {
+  const fn = body(reportingRpcs, "get_account_statement_records");
+  assert.match(fn, /auth\.uid\(\)/i);
+  assert.match(fn, /au\.auth_user_id=auth\.uid\(\) and au\.is_active=true/i);
+  assert.match(fn, /au\.role in \('ADMIN','HEAD_OFFICE'\)/i);
+  assert.match(fn, /INSUFFICIENT_ROLE/);
+  assert.match(fn, /INVALID_DATE_RANGE/);
+});
+
+test("Vehicle-owner reports require an active signed-in office user and validate date range", () => {
+  const fn = body(reportingRpcs, "get_vehicle_owner_reports");
+  assert.match(fn, /auth\.uid\(\)/i);
+  assert.match(fn, /au\.auth_user_id=auth\.uid\(\) and au\.is_active=true/i);
+  assert.match(fn, /au\.role in \('ADMIN','HEAD_OFFICE','BRANCH'\)/i);
+  assert.match(fn, /INSUFFICIENT_ROLE/);
+  assert.match(fn, /INVALID_DATE_RANGE/);
+});
+
+test("Waiting-list RPC rejects anonymous and inactive/unsupported roles and reads only the Ras Sedr queue", () => {
+  const fn = body(waitingListRpc, "get_office_waiting_list");
+  assert.match(fn, /v_uid is null then raise exception 'AUTH_REQUIRED'/i);
+  assert.match(fn, /auth_user_id=v_uid and is_active=true/i);
+  assert.match(fn, /v_role not in \('ADMIN','HEAD_OFFICE','BRANCH'\)/i);
+  assert.match(fn, /office_code='RAS_SEDR' and office_type='BRANCH' and is_active=true/i);
+  assert.match(fn, /where w\.office_id=v_office\.office_id and w\.status in \('WAITING','ASSIGNED'\)/i);
+});
