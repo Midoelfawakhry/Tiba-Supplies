@@ -78,3 +78,29 @@ test('queue schema is declared before queue RPCs and later hardening remains pre
   assert.ok(driverSnapshot.includes('create or replace function public.driver_get_portal_snapshot'));
   assert.ok(mainOffice.includes('create or replace function public.current_main_office_user'));
 });
+
+
+const assignmentModel = migration('20261014370000_phase1_driver_vehicle_assignments.sql');
+const deliveryIdempotency = migration('20261015120001_phase1_actual_weight_idempotency.sql');
+const tripIdentity = migration('20261011125652_20261011190000_direct_assignment_trip_identity.sql');
+
+test('canonical driver-vehicle assignment model is created before queue compatibility code', () => {
+  assert.ok(assignmentModel.includes('create table if not exists public.driver_vehicle_assignments'));
+  assert.ok(assignmentModel.includes('assigned_at timestamptz'));
+  assert.ok(assignmentModel.includes('ended_at timestamptz'));
+  assert.ok(!assignmentModel.includes('create table if not exists public.vehicle_driver_assignments'));
+  assert.ok(queueVehicleCompatibility.includes('public.driver_vehicle_assignments'));
+});
+
+test('v191 schema evolution sources include delivery idempotency and trip identity changes', () => {
+  assert.ok(deliveryIdempotency.includes('actual_loading_records'));
+  assert.ok(tripIdentity.includes('trip_code'));
+  assert.ok(directAssignment.includes('direct_acceptance_status'));
+  assert.ok(queue.includes('dispatch_window_id'));
+});
+
+test('baseline is not treated as a complete v191 bootstrap by itself', () => {
+  assert.ok(!baseline.includes('create table public.driver_vehicle_assignments'));
+  assert.ok(!baseline.includes('trip_code'));
+  assert.ok(!baseline.includes('create table public.dispatch_windows'));
+});
