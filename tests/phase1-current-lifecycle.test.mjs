@@ -72,6 +72,15 @@ test("assignment loading data is separate and paper actual records can exist wit
 
 
 test("updated actual-loading reports retain Main Office scope", () => {
-  assert.equal((separation.match(/perform public\.current_main_office_user\(\)/gi) || []).length >= 3, true);
+  const vehicleReports = separation.slice(
+    separation.indexOf("create or replace function public.get_vehicle_owner_reports"),
+    separation.indexOf("create or replace function public.get_account_statement_records")
+  );
+  const accountStatements = separation.slice(
+    separation.indexOf("create or replace function public.get_account_statement_records")
+  );
+  assert.match(vehicleReports, /perform public\.current_main_office_user\(\)/i);
+  assert.match(accountStatements, /perform public\.current_main_office_user\(\)/i);
+  assert.match(separation, /v_actor := public\.current_main_office_user\(\)/i);
   assert.doesNotMatch(separation, /au\.role in \('ADMIN','HEAD_OFFICE','BRANCH'\)/i);
 });
