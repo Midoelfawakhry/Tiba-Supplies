@@ -158,7 +158,7 @@ Recent branch commits include:
 
 ## 8. Paper-load CSV contract
 
-Use UTF-8 CSV with a header row. Required columns:
+Use UTF-8 CSV with a header row. A blank header-only template is available at [docs/paper-load-import-template.csv](docs/paper-load-import-template.csv). Required columns:
 
 ```csv
 load_date,vehicle_code,driver_code,factory_code,quarry_code,actual_weight
