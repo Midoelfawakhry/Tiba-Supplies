@@ -80,7 +80,7 @@ BEGIN
     JOIN pg_namespace n ON n.oid=t.relnamespace
     WHERE n.nspname='public' AND t.relname='actual_loading_records'
       AND c.contype='c'
-      AND pg_get_constraintdef(c.oid) ~* 'actual_weight\\s*>\\s*\\(?0'
+      AND pg_get_constraintdef(c.oid) ~* 'actual_weight\s*>\s*\(?0'
   ) THEN
     RAISE EXCEPTION 'ACTUAL_LOADING_WEIGHT_MUST_BE_POSITIVE';
   END IF;
