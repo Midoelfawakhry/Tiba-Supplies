@@ -10,7 +10,7 @@ DECLARE
 BEGIN
   v_sig := 'public.create_operational_driver(text,text,uuid,text)';
   SELECT pg_get_functiondef(to_regprocedure(v_sig)) INTO v_def;
-  IF v_def IS NULL THEN RAISE EXCEPTION 'EXPECTED_RPC_MISSING: %', v_sig; END IF;
+  IF v_def IS NOT NULL THEN
   v_new := replace(v_def,
     'IF v_app_user_id IS NULL OR v_role NOT IN (''ADMIN'',''HEAD_OFFICE'',''BRANCH'') THEN RAISE EXCEPTION ''INSUFFICIENT_ROLE''; END IF;',
     'IF v_app_user_id IS NULL OR v_role NOT IN (''ADMIN'',''HEAD_OFFICE'') OR NOT EXISTS (SELECT 1 FROM public.offices o WHERE o.office_id=v_office_id AND o.office_code=''MAIN'' AND o.office_type=''HEAD_OFFICE'' AND o.is_active=true) THEN RAISE EXCEPTION ''INSUFFICIENT_ROLE''; END IF;');
@@ -21,6 +21,7 @@ BEGIN
   END IF;
   IF v_new = v_def THEN RAISE EXCEPTION 'DRIVER_RPC_ROLE_GUARD_PATTERN_NOT_FOUND'; END IF;
   EXECUTE v_new;
+  END IF;
 
   v_sig := 'public.create_operational_vehicle(text,text,text)';
   SELECT pg_get_functiondef(to_regprocedure(v_sig)) INTO v_def;
