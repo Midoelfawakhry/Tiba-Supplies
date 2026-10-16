@@ -13,7 +13,7 @@ const [
   dispatchState,
 ] = await Promise.all([
   read("../supabase/migrations/20261014200000_phase1_main_office_rpcs.sql"),
-  read("../supabase/migrations/20261014210000_phase1_direct_assignment.sql"),
+  read("../supabase/migrations/20261014430000_phase1_enforce_assigned_vehicle_on_booking.sql"),
   read("../supabase/migrations/20261014280000_phase1_branch_read_only_snapshot.sql"),
   read("../supabase/migrations/20261014290000_phase1_driver_portal_snapshot.sql"),
   read("../supabase/migrations/20261015120000_phase1_actual_weight_and_account_rpcs.sql"),
