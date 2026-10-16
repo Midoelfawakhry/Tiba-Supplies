@@ -59,3 +59,13 @@ After the schema contract is deliberately reconciled, add `supabase/tests/phase1
 - [Current delivery RPC migration](https://github.com/Midoelfawakhry/Tiba-Supplies/blob/shadow/phase1-hardening/supabase/migrations/20261014300000_phase1_harden_driver_delivery_confirmation.sql)
 - [Clean baseline](https://github.com/Midoelfawakhry/Tiba-Supplies/blob/shadow/phase1-hardening/supabase/migrations/20261014190000_phase1_clean_baseline.sql)
 - [Contract gate test](https://github.com/Midoelfawakhry/Tiba-Supplies/blob/shadow/phase1-hardening/supabase/tests/phase1_v191_contract_gate.sql)
+
+
+## Lifecycle conflict: who records the actual weight?
+
+The same clean-chain migrations show a second decision that must be made before implementing the eight-argument delivery RPC:
+- `20261015173000_phase1_direct_assignment_acceptance.sql` records `actual_loading_records` when the head-office RPC `main_office_advance_booking(..., 'LOADED', p_actual_weight, ...)` transitions a booking from `LOADING` to `LOADED`.
+- The v191 driver client supplies `p_actual_weight` and `p_scale_image_path` to `driver_confirm_delivery`, which is called at the delivery-confirmation step after the booking is `IN_TRANSIT`.
+- The current six-argument driver delivery RPC writes only `delivery_confirmations`.
+
+These are distinct operational moments. The intended source of truth must say whether the scale weight/ticket is captured at loading by the office, captured by the driver at delivery, or both with an explicit reconciliation rule. Do not automatically insert a second `actual_loading_records` row during delivery: the baseline's unique `booking_id` constraint would reject it, and silently overwriting the earlier weight would corrupt the operational record. If the driver payload represents a final/verified weight rather than loading weight, model that distinction explicitly and test it.
