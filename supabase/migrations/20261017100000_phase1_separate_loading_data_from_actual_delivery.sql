@@ -86,6 +86,7 @@ where load_date is null
 alter table public.actual_loading_records
   alter column load_date set default current_date,
   alter column actual_weight_recorded_at set default now(),
+  alter column actual_weight_recorded_at set not null,
   alter column record_source set default 'DRIVER_DELIVERY',
   alter column record_source set not null;
 
