@@ -35,21 +35,31 @@ Migration added:
 - Adds per-day loading numbers and a concurrency-safe daily counter, plus uniqueness checks for daily identity and trip codes.
 - Preserves the distinction between a load assignment/status and the actual weight recorded at the factory. Do not infer actual weight merely from an assignment.
 
-### B. Scale-ticket storage authorization
+### B. Paper-loading entry and CSV import
+
+- Added a Main Office screen inside the existing **التحميل الفعلي** workflow for entering a paper-recorded load without creating a fake booking or driver delivery confirmation.
+- The manual form validates date, vehicle, driver, factory, quarry, and positive actual weight, then calls the restricted `main_office_record_paper_actual_load` RPC.
+- Added CSV file reading, required-header validation, a row-count limit, and a preview before submitting the import through `main_office_import_paper_loads`.
+- CSV import requires `load_date, vehicle_code, driver_code, factory_code, quarry_code, actual_weight`; optional columns are `ticket_number, notes, source_record_id`.
+- The server validates the whole file before inserting rows, records source file/row provenance, skips previously imported source identities, assigns daily trip identity, and writes audit events.
+- Added contract tests for the manual-entry authorization and provenance path.
+- **Not yet proven:** the new SQL has not been applied to the intended Shadow database; the CSV/manual flows are not ready for operational use until database migration reconciliation and authenticated integration testing are complete.
+
+### C. Scale-ticket storage authorization
 
 - Added narrowly scoped `SECURITY DEFINER` predicates: `can_upload_scale_ticket(text)`, `can_read_scale_ticket(text)`, and `can_delete_scale_ticket(text)`.
 - Pinned function search paths and limited execution grants to authenticated users; public/anonymous execution is revoked.
 - Updated Storage policies to use these predicates rather than relying on direct access to RPC-only tables.
 - Deletion is restricted to the active driver who owns the relevant booking, while the booking is in transit and delivery has not been confirmed.
 
-### C. Test and SQL corrections
+### D. Test and SQL corrections
 
 - Fixed malformed SQL dollar quoting in `assign_actual_loading_trip_code()`.
 - Corrected lifecycle test assertions so each reporting RPC's Main Office scope is checked explicitly.
 - Added v191 contract-gate checks for the scale-ticket helper grants and Storage-policy references.
 - Added/retained contract coverage for paper-import provenance and duplicate-source protection.
 
-### D. Documentation and traceability
+### E. Documentation and traceability
 
 - Recorded paper-import provenance and the remaining import-workflow gap in commit history.
 - Kept the changes isolated to the review branch; no merge to `main` was performed as part of this work.
@@ -122,7 +132,7 @@ The schema supports paper-only actual-load records, but a complete office-facing
 - [x] Scale-ticket authorization helper and Storage-policy contract checks added.
 - [x] Changes remain on `shadow/phase1-hardening`; no merge to `main` in this work.
 - [x] No Production migration or write was performed in this work.
-- [ ] Paper-load manual entry/import UI and secure RPC completed.
+- [x] Paper-load manual entry form and CSV import UI/RPC added on the review branch (runtime database validation remains pending).
 - [ ] Intended Shadow schema/ledger reconciled and migration safely validated.
 - [ ] Authenticated database acceptance tests passed against the intended Shadow target.
 - [ ] Android and Windows real-device/installation smoke tests passed.
@@ -144,3 +154,22 @@ Recent branch commits include:
 ## 7. Working principle
 
 **Keep the real operational data safe.** Complete the paper-import workflow and Shadow reconciliation first; verify database permissions and app behavior with controlled tests; only then consider a separately approved release. A green build is necessary, but not sufficient, for production deployment.
+
+
+## 8. Paper-load CSV contract
+
+Use UTF-8 CSV with a header row. Required columns:
+
+```csv
+load_date,vehicle_code,driver_code,factory_code,quarry_code,actual_weight
+2026-10-17,TRK-001,DRV-001,FAC-01,QUA-01,32.500
+```
+
+Optional columns: `ticket_number`, `notes`, `source_record_id`.
+
+- `load_date` must be an ISO date (`YYYY-MM-DD`).
+- Codes must match the existing directory codes exactly (case-insensitive matching is performed server-side).
+- Weight is in tons and must be greater than zero and no more than 1000.
+- The CSV filename plus logical data-row number is retained as import provenance; re-importing the same file name skips already imported source rows.
+- Do not rename/relabel a different spreadsheet to the same filename unless it is intentionally the same source file. Preserve the original source file and the import summary for audit.
+- The screen currently offers a first-row preview and whole-file server validation. Real-world spreadsheet acceptance and authenticated database tests remain release gates.
