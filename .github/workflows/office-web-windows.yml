@@ -21,8 +21,8 @@ permissions:
 
 env:
   VITE_APP_MODE: office
-  VITE_SUPABASE_URL: https://awgppfjxegognuqozldl.supabase.co
-  VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_k78B7hdU7uSnAtvfA18iWQ_BxzVmdmz
+  VITE_SUPABASE_URL: https://bvyxiahpxogblkmtjxyx.supabase.co
+  VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_xiPfODQDOUSsTbgRQH9z6Q_izM6SFKn
 
 jobs:
   build-web:
