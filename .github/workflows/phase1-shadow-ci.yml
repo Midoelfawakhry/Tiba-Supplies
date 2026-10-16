@@ -66,7 +66,7 @@ jobs:
           PGPASSWORD: postgres
         run: |
           psql -h localhost -U postgres -d tiba_test -v ON_ERROR_STOP=1 <<'SQL'
-          do $
+          do $assert$
           declare
             expected text[] := array['offices','app_users','factories','quarries','vehicle_owners','vehicles','drivers','load_orders','bookings','actual_loading_records','delivery_confirmations','driver_live_locations','notifications','audit_log'];
             missing text[];
@@ -101,5 +101,5 @@ jobs:
             if exposed is not null then
               raise exception 'BASELINE_TABLE_GRANTS_TOO_BROAD: %', array_to_string(exposed, ', ');
             end if;
-          end $;
+          end $assert$;
           SQL
