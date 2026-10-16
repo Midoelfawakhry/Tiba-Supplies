@@ -176,13 +176,13 @@ export const LiveOperationsBoard: React.FC = () => {
   const checkInRadiusKm = Number(checkInOffice?.geofence_radius_m ?? 10000) / 1000;
 
   return (
-    <div dir="rtl" className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="relative sm:sticky sm:top-0 z-20 border-b border-slate-200 bg-white/95 shadow-sm shadow-slate-900/5 backdrop-blur">
-        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 py-4 sm:py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div dir="rtl" className="min-h-screen bg-[#f3f6fa] text-slate-900 selection:bg-cyan-200">
+      <header className="relative sm:sticky sm:top-0 z-30 overflow-hidden border-b border-slate-800 bg-gradient-to-l from-[#071426] via-[#0c2340] to-[#102f4b] text-white shadow-xl shadow-slate-950/15">
+        <div className="mx-auto flex max-w-[1440px] flex-col gap-4 px-4 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-6">
           <div className="min-w-0 w-full sm:w-auto">
-            <div className="inline-flex items-center gap-2.5 text-[11px] sm:text-xs font-black tracking-[0.12em] text-teal-800"><span className="grid h-10 w-10 place-items-center rounded-2xl bg-gradient-to-br from-teal-700 to-cyan-600 text-white shadow-md shadow-teal-900/15"><Truck className="h-5 w-5" /></span><span>TIBA SUPPLIES <span className="text-slate-400">·</span> <span className="text-cyan-700">LIVE CORE</span></span></div>
-            <h1 className="mt-2 text-xl leading-8 sm:text-2xl lg:text-[28px] font-black tracking-tight text-slate-950">مركز تشغيل طيبة للتوريدات</h1>
-            <div className="mt-2 max-w-3xl text-xs sm:text-sm leading-6 text-slate-500 break-words">
+            <div className="inline-flex items-center gap-3 text-[11px] font-black tracking-[0.12em] text-cyan-100 sm:text-xs"><span className="grid h-12 w-12 place-items-center rounded-2xl border border-white/15 bg-white/10 text-cyan-300 shadow-lg shadow-black/10"><Truck className="h-6 w-6" /></span><span><span className="block text-sm tracking-[0.16em] text-white">TIBA SUPPLIES</span><span className="mt-1 block text-[10px] tracking-[0.2em] text-cyan-300">SHADOW OPERATIONS · LIVE CORE</span></span></div>
+            <h1 className="mt-3 text-2xl font-black leading-tight tracking-tight text-white sm:text-3xl">مركز تشغيل طيبة للتوريدات</h1>
+            <div className="mt-3 max-w-3xl text-xs leading-6 text-slate-300 break-words sm:text-sm">
               <MapPin className="inline h-3 w-3 ml-1" />
               مكتب التشغيل: {operationalOffice?.name ?? 'طيبة للتوريدات - الإسماعيلية'}
               {' · '}
@@ -191,30 +191,30 @@ export const LiveOperationsBoard: React.FC = () => {
               نطاق تسجيل الوصول {checkInRadiusKm} كم
             </div>
           </div>
-          <div className="flex w-full sm:w-auto shrink-0 gap-2 sm:self-auto">
-            <button onClick={load} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm hover:border-teal-300 hover:text-teal-800">
+          <div className="flex w-full shrink-0 gap-2 sm:w-auto sm:self-auto">
+            <button onClick={load} className="flex min-h-11 flex-1 items-center justify-center rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/15 sm:flex-none">
               <RefreshCw className="inline h-4 w-4 ml-1" /> تحديث
             </button>
-            <button onClick={() => supabase.auth.signOut()} className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-bold text-rose-700 hover:bg-rose-100">
+            <button onClick={() => supabase.auth.signOut()} className="flex min-h-11 flex-1 items-center justify-center rounded-xl border border-rose-300/30 bg-rose-400/10 px-4 py-2.5 text-sm font-bold text-rose-100 transition hover:bg-rose-400/20 sm:flex-none">
               <LogOut className="inline h-4 w-4 ml-1" /> خروج
             </button>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1440px] px-3 py-4 sm:px-6 sm:py-6 space-y-5 sm:space-y-6">
+      <main className="mx-auto max-w-[1440px] space-y-4 px-3 py-4 sm:space-y-6 sm:px-6 sm:py-6">
         {error && <div className="rounded-2xl border border-red-500/30 bg-red-50 p-4 text-sm text-red-800">خطأ: {error}</div>}
 
         {successMessage && <div className="rounded-2xl border border-emerald-500/30 bg-emerald-50 p-4 text-sm text-emerald-800">{successMessage}</div>}
 
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-start">
-          <aside className="w-full shrink-0 rounded-[28px] border border-slate-200/90 bg-white p-4 shadow-[0_12px_36px_rgba(15,40,60,0.06)] xl:sticky xl:top-28 xl:w-[285px]" aria-label="القائمة الرئيسية للمكتب">
-            <div className="mb-3 rounded-2xl bg-gradient-to-l from-teal-50 to-slate-50 px-4 py-4">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
+          <aside className="w-full shrink-0 rounded-[26px] border border-slate-200 bg-white p-3 shadow-[0_14px_38px_rgba(15,40,60,0.07)] xl:sticky xl:top-28 xl:w-[290px] xl:p-4" aria-label="القائمة الرئيسية للمكتب">
+            <div className="mb-3 rounded-2xl border border-slate-100 bg-gradient-to-l from-[#e4f7fa] via-white to-[#edf3ff] px-4 py-4">
               <div className="text-[10px] font-black tracking-[0.14em] text-teal-800">TIBA SUPPLIES</div>
               <h2 className="mt-1 text-lg font-black text-slate-900">إدارة المكتب</h2>
               <p className="mt-1 text-xs leading-5 text-slate-500">كل شاشات التشغيل في مكان واحد</p>
             </div>
-            <nav className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-1" aria-label="التنقل بين شاشات المكتب">
+            <nav className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden xl:grid xl:grid-cols-1 xl:overflow-visible" aria-label="التنقل بين شاشات المكتب">
               {([
                 ['dashboard', 'مركز التشغيل', ClipboardList],
                 ['drivers', 'قائمة السائقين', Users],
@@ -234,7 +234,7 @@ export const LiveOperationsBoard: React.FC = () => {
                 ['assistant', 'مساعد النظام AI', Bot],
               ] as const).map(([key, label, Icon]) => {
                 const selected = activeScreen === key;
-                return <button key={key} type="button" onClick={() => setActiveScreen(key as typeof activeScreen)} className={selected ? `flex min-h-[48px] items-center gap-2.5 rounded-xl border border-teal-800 px-3 py-2.5 text-right text-sm font-black text-white shadow-md shadow-teal-900/15 transition ${screenPalette[key].selected}` : 'flex min-h-[48px] items-center gap-2.5 rounded-xl border border-transparent px-3 py-2.5 text-right text-sm font-semibold text-slate-600 transition hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900'}>
+                return <button key={key} type="button" onClick={() => setActiveScreen(key as typeof activeScreen)} className={selected ? `flex min-h-[46px] shrink-0 items-center gap-2 rounded-xl border border-transparent px-3 py-2 text-right text-xs font-black text-white shadow-md transition xl:w-full xl:text-sm ${screenPalette[key].selected}` : 'flex min-h-[46px] shrink-0 items-center gap-2 rounded-xl border border-slate-100 bg-white px-3 py-2 text-right text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 xl:w-full xl:text-sm'}>
                   <span className={selected ? "grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white/15" : `grid h-8 w-8 shrink-0 place-items-center rounded-lg ${screenPalette[key].iconBg} ${screenPalette[key].icon}`}><Icon className="h-4 w-4 shrink-0" /></span>
                   <span className="min-w-0 flex-1 leading-5">{label}</span>
                   {selected && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
@@ -242,18 +242,18 @@ export const LiveOperationsBoard: React.FC = () => {
               })}
             </nav>
           </aside>
-          <section className={`min-w-0 flex-1 space-y-5 rounded-[2rem] p-2 transition-colors sm:p-3 ${screenPalette[activeScreen].wash}`}>
+          <section className={`min-w-0 flex-1 space-y-4 rounded-[1.75rem] border border-white/80 p-2 shadow-sm transition-colors sm:space-y-5 sm:p-4 ${screenPalette[activeScreen].wash}`}>
         {activeScreen === 'analytics' ? <section className="space-y-4 rounded-3xl border border-indigo-100 bg-white p-5 shadow-sm"><div><h2 className="text-xl font-black text-slate-900">تحليل البيانات والتقارير</h2><p className="mt-1 text-sm leading-6 text-slate-500">اختار التقرير المطلوب من تقارير التشغيل المسجلة.</p></div><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"><button type="button" onClick={() => setActiveScreen('vehicleReports')} className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-right"><Users className="mb-3 h-7 w-7 text-sky-700"/><h3 className="font-black">حسابات العربيات والملاك</h3></button><button type="button" onClick={() => setActiveScreen('factoryStatement')} className="rounded-2xl border border-cyan-200 bg-cyan-50 p-4 text-right"><Factory className="mb-3 h-7 w-7 text-cyan-700"/><h3 className="font-black">كشف حساب المصانع والعملاء</h3></button><button type="button" onClick={() => setActiveScreen('quarryStatement')} className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-right"><Mountain className="mb-3 h-7 w-7 text-amber-700"/><h3 className="font-black">كشف حساب المحاجر</h3></button></div></section> : activeScreen === 'assistant' ? <SystemAiAssistant audience="HEAD_OFFICE" context={{ office: data?.operational_office?.name ?? data?.office?.name ?? 'مكتب الإسماعيلية', check_in_office: data?.check_in_office?.name ?? 'مكتب رأس سدر', totals: { factories: data?.factories.length ?? 0, quarries: data?.quarries.length ?? 0, load_orders: data?.load_orders.length ?? 0, bookings: data?.bookings.length ?? 0, actual_loading_records: data?.actual_loading_records.length ?? 0, active_drivers: data?.drivers.filter(row => row.is_active !== false).length ?? 0, active_vehicles: data?.vehicles.filter(row => row.is_active !== false).length ?? 0 }, load_orders: (data?.load_orders ?? []).slice(0, 80).map(order => ({ factory: liveName(data?.factories.find(row => row.factory_id === order.factory_id)), quarry: liveName(data?.quarries.find(row => row.quarry_id === order.quarry_id)), status: order.status, requested_quantity: order.requested_quantity, priority: order.priority })), bookings_by_status: Object.entries((data?.bookings ?? []).reduce((acc: Record<string, number>, row) => { acc[row.status] = (acc[row.status] ?? 0) + 1; return acc; }, {})), actual_loads_today: todaysActualCount }} /> : activeScreen === 'employees' ? <BranchEmployeeManagementScreen /> : activeScreen === 'factoryStatement' ? <AccountStatementsScreen kind="factory" /> : activeScreen === 'quarryStatement' ? <AccountStatementsScreen kind="quarry" /> : activeScreen === 'vehicleReports' ? <VehicleOwnerReportsScreen /> : activeScreen === 'tracking' ? <VehicleTrackingScreen /> : activeScreen === 'drivers' ? <OfficeDirectoryScreen initialSection="drivers" showSectionTabs={false} /> : activeScreen === 'vehicles' ? <OfficeDirectoryScreen initialSection="vehicles" showSectionTabs={false} /> : activeScreen === 'waiting' ? <OfficeDirectoryScreen initialSection="waiting" showSectionTabs={false} /> : activeScreen === 'orders' ? <OfficeDirectoryScreen initialSection="loads" showSectionTabs={false} /> : activeScreen === 'actual' ? <OfficeDirectoryScreen initialSection="actual" showSectionTabs={false} /> : activeScreen === 'factories' ? <OfficeDirectoryScreen initialSection="factories" showSectionTabs={false} /> : activeScreen === 'quarries' ? <OfficeDirectoryScreen initialSection="quarries" showSectionTabs={false} /> : activeScreen === 'directory' ? <OfficeDirectoryScreen /> : activeScreen === 'direct' ? <DirectLoadAssignmentScreen /> : <>
-        <section className="overflow-hidden rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 p-5 text-white shadow-xl shadow-slate-900/10 sm:p-7">
+        <section className="relative isolate overflow-hidden rounded-[28px] border border-[#163552] bg-gradient-to-br from-[#061426] via-[#0b2a49] to-[#11536a] p-5 text-white shadow-[0_20px_50px_rgba(8,35,60,0.22)] sm:rounded-[32px] sm:p-7"><div aria-hidden="true" className="pointer-events-none absolute -left-16 -top-20 h-56 w-56 rounded-full bg-cyan-400/10 blur-3xl"/><div aria-hidden="true" className="pointer-events-none absolute -bottom-24 right-1/3 h-56 w-56 rounded-full bg-blue-400/10 blur-3xl"/>
           <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
             <div className="max-w-2xl">
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-bold text-cyan-100"><span className="h-2 w-2 rounded-full bg-emerald-400" /> بيانات التشغيل الحقيقية</div>
-              <h2 className="mt-3 text-2xl font-black sm:text-3xl">لوحة تشغيل Tiba-Supplies</h2>
-              <p className="mt-2 max-w-xl text-sm leading-6 text-slate-300">متابعة أوامر التحميل والسائقين والمصانع والمحاجر من مكان واحد، مع الانتقال إلى شاشة مستقلة لكل قسم.</p>
-              <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-300"><span className="rounded-lg bg-white/10 px-3 py-2">مكتب التشغيل: {operationalOffice?.name ?? 'طيبة للتوريدات'}</span><span className="rounded-lg bg-white/10 px-3 py-2">مكتب الوصول: {checkInOffice?.name ?? 'رأس سدر'}</span></div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 py-1.5 text-xs font-bold text-emerald-100"><span className="h-2 w-2 rounded-full bg-emerald-400" /> بيانات التشغيل الحقيقية</div>
+              <h2 className="mt-4 text-3xl font-black leading-tight tracking-tight sm:text-4xl">لوحة تشغيل <span className="text-cyan-300">Tiba-Supplies</span></h2>
+              <p className="mt-3 max-w-xl text-sm leading-7 text-slate-300">متابعة أوامر التحميل والسائقين والمصانع والمحاجر من مكان واحد، مع الانتقال إلى شاشة مستقلة لكل قسم.</p>
+              <div className="mt-5 flex flex-wrap gap-2 text-xs text-slate-200"><span className="rounded-lg bg-white/10 px-3 py-2">مكتب التشغيل: {operationalOffice?.name ?? 'طيبة للتوريدات'}</span><span className="rounded-lg bg-white/10 px-3 py-2">مكتب الوصول: {checkInOffice?.name ?? 'رأس سدر'}</span></div>
             </div>
             <div className="grid grid-cols-2 gap-3 sm:min-w-64">
-              <div className="rounded-2xl border border-white/10 bg-white/10 p-4"><ClipboardList className="h-5 w-5 text-cyan-300"/><div className="mt-2 text-2xl font-black">{counts.orders}</div><div className="text-xs text-slate-300">أوامر التحميل</div></div>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.08] p-4 shadow-lg shadow-black/5 backdrop-blur-sm"><ClipboardList className="h-5 w-5 text-cyan-300"/><div className="mt-2 text-2xl font-black">{counts.orders}</div><div className="text-xs text-slate-300">أوامر التحميل</div></div>
               <div className="rounded-2xl border border-white/10 bg-white/10 p-4"><Truck className="h-5 w-5 text-emerald-300"/><div className="mt-2 text-2xl font-black">{counts.activeBookings}</div><div className="text-xs text-slate-300">تخصيصات نشطة</div></div>
               <div className="rounded-2xl border border-white/10 bg-white/10 p-4"><Factory className="h-5 w-5 text-sky-300"/><div className="mt-2 text-2xl font-black">{data?.factories.length ?? 0}</div><div className="text-xs text-slate-300">المصانع والعملاء</div></div>
               <div className="rounded-2xl border border-white/10 bg-white/10 p-4"><Mountain className="h-5 w-5 text-amber-300"/><div className="mt-2 text-2xl font-black">{data?.quarries.length ?? 0}</div><div className="text-xs text-slate-300">المحاجر والموردون</div></div>
