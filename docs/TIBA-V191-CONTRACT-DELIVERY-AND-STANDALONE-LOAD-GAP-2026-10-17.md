@@ -3,11 +3,11 @@
 Branch: `shadow/phase1-hardening`
 Scope: static source comparison of the v191 client and versioned clean-chain SQL. No live database writes.
 
-## Confirmed delivery RPC mismatch
+## Delivery RPC signature: resolved by a later migration
 
 ### Client contract
 
-In `src/components/DriverApp.tsx`, the v191 client calls `driver_confirm_delivery` with named parameters:
+In `src/components/DriverApp.tsx`, v191 calls `driver_confirm_delivery` with eight named parameters:
 - `p_booking_id`
 - `p_latitude`
 - `p_longitude`
@@ -17,25 +17,19 @@ In `src/components/DriverApp.tsx`, the v191 client calls `driver_confirm_deliver
 - `p_scale_image_path`
 - `p_notes`
 
-The client then requires `data.confirmed` to be truthy.
+The client requires `data.confirmed` and displays `data.actual_weight`.
 
-### Current clean-chain definition
+### Corrected source finding
 
-Migration `supabase/migrations/20261014300000_phase1_harden_driver_delivery_confirmation.sql` defines the function with only six parameters:
-`(p_booking_id uuid, p_latitude double precision, p_longitude double precision, p_accuracy_m double precision, p_captured_at timestamptz, p_notes text default null)`.
+The earlier migration `20261014300000_phase1_harden_driver_delivery_confirmation.sql` defines a six-argument intermediate function, but it is superseded in the versioned chain by `20261015120000_phase1_actual_weight_and_account_rpcs.sql` and `20261015120001_phase1_actual_weight_idempotency.sql`, both of which define the eight-argument signature and return the required weight/confirmation fields.
 
-It validates auth, GPS accuracy/freshness and booking ownership, inserts a row in `delivery_confirmations`, audits the confirmation, and returns `booking_id`, `confirmed`, and `confirmed_at`. It does **not** accept or persist `p_actual_weight` or `p_scale_image_path`, and it does not return `actual_weight`.
+Therefore, **the final versioned chain's delivery signature is compatible with the v191 named-argument contract**. The earlier report's signature-mismatch conclusion was incomplete because it stopped at the intermediate migration; this section corrects that finding.
 
-**Result:** PostgREST named-argument invocation from the v191 client is incompatible with this SQL signature. The current contract gate's eight-argument check should fail against this clean-chain definition. The CI currently does not run that standalone contract gate, so the green chain smoke is not proof of delivery-contract compatibility.
+### Actual remaining delivery-flow defect
 
-## Confirmed actual-loading model gap
+The later migration `20261015173000_phase1_direct_assignment_acceptance.sql` replaces `main_office_advance_booking` and inserts into `actual_loading_records` when the office moves a booking from `LOADING` to `LOADED`. It requires `p_actual_weight` at that point. The driver delivery RPC then treats that same row as an existing actual-weight record and rejects a different delivery-time weight with `ACTUAL_WEIGHT_ALREADY_RECORDED`.
 
-The clean baseline `20261014190000_phase1_clean_baseline.sql` defines:
-- `actual_loading_records.booking_id NOT NULL UNIQUE`
-- `actual_loading_records.recorded_by NOT NULL REFERENCES app_users`
-- `actual_weight`, `ticket_number`, `scale_image_path`, `loaded_at`, and `notes`
-
-This model only supports one actual-loading row tied to a booking and recorded by an office app user. It cannot directly represent a paper-based actual-loading entry with no booking and a driver/vehicle/factory/quarry/load date as the primary facts. Production's observed `actual_loading_records` model allows `booking_id` to be null and carries separate loading-date and operational identity fields; do not treat the clean baseline as production-equivalent.
+That conflicts with the established operating rule: assignment/direct assignment belongs in loading data; **actual weight is recorded when the vehicle delivers to the factory**. The fix must remove actual-weight insertion from the office's `LOADED` transition and make the delivery RPC the current-flow writer of actual weight, while preserving ownership, GPS freshness/accuracy, lifecycle, audit, and idempotency checks.
 
 ## Safe resolution requirements
 
