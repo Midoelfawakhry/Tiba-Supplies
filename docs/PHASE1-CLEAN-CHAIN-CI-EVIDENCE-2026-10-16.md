@@ -34,6 +34,14 @@ Artifacts are attached to the successful GitHub Actions runs above.
 
 Build success verifies artifact generation and upload, not installation or end-to-end operation on a physical device.
 
+
+## Supabase read-only target distinction (2026-10-16)
+Two separate active projects are connected; they must not be treated as the same database.
+
+- **`Tiba Shadow` — `bvyxiahpxogblkmtjxyx`:** `public` table listing is empty. Migration ledger contains only `20261016210023_phase1_revoke_public_rls_event_trigger_shadow_remediation`. Security and performance advisors returned no lints.
+- **`Tiba-Shadow` — `awgppfjxegognuqozldl`:** contains seeded operational-style data (for example 23 factories, 108 vehicle owners, 139 vehicles, 2 offices, and 11 audit rows at the time of this read-only check). Its migration ledger contains many applied migrations and duplicate `phase1_atomic_direct_trip` entries. The advisors report 37 authenticated-callable `SECURITY DEFINER` functions, 22 RLS-enabled tables with no policies, leaked-password protection disabled, 27 foreign keys without covering indexes, and 2 unused indexes. These findings require function-by-function review; they are not proof by themselves that each RPC is exploitable or each missing policy is a defect in an RPC-only access model.
+- Because the connected projects have different schemas, ledgers, and data, **do not apply migrations to either project until the intended target is explicitly identified and its existing migration ledger is reconciled**. This document does not authorize any database mutation.
+
 ## Remaining release gates
 1. Reconcile the candidate migration history and exact target-project migration ledger; do not blindly apply the repository folder to an existing project.
 2. Run the reviewed SQL role/office-scope and transactional/concurrency matrix against a disposable managed Supabase staging project with synthetic identities and data.
