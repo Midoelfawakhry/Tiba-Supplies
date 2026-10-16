@@ -10,7 +10,7 @@ const [multiDriverMigration, assignmentsMigration, baseline, directoryUi, assign
   read("../src/components/OfficeDirectoryScreen.tsx"),
   read("../supabase/migrations/20261014430000_phase1_enforce_assigned_vehicle_on_booking.sql"),
   read("../supabase/migrations/20261016083000_phase1_multi_driver_assignment_guard_fix.sql"),
-  read("../supabase/migrations/20261016083501_phase1_retire_legacy_vehicle_rpcs.sql"),
+  read("../supabase/migrations/20261016083502_phase1_retire_legacy_vehicle_rpcs.sql"),
 ]);
 
 test("a vehicle can have multiple active driver assignments while a driver has only one", () => {
