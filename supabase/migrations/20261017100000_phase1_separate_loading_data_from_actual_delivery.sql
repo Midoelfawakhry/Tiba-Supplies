@@ -434,7 +434,8 @@ begin
       jsonb_build_object('driver_id',v_driver.driver_id,'actual_weight',v_weight,
         'scale_image_attached',p_scale_image_path is not null,'accuracy_m',p_accuracy_m,
         'captured_at',p_captured_at,'confirmed_at',v_confirmation.confirmed_at,
-        'record_source','DRIVER_DELIVERY','previous_record_source',v_actual.record_source,\n        'previous_actual_weight',v_actual.actual_weight));
+        'record_source','DRIVER_DELIVERY','previous_record_source',v_actual.record_source,
+        'previous_actual_weight',v_actual.actual_weight));
   end if;
 
   select * into v_actual from public.actual_loading_records where booking_id=p_booking_id;
