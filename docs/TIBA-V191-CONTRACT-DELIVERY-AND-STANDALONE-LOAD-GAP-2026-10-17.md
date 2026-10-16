@@ -1,13 +1,12 @@
 # Tiba v191 Contract Gap — Delivery and Actual Loading (2026-10-17)
 
 Branch: `shadow/phase1-hardening`
-Scope: static source comparison of the v191 client and versioned clean-chain SQL. No live database writes.
 
-## Delivery RPC signature: resolved by a later migration
+Scope: static source review and review-branch candidate migration. No live database writes.
 
-### Client contract
+## 1. Confirmed v191 client contract
 
-In `src/components/DriverApp.tsx`, v191 calls `driver_confirm_delivery` with eight named parameters:
+In `src/components/DriverApp.tsx`, the driver calls `driver_confirm_delivery` with eight named parameters:
 - `p_booking_id`
 - `p_latitude`
 - `p_longitude`
@@ -19,47 +18,53 @@ In `src/components/DriverApp.tsx`, v191 calls `driver_confirm_delivery` with eig
 
 The client requires `data.confirmed` and displays `data.actual_weight`.
 
-### Corrected source finding
+## 2. Corrected RPC signature finding
 
-The earlier migration `20261014300000_phase1_harden_driver_delivery_confirmation.sql` defines a six-argument intermediate function, but it is superseded in the versioned chain by `20261015120000_phase1_actual_weight_and_account_rpcs.sql` and `20261015120001_phase1_actual_weight_idempotency.sql`, both of which define the eight-argument signature and return the required weight/confirmation fields.
+The older migration `20261014300000_phase1_harden_driver_delivery_confirmation.sql` defines a six-argument intermediate function, but later migrations `20261015120000_phase1_actual_weight_and_account_rpcs.sql` and `20261015120001_phase1_actual_weight_idempotency.sql` supersede it with the eight-argument contract. Therefore the final versioned chain's delivery signature is compatible with v191. The initial review that stopped at the intermediate migration was incomplete; this is corrected here.
 
-Therefore, **the final versioned chain's delivery signature is compatible with the v191 named-argument contract**. The earlier report's signature-mismatch conclusion was incomplete because it stopped at the intermediate migration; this section corrects that finding.
+## 3. Actual defect: the weight was written at the wrong lifecycle stage
 
-### Actual remaining delivery-flow defect
+`20261015173000_phase1_direct_assignment_acceptance.sql` replaces `main_office_advance_booking` and records `actual_loading_records` when the office transitions a booking from `LOADING` to `LOADED`. It requires a weight at that stage. The delivery RPC later treats the same row as the actual weight and rejects a different value with `ACTUAL_WEIGHT_ALREADY_RECORDED`.
 
-The later migration `20261015173000_phase1_direct_assignment_acceptance.sql` replaces `main_office_advance_booking` and inserts into `actual_loading_records` when the office moves a booking from `LOADING` to `LOADED`. It requires `p_actual_weight` at that point. The driver delivery RPC then treats that same row as an existing actual-weight record and rejects a different delivery-time weight with `ACTUAL_WEIGHT_ALREADY_RECORDED`.
+The established operational rule is:
+- Assignment/direct assignment belongs in loading data.
+- The actual weight and scale evidence are recorded when the vehicle delivers to the factory.
+- Delivery confirmation is atomic with the actual-weight record and must remain idempotent.
+- Standalone paper actual-loading records may exist without a booking and need their own date/vehicle/driver/factory/quarry/trip identifiers.
 
-That conflicts with the established operating rule: assignment/direct assignment belongs in loading data; **actual weight is recorded when the vehicle delivers to the factory**. The fix must remove actual-weight insertion from the office's `LOADED` transition and make the delivery RPC the current-flow writer of actual weight, while preserving ownership, GPS freshness/accuracy, lifecycle, audit, and idempotency checks.
+## 4. Review-branch migration prepared
 
-## Safe resolution requirements
+Candidate: [`20261017100000_phase1_separate_loading_data_from_actual_delivery.sql`](https://github.com/Midoelfawakhry/Tiba-Supplies/blob/shadow/phase1-hardening/supabase/migrations/20261017100000_phase1_separate_loading_data_from_actual_delivery.sql)
 
-Do not fix this by merely adding unused function arguments or by writing weight into `delivery_confirmations`. A correct compatibility migration must, as a single tested contract:
-1. Preserve driver authentication, booking ownership, allowed lifecycle state, GPS timestamp and accuracy checks, and idempotency.
-2. Validate `p_actual_weight > 0` and persist actual weight and scale image path to the canonical actual-loading record.
-3. Return the exact client-required keys, including `confirmed` and `actual_weight`.
-4. Define how `recorded_by` is represented for driver-entered loading without incorrectly requiring a head-office `app_users` row.
-5. Decide whether a driver delivery confirmation may create the actual-loading record, or whether weight capture and delivery confirmation are separate transactions; enforce atomicity and duplicate prevention accordingly.
-6. Add regression tests for first submission, retry/idempotency, invalid weight, missing/invalid image path policy, booking not owned by caller, stale GPS, and already-confirmed delivery.
+It:
+1. Adds `loading_data_records`, synced from booking assignment and lifecycle, without treating assignment as actual weight.
+2. Allows `actual_loading_records.booking_id` to be null for standalone paper records while retaining uniqueness when a booking is present.
+3. Adds the paper/actual record fields: load date, vehicle, driver, quarry, factory, trip code, daily load number, loading sequence date, actual-weight timestamp, and record source.
+4. Removes actual-weight insertion from the office `LOADED` transition and rejects the old office-side weight/ticket input at that stage.
+5. Replaces the eight-argument delivery RPC so it validates identity, ownership, lifecycle, GPS timestamp/accuracy, weight and image-path constraints; records weight and evidence in one transaction; preserves idempotency; and returns `confirmed` and `actual_weight`.
+6. Updates owner and account-statement reporting RPCs to include standalone paper records.
 
-Separately, decide whether standalone paper records are in scope for this clean Shadow baseline. If yes, model nullable `booking_id` plus the required loading date and vehicle/driver/factory/quarry identifiers and test duplicate/import reconciliation. Do not import production records during bootstrap.
+This is a **candidate migration on the review branch**, not an applied or production-approved migration.
 
-## CI gate recommendation
+## 5. Tests and remaining validation
 
-After the schema contract is deliberately reconciled, add `supabase/tests/phase1_v191_contract_gate.sql` to the disposable PostgreSQL clean-chain job. Until then, keep the mismatch visible as a blocker rather than making the workflow green by weakening the assertion.
+The review branch also updates:
+- `tests/phase1-current-lifecycle.test.mjs` to assert that `LOADED` does not write actual weight.
+- `tests/phase1-v191-migration-rpc-source.test.mjs` to include the new migration.
+- `supabase/tests/phase1_v191_contract_gate.sql` to assert the separate loading-data and standalone actual-record columns.
+- `.github/workflows/phase1-shadow-ci.yml` to run the SQL contract gate after replaying the versioned migrations on disposable PostgreSQL.
+
+**Do not mark the migration validated until the latest CI runs complete successfully.** Required next checks are:
+1. PostgreSQL clean-chain replay including the new migration.
+2. The SQL v191 contract gate, including named-argument signatures and required columns.
+3. All app contract tests and TypeScript/build checks.
+4. Review any migration-integrity workflow findings and verify that non-standard legacy migration gaps remain documented.
+5. Only after clean tests, plan a separate live Shadow apply and authenticated end-to-end test; never apply this candidate to Production as part of this work.
 
 ## Evidence links
 
 - [v191 driver client](https://github.com/Midoelfawakhry/Tiba-Supplies/blob/shadow/phase1-hardening/src/components/DriverApp.tsx)
-- [Current delivery RPC migration](https://github.com/Midoelfawakhry/Tiba-Supplies/blob/shadow/phase1-hardening/supabase/migrations/20261014300000_phase1_harden_driver_delivery_confirmation.sql)
+- [Eight-argument delivery implementation before the new lifecycle correction](https://github.com/Midoelfawakhry/Tiba-Supplies/blob/shadow/phase1-hardening/supabase/migrations/20261015120001_phase1_actual_weight_idempotency.sql)
 - [Clean baseline](https://github.com/Midoelfawakhry/Tiba-Supplies/blob/shadow/phase1-hardening/supabase/migrations/20261014190000_phase1_clean_baseline.sql)
-- [Contract gate test](https://github.com/Midoelfawakhry/Tiba-Supplies/blob/shadow/phase1-hardening/supabase/tests/phase1_v191_contract_gate.sql)
-
-
-## Lifecycle conflict: who records the actual weight?
-
-The same clean-chain migrations show a second decision that must be made before implementing the eight-argument delivery RPC:
-- `20261015173000_phase1_direct_assignment_acceptance.sql` records `actual_loading_records` when the head-office RPC `main_office_advance_booking(..., 'LOADED', p_actual_weight, ...)` transitions a booking from `LOADING` to `LOADED`.
-- The v191 driver client supplies `p_actual_weight` and `p_scale_image_path` to `driver_confirm_delivery`, which is called at the delivery-confirmation step after the booking is `IN_TRANSIT`.
-- The current six-argument driver delivery RPC writes only `delivery_confirmations`.
-
-These are distinct operational moments. The intended source of truth must say whether the scale weight/ticket is captured at loading by the office, captured by the driver at delivery, or both with an explicit reconciliation rule. Do not automatically insert a second `actual_loading_records` row during delivery: the baseline's unique `booking_id` constraint would reject it, and silently overwriting the earlier weight would corrupt the operational record. If the driver payload represents a final/verified weight rather than loading weight, model that distinction explicitly and test it.
+- [SQL contract gate](https://github.com/Midoelfawakhry/Tiba-Supplies/blob/shadow/phase1-hardening/supabase/tests/phase1_v191_contract_gate.sql)
+- [CI workflow](https://github.com/Midoelfawakhry/Tiba-Supplies/blob/shadow/phase1-hardening/.github/workflows/phase1-shadow-ci.yml)
