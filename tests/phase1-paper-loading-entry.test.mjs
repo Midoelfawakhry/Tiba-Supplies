@@ -3,14 +3,15 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
-const [migration, screen, board] = await Promise.all([
+const [migration, importMigration, screen, board] = await Promise.all([
   read("../supabase/migrations/20261017111000_phase1_paper_actual_load_entry.sql"),
+  read("../supabase/migrations/20261017110000_phase1_paper_load_import_rpc.sql"),
   read("../src/components/PaperLoadingEntryScreen.tsx"),
   read("../src/components/LiveOperationsBoard.tsx"),
 ]);
 
 test("paper loading entry is Main Office-authorized and writes a paper provenance record", () => {
-  assert.match(migration, /perform public\.current_main_office_user\(\)/i);
+  assert.match(migration, /v_actor := public\.current_main_office_user\(\)/i);
   assert.match(migration, /record_source,\s*source_record_id,\s*source_file_name,\s*source_row_number,\s*imported_at/i);
   assert.match(migration, /'PAPER_IMPORT'/);
   assert.match(migration, /public\.write_audit_event\('PAPER_ACTUAL_LOAD_RECORDED'/i);
@@ -25,4 +26,18 @@ test("paper loading form validates weight and uses the scoped server RPC", () =>
   assert.match(screen, /p_source_row_number: null/);
   assert.match(board, /PaperLoadingEntryScreen/);
   assert.match(board, /activeScreen === 'actual'/);
+});
+
+test("CSV import validates source rows and has an idempotent Main Office RPC", () => {
+  assert.match(importMigration, /perform public\\.current_main_office_user\\(\\)/i);
+  assert.match(importMigration, /jsonb_array_length\\(p_rows\\) > 2000/);
+  assert.match(importMigration, /VEHICLE_CODE_NOT_FOUND/);
+  assert.match(importMigration, /DRIVER_CODE_NOT_FOUND/);
+  assert.match(importMigration, /FACTORY_CODE_NOT_FOUND/);
+  assert.match(importMigration, /QUARRY_CODE_NOT_FOUND/);
+  assert.match(importMigration, /actual_loading_records_import_source_id_unique/);
+  assert.match(importMigration, /record_source,source_record_id,source_file_name,source_row_number,imported_at/);
+  assert.match(importMigration, /grant execute on function public\\.main_office_import_paper_loads\\(text,jsonb\\) to authenticated/i);
+  assert.match(screen, /main_office_import_paper_loads/);
+  assert.match(screen, /source_row_number: index \+ 2/);
 });
