@@ -58,6 +58,11 @@ test("assignment loading data is separate and paper actual records can exist wit
   assert.match(separation, /create trigger actual_loading_assign_trip_identity/i);
   assert.match(separation, /TRIP_IDENTITY_IS_IMMUTABLE/);
   assert.match(separation, /actual_loading_records_daily_number_unique/);
+  assert.match(separation, /source_record_id text/);
+  assert.match(separation, /source_file_name text/);
+  assert.match(separation, /source_row_number integer/);
+  assert.match(separation, /imported_at timestamptz/);
+  assert.match(separation, /actual_loading_records_import_source_unique/);
   assert.match(separation, /alter column trip_code set not null/);
   assert.match(separation, /alter column booking_id drop not null/i);
   assert.match(separation, /record_source in \('DRIVER_DELIVERY','PAPER_IMPORT','OFFICE_CORRECTION','LEGACY'\)/i);
