@@ -103,3 +103,93 @@ jobs:
             end if;
           end $assert$;
           SQL
+
+  clean-chain-postgres-smoke:
+    name: Disposable PostgreSQL v191 clean-chain smoke
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: tiba_chain_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d tiba_chain_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Create minimal Supabase Auth and roles fixture
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d tiba_chain_test -v ON_ERROR_STOP=1 <<'SQL'
+          create role anon nologin;
+          create role authenticated nologin;
+          create role service_role nologin bypassrls;
+          create schema auth;
+          create table auth.users (id uuid primary key);
+          create function auth.uid() returns uuid language sql stable as $uid$ select null::uuid $uid$;
+          SQL
+      - name: Apply reviewed v191 schema and RPC chain
+        env:
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          for migration in \
+            20261014190000_phase1_clean_baseline.sql \
+            20261014200000_phase1_main_office_rpcs.sql \
+            20261014240000_phase1_driver_location_and_arrival.sql \
+            20261014290000_phase1_driver_portal_snapshot.sql \
+            20261014370000_phase1_driver_vehicle_assignments.sql \
+            20261015120000_phase1_actual_weight_and_account_rpcs.sql \
+            20261015120001_phase1_actual_weight_idempotency.sql \
+            20261015173000_phase1_direct_assignment_acceptance.sql \
+            20261015180000_phase1_queue_selection_and_atomic_dispatch.sql \
+            20261015181000_phase1_queue_ui_and_concurrency_hardening.sql \
+            20261015182000_phase1_queue_driver_notifications.sql \
+            20261015184000_phase1_queue_vehicle_compatibility.sql \
+            20261015185000_phase1_queue_office_selection_visibility.sql
+          do
+            echo "Applying $migration"
+            psql -h localhost -U postgres -d tiba_chain_test -v ON_ERROR_STOP=1 -f "supabase/migrations/$migration"
+          done
+      - name: Assert v191 RPC and queue objects exist
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d tiba_chain_test -v ON_ERROR_STOP=1 <<'SQL'
+          do $chain$
+          declare
+            required_rpcs text[] := array[
+              'driver_get_pending_assignments','driver_get_dispatch_state',
+              'driver_get_portal_snapshot','driver_select_load','driver_confirm_delivery',
+              'accept_direct_assignment','driver_update_live_location',
+              'driver_confirm_arrival','driver_check_in_queue'
+            ];
+            missing text[];
+          begin
+            select array_agg(name) into missing
+            from unnest(required_rpcs) name
+            where not exists (
+              select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+              where n.nspname='public' and p.proname=name
+            );
+            if missing is not null then
+              raise exception 'V191_RPC_MISSING: %', array_to_string(missing, ', ');
+            end if;
+            if to_regclass('public.driver_vehicle_assignments') is null
+              or to_regclass('public.dispatch_windows') is null
+              or to_regclass('public.waiting_list_entries') is null
+              or to_regclass('public.driver_load_choices') is null then
+              raise exception 'V191_QUEUE_OR_ASSIGNMENT_SCHEMA_MISSING';
+            end if;
+            if to_regclass('public.vehicle_driver_assignments') is not null then
+              raise exception 'DUPLICATE_ASSIGNMENT_MODELS';
+            end if;
+          end $chain$;
+          SQL
