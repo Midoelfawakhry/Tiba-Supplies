@@ -46,6 +46,10 @@ It:
 
 This is a **candidate migration on the review branch**, not an applied or production-approved migration.
 
+### Daily loading identity added
+
+The source handover and schema export show that actual-loading rows need a stable `trip_code`, `daily_load_number`, and `loading_sequence_date`; the historical production schema also used a per-date counter. The candidate migration now adds a protected `daily_loading_counters` table and a trigger that allocates a per-day number atomically, derives a stable `TIBA-YYYYMMDD-XNNNNNN` code for standalone paper records, uses the booking trip code for booked records, and prevents identity changes after insertion. Existing rows are backfilled first; ambiguous duplicate trip codes or daily numbers fail the migration for manual reconciliation instead of being silently rewritten.
+
 ### Legacy weight reconciliation added
 
 A further review found that existing `LEGACY` actual-loading rows could still block factory delivery if the office-side weight differed from the driver's confirmed delivery weight. The candidate migration now promotes that existing row to `DRIVER_DELIVERY` during the authenticated delivery transaction and writes the prior source/weight into the audit details. This avoids a duplicate row and retains evidence of the previous value. The booking remains locked during the operation, and non-legacy conflicting weights still fail closed.
