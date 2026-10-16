@@ -56,3 +56,9 @@ test("assignment loading data is separate and paper actual records can exist wit
   assert.match(separation, /booking_id is not null\s+or \(load_date is not null and vehicle_id is not null and driver_id is not null/i);
   assert.match(separation, /left join public\.bookings b on b\.booking_id=alr\.booking_id/i);
 });
+
+
+test("updated actual-loading reports retain Main Office scope", () => {
+  assert.equal((separation.match(/perform public\.current_main_office_user\(\)/gi) || []).length >= 3, true);
+  assert.doesNotMatch(separation, /au\.role in \('ADMIN','HEAD_OFFICE','BRANCH'\)/i);
+});
