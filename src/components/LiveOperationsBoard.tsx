@@ -260,6 +260,34 @@ export const LiveOperationsBoard: React.FC = () => {
             </div>
           </div>
         </section>
+        <section className="space-y-3">
+          <div className="flex flex-wrap items-end justify-between gap-2 px-1">
+            <div><p className="text-[10px] font-black tracking-[0.18em] text-cyan-800">OPERATIONS WORKFLOW</p><h2 className="mt-1 text-xl font-black text-slate-900 sm:text-2xl">مراحل النقلة من الطلب للتسليم</h2><p className="mt-1 text-xs leading-5 text-slate-500">اضغط على أي مرحلة للانتقال لشاشة التشغيل المرتبطة بها.</p></div>
+            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">مركز التشغيل · Shadow</span>
+          </div>
+          <div className="flex snap-x gap-3 overflow-x-auto pb-2 [scrollbar-width:thin] xl:grid xl:grid-cols-4 2xl:grid-cols-7">
+            {([
+              { n:'01', title:'المكتب الرئيسي', desc:'إنشاء ومراجعة طلب التحميل', count:counts.orders, metric:'أمر تحميل', key:'orders' as OfficeScreen, Icon:ClipboardList, tone:'from-blue-700 to-blue-950', ring:'border-blue-200' },
+              { n:'02', title:'قائمة الانتظار', desc:'السائقون المسجل وصولهم', count:(data?.bookings ?? []).filter(x => ['QUEUED','WAITING','ARRIVED'].includes(String(x.status).toUpperCase())).length, metric:'سائق منتظر', key:'waiting' as OfficeScreen, Icon:Clock3, tone:'from-emerald-600 to-emerald-900', ring:'border-emerald-200' },
+              { n:'03', title:'تأكيد التحميل', desc:'مراجعة الإسناد وتفاصيل الطلب', count:counts.activeBookings, metric:'تخصيص نشط', key:'direct' as OfficeScreen, Icon:CheckCircle2, tone:'from-violet-600 to-violet-950', ring:'border-violet-200' },
+              { n:'04', title:'السائق والعربية', desc:'بيانات السائقين والمركبات', count:data?.drivers.length ?? 0, metric:'سائق مسجل', key:'drivers' as OfficeScreen, Icon:Users, tone:'from-orange-500 to-orange-800', ring:'border-orange-200' },
+              { n:'05', title:'تنفيذ التحميل', desc:'متابعة التحميل الفعلي المسجل', count:data?.actual_loading_records.length ?? 0, metric:'سجل تحميل فعلي', key:'actual' as OfficeScreen, Icon:Truck, tone:'from-sky-600 to-sky-950', ring:'border-sky-200' },
+              { n:'06', title:'المسار والتوجيه', desc:'فتح شاشة تتبع السيارات', count:data?.vehicles.length ?? 0, metric:'مركبة مسجلة', key:'tracking' as OfficeScreen, Icon:MapPin, tone:'from-indigo-600 to-indigo-950', ring:'border-indigo-200' },
+              { n:'07', title:'التسليم والحسابات', desc:'مراجعة السجلات وكشوف الحساب', count:todaysActualCount, metric:'تحميل اليوم', key:'factoryStatement' as OfficeScreen, Icon:Factory, tone:'from-teal-600 to-teal-950', ring:'border-teal-200' },
+            ]).map(({n,title,desc,count,metric,key,Icon,tone,ring}) => (
+              <button key={n} type="button" onClick={() => setActiveScreen(key)} className={`group relative flex min-h-[220px] w-[235px] shrink-0 snap-start flex-col overflow-hidden rounded-2xl border ${ring} bg-white text-right shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 xl:w-auto`}>
+                <div className={`bg-gradient-to-l ${tone} p-4 text-white`}>
+                  <div className="flex items-center justify-between gap-2"><span className="grid h-9 w-9 place-items-center rounded-xl border border-white/20 bg-white/15 text-sm font-black">{n}</span><Icon className="h-6 w-6 text-white/90"/></div>
+                  <h3 className="mt-3 text-base font-black">{title}</h3><p className="mt-1 text-[11px] leading-5 text-white/80">{desc}</p>
+                </div>
+                <div className="flex flex-1 flex-col justify-between p-4">
+                  <div><div className="text-2xl font-black tabular-nums text-slate-900">{count}</div><div className="mt-1 text-[11px] text-slate-500">{metric}</div></div>
+                  <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs font-black text-slate-700"><span>فتح المرحلة</span><span className="grid h-7 w-7 place-items-center rounded-full bg-slate-100 transition group-hover:bg-slate-900 group-hover:text-white">←</span></div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
         <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_12px_36px_rgba(15,40,60,0.05)] sm:p-6">
           <div className="mb-4">
             <h2 className="text-lg font-black">إنشاء أمر تحميل جديد</h2>
