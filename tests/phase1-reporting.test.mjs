@@ -33,10 +33,6 @@ test("factory and quarry statements filter by vehicle, its registered owner, and
   assert.match(statementsMigration, /'trip_code', alr\.trip_code/i);
   assert.match(statementsMigration, /'daily_load_number', alr\.daily_load_number/i);
   assert.match(statementsMigration, /'loading_sequence_date', alr\.loading_sequence_date/i);
-  assert.ok(statementsMigration.toLowerCase().replace(/\s+/g, ' ').includes('left join public.vehicles v on v.vehicle_id = alr.vehicle_id'));
-  assert.match(statementsMigration, /'trip_code', alr\.trip_code/i);
-  assert.match(statementsMigration, /'daily_load_number', alr\.daily_load_number/i);
-  assert.match(statementsMigration, /'loading_sequence_date', alr\.loading_sequence_date/i);
   assert.match(accountStatementsUi, /row\.trip_code/);
   assert.match(accountStatementsUi, /setOwnerId/);
   assert.match(accountStatementsUi, /vehicles\.find\(v => String\(v\.vehicle_id\) === String\(row\.vehicle_id\)\)\?\.owner_id/);
