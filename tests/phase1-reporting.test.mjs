@@ -18,8 +18,8 @@ test("vehicle identity is generated and permanently associated with its register
 });
 
 test("owner and vehicle reports drill down to completed trips and actual tons", () => {
-  assert.match(reportsMigration, /left join public\.vehicles v on v\.vehicle_id=alr\.vehicle_id/i);
-  assert.match(reportsMigration, /left join public\.vehicle_owners vo on vo\.owner_id=v\.owner_id/i);
+  assert.ok(reportsMigration.toLowerCase().replace(/\s+/g, ' ').includes('left join public.vehicles v on v.vehicle_id = alr.vehicle_id'));
+  assert.ok(reportsMigration.toLowerCase().replace(/\s+/g, ' ').includes('left join public.vehicle_owners vo on vo.owner_id = v.owner_id'));
   assert.match(vehicleReportsUi, /setOwnerVehicle/);
   assert.match(vehicleReportsUi, /tripCode/);
   assert.match(vehicleReportsUi, /factoryFilter/);
@@ -28,7 +28,11 @@ test("owner and vehicle reports drill down to completed trips and actual tons", 
 });
 
 test("factory and quarry statements filter by vehicle, its registered owner, and trip code", () => {
-  assert.match(statementsMigration, /'vehicle_id', v\.vehicle_id/i);
+  assert.match(statementsMigration, /'vehicle_id', alr\.vehicle_id/i);
+  assert.ok(statementsMigration.toLowerCase().replace(/\s+/g, ' ').includes('left join public.vehicles v on v.vehicle_id = alr.vehicle_id'));
+  assert.match(statementsMigration, /'trip_code', alr\.trip_code/i);
+  assert.match(statementsMigration, /'daily_load_number', alr\.daily_load_number/i);
+  assert.match(statementsMigration, /'loading_sequence_date', alr\.loading_sequence_date/i);
   assert.match(accountStatementsUi, /row\.trip_code/);
   assert.match(accountStatementsUi, /setOwnerId/);
   assert.match(accountStatementsUi, /vehicles\.find\(v => String\(v\.vehicle_id\) === String\(row\.vehicle_id\)\)\?\.owner_id/);
