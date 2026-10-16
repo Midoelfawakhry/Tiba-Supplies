@@ -11,6 +11,7 @@ export type LiveSnapshot = {
   actual_loading_records: Record<string, any>[];
   drivers: Record<string, any>[];
   vehicles: Record<string, any>[];
+  office_notifications: Record<string, any>[];
 };
 
 export async function getLiveSnapshot(): Promise<LiveSnapshot> {
@@ -30,6 +31,7 @@ export async function getLiveSnapshot(): Promise<LiveSnapshot> {
     actual_loading_records: data?.actual_loading_records ?? [],
     drivers: data?.drivers ?? [],
     vehicles: data?.vehicles ?? [],
+    office_notifications: data?.office_notifications ?? [],
   };
 }
 
