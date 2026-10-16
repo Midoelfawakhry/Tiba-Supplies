@@ -54,7 +54,7 @@ Read-only metadata checks returned true for:
 
 - GitHub CI build, TypeScript lint, and the complete Phase 1 test suite. The available workflow-run lookup did not return a run, so do not treat tests as passed.
 - Runtime tests with isolated authenticated identities for: driver A cannot see/accept driver B's direct offer; pending direct offers remain absent from branch snapshots; acceptance reveals the trip; queue winners and all loser reasons produce the correct notifications; and repeated weight confirmation is idempotent.
-- Verify the one-minute dispatch scheduler is enabled and successfully invoking the finalizer in Shadow.
+- The one-minute `pg_cron` scheduler is active (`* * * * *`); recent job-run records show successful executions through 2026-10-16 05:13 UTC. Continue monitoring scheduler outcomes during runtime acceptance.
 - Finish migration reconciliation between the divergent Shadow branch and database migration ledger before any release or merge.
 
 **Release status: BLOCKED pending CI/runtime acceptance and migration reconciliation. No merge or Production deployment authorized.**
