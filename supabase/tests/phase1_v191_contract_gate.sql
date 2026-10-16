@@ -124,6 +124,62 @@ begin
 end
 $schema$;
 
+
+do $lifecycle$
+declare
+  v_office_def text;
+  v_delivery_def text;
+  v_booking_id_nullable text;
+begin
+  if to_regclass('public.loading_data_records') is null then
+    raise exception 'V191_LOADING_DATA_SCHEMA_MISSING';
+  end if;
+
+  select is_nullable into v_booking_id_nullable
+  from information_schema.columns
+  where table_schema='public' and table_name='actual_loading_records'
+    and column_name='booking_id';
+  if v_booking_id_nullable <> 'YES' then
+    raise exception 'V191_PAPER_ACTUAL_RECORDS_REQUIRE_NULLABLE_BOOKING_ID';
+  end if;
+
+  if not exists (
+    select 1 from pg_trigger
+    where tgrelid='public.bookings'::regclass
+      and tgname='bookings_sync_loading_data'
+      and not tgisinternal and tgenabled <> 'D'
+  ) then
+    raise exception 'V191_LOADING_DATA_SYNC_TRIGGER_MISSING';
+  end if;
+
+  if has_table_privilege('anon','public.loading_data_records','SELECT')
+     or has_table_privilege('authenticated','public.loading_data_records','SELECT')
+     or has_table_privilege('anon','public.loading_data_records','INSERT')
+     or has_table_privilege('authenticated','public.loading_data_records','INSERT') then
+    raise exception 'V191_LOADING_DATA_DIRECT_ACCESS_EXPOSED';
+  end if;
+
+  v_office_def := upper(pg_get_functiondef(
+    'public.main_office_advance_booking(uuid,text,numeric,text,text)'::regprocedure
+  ));
+  if position('INSERT INTO PUBLIC.ACTUAL_LOADING_RECORDS' in v_office_def) > 0 then
+    raise exception 'V191_OFFICE_LOADED_TRANSITION_MUST_NOT_WRITE_ACTUAL_WEIGHT';
+  end if;
+  if position('ACTUAL_WEIGHT_CAPTURED_AT_DELIVERY' in v_office_def) = 0 then
+    raise exception 'V191_LEGACY_OFFICE_WEIGHT_INPUT_NOT_RETIRED';
+  end if;
+
+  v_delivery_def := upper(pg_get_functiondef(
+    'public.driver_confirm_delivery(uuid,double precision,double precision,double precision,timestamp with time zone,numeric,text,text)'::regprocedure
+  ));
+  if position('INSERT INTO PUBLIC.ACTUAL_LOADING_RECORDS' in v_delivery_def) = 0
+     or position('DRIVER_DELIVERY' in v_delivery_def) = 0
+     or position('ACTUAL_WEIGHT_RECORDED_AT' in v_delivery_def) = 0 then
+    raise exception 'V191_DRIVER_DELIVERY_MUST_WRITE_ACTUAL_WEIGHT_AND_EVIDENCE';
+  end if;
+end
+$lifecycle$;
+
 -- Assignment model is deliberately asserted as a single canonical relation.
 -- This gate currently accepts the newer name only; if source pinning proves that
 -- v191 requires the historical name instead, update this test with a documented decision.
