@@ -9,7 +9,7 @@
 - Target: Supabase project `bvyxiahpxogblkmtjxyx` (Tiba Shadow, eu-west-1).
 - Status: `ACTIVE_HEALTHY`.
 - `public` application tables: none found.
-- Supabase migration ledger: empty.
+- Supabase migration ledger: one row observed on 2026-10-17: `20261016210023 / phase1_revoke_public_rls_event_trigger_shadow_remediation`. The earlier empty-ledger statement was a prior snapshot and is stale.
 - Edge Functions listed in this project: none.
 
 ## Critical bootstrap finding
@@ -78,9 +78,9 @@ The production migration history is documented as containing these versions with
 - `20261011020800_phase1_direct_assignment_acceptance_head_owned`
 - `20261011022028_enforce_head_office_write_permissions_fail_closed`
 
-The expected file paths were checked on `main`, `backup-main-before-live-core`, `phase1-live-core`, `phase1-core-workflow`, `shadow/phase1-hardening`, and `chore/reconcile-legacy-migrations`; they were not present at those exact paths. This is not proof that no equivalent source exists anywhere in Git history. Search commits, tags, alternate paths, and deployment artifacts before deciding whether a clearly labeled archival reconstruction is needed. Never present a reconstruction as the original applied SQL.
+The expected file paths have been checked on `main` and across the currently reachable `shadow/*`, `design/*`, `feat/*`, `fix/*`, `chore/*`, and `release/*` branches inspected on 2026-10-17; the exact paths were not present. Commit-message searches for the three migration names also returned no matches, but this is not proof that no equivalent source exists under alternate paths or in unreachable history. Search tags, alternate paths, and deployment artifacts before deciding whether a clearly labeled archival reconstruction is needed. Never present a reconstruction as the original applied SQL.
 
-## Required validation sequence
+## Queue migration update — 2026-10-17\n\nThe queue schema/RPC migration `supabase/migrations/20261015180000_phase1_queue_selection_and_atomic_dispatch.sql` is now present on `shadow/phase1-hardening` (blob SHA `e2464ea452dbbbda7ae9580caf24ce2b17a190dc`). It was compared with its historical counterpart; the current branch version separates scheduler provisioning rather than embedding the `pg_cron` side effect. The optional scheduler is now `supabase/migrations/20261015186000_phase1_queue_scheduler.sql` (blob SHA `b34b0ac5096b640c38d7797a76f66e9c76cc8813`). The queue schema migration still depends on foundational tables/helpers and references `driver_vehicle_assignments`, which conflicts with Production's `vehicle_driver_assignments` relation. Queue source availability does not remove the bootstrap blocker. See `docs/TIBA-SHADOW-QUEUE-SOURCE-RECOVERY.md`.\n\n## Required validation sequence
 
 1. Recover the base schema source from repository history or a verified schema-only export.
 2. Build a complete inventory of every SQL file on `shadow/phase1-hardening`; check duplicate version prefixes and untracked/legacy files.
@@ -97,5 +97,5 @@ The expected file paths were checked on `main`, `backup-main-before-live-core`, 
 - Base schema source: **not yet identified**.
 - Historical SQL source gaps: **not yet resolved**.
 - Clean bootstrap: **not run**.
-- Tiba Shadow application schema: **still empty**.
+- Tiba Shadow application schema: **still empty** (latest read-only table inventory); one remediation migration is recorded in its ledger.
 - Production mutations / merge to main: **none**.
