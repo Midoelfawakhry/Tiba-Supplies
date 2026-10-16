@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
-const [multiDriverMigration, assignmentsMigration, baseline, directoryUi, assignmentGuard, guardFixMigration, retireLegacyMigration] = await Promise.all([
+const [multiDriverMigration, assignmentsMigration, baseline, directoryUi, assignmentGuard, guardFixMigration, retireLegacyMigration, nativeLocation, liveLocations] = await Promise.all([
   read("../supabase/migrations/20261015190000_phase1_multi_driver_per_vehicle.sql"),
   read("../supabase/migrations/20261014370000_phase1_driver_vehicle_assignments.sql"),
   read("../supabase/migrations/20261014190000_phase1_clean_baseline.sql"),
@@ -11,6 +11,8 @@ const [multiDriverMigration, assignmentsMigration, baseline, directoryUi, assign
   read("../supabase/migrations/20261014430000_phase1_enforce_assigned_vehicle_on_booking.sql"),
   read("../supabase/migrations/20261016083000_phase1_multi_driver_assignment_guard_fix.sql"),
   read("../supabase/migrations/20261016083502_phase1_retire_legacy_vehicle_rpcs.sql"),
+  read("../supabase/functions/driver-native-location/index.ts"),
+  read("../supabase/migrations/20261016103000_phase1_branch_directory_availability_guard.sql"),
 ]);
 
 test("a vehicle can have multiple active driver assignments while a driver has only one", () => {
@@ -39,6 +41,15 @@ test("create and edit flows permit shared active vehicles without weakening book
   assert.match(directoryUi, /تعارض النقلات الفعلية/);
   assert.match(directoryUi, /DRIVER_HAS_ACTIVE_BOOKING/);
   assert.match(directoryUi, /vehicle\.assigned_drivers\.length > 1/);
+});
+
+test("shared vehicles preserve per-driver location tracking", () => {
+  assert.match(nativeLocation, /\.eq\("driver_id", driver\.driver_id\)/);
+  assert.match(nativeLocation, /\.is\("ended_at", null\)/);
+  assert.match(nativeLocation, /\.limit\(1\)\s*\.maybeSingle\(\)/);
+  assert.match(liveLocations, /JOIN LATERAL\s*\(\s*SELECT a\.vehicle_id/i);
+  assert.match(liveLocations, /WHERE a\.driver_id = d\.driver_id/i);
+  assert.match(liveLocations, /ORDER BY a\.assigned_at DESC\s*LIMIT 1/i);
 });
 
 test("legacy single-driver RPCs are retired from client roles", () => {
