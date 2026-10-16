@@ -1285,7 +1285,6 @@ export type Database = {
       }
       get_available_vehicles: { Args: never; Returns: Json }
       get_branch_employee_directory: { Args: never; Returns: Json }
-      get_branch_office_snapshot: { Args: never; Returns: Json }
       get_direct_assignment_trip_identity: {
         Args: { p_booking_id: string }
         Returns: Json
