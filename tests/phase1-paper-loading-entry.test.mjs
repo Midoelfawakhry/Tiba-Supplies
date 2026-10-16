@@ -35,8 +35,8 @@ test("CSV import validates source rows and has an idempotent Main Office RPC", (
   assert.match(importMigration, /DUPLICATE_SOURCE_ROW_NUMBER_IN_FILE/);
   assert.match(importMigration, /DUPLICATE_SOURCE_RECORD_ID_IN_FILE/);
   assert.match(importMigration, /v_date > current_date \+ 1/);
-    assert.match(importMigration, /upper\\(trim\\(vehicle_code\\)\\)=upper\\(trim\\(v_row->>'vehicle_code'\\)\\) and is_active=true/);
-    assert.match(importMigration, /upper\\(trim\\(driver_code\\)\\)=upper\\(trim\\(v_row->>'driver_code'\\)\\) and is_active=true/);
+  assert.match(importMigration, /upper\(trim\(vehicle_code\)\)=upper\(trim\(v_row->>'vehicle_code'\)\) and is_active=true/);
+  assert.match(importMigration, /upper\(trim\(driver_code\)\)=upper\(trim\(v_row->>'driver_code'\)\) and is_active=true/);
   assert.match(importMigration, /v_actor,v_notes/);
   assert.match(importMigration, /VEHICLE_CODE_NOT_FOUND/);
   assert.match(importMigration, /DRIVER_CODE_NOT_FOUND/);
