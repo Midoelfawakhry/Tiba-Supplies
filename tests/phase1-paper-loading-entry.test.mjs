@@ -4,7 +4,7 @@ import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 const [migration, screen, board] = await Promise.all([
-  read("../supabase/migrations/20261017110000_phase1_paper_actual_load_entry.sql"),
+  read("../supabase/migrations/20261017111000_phase1_paper_actual_load_entry.sql"),
   read("../src/components/PaperLoadingEntryScreen.tsx"),
   read("../src/components/LiveOperationsBoard.tsx"),
 ]);
