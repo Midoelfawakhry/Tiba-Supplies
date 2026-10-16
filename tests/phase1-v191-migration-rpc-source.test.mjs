@@ -9,18 +9,21 @@ const migration = (name) => readFileSync(
 
 const baseline = migration('20261014190000_phase1_clean_baseline.sql');
 const mainOffice = migration('20261014200000_phase1_main_office_rpcs.sql');
-const directAssignment = migration('20261015173000_phase1_direct_assignment_acceptance.sql');
 const locationArrival = migration('20261014240000_phase1_driver_location_and_arrival.sql');
 const driverSnapshot = migration('20261014290000_phase1_driver_portal_snapshot.sql');
+const assignmentModel = migration('20261014370000_phase1_driver_vehicle_assignments.sql');
 const delivery = migration('20261015120000_phase1_actual_weight_and_account_rpcs.sql');
+const deliveryIdempotency = migration('20261015120001_phase1_actual_weight_idempotency.sql');
+const directAssignment = migration('20261015173000_phase1_direct_assignment_acceptance.sql');
 const queue = migration('20261015180000_phase1_queue_selection_and_atomic_dispatch.sql');
 const queueHardening = migration('20261015181000_phase1_queue_ui_and_concurrency_hardening.sql');
 const queueNotifications = migration('20261015182000_phase1_queue_driver_notifications.sql');
 const queueVehicleCompatibility = migration('20261015184000_phase1_queue_vehicle_compatibility.sql');
 
 const chain = [
-  baseline, mainOffice, directAssignment, locationArrival, driverSnapshot,
-  delivery, queue, queueHardening, queueNotifications, queueVehicleCompatibility,
+  baseline, mainOffice, locationArrival, driverSnapshot, assignmentModel,
+  delivery, deliveryIdempotency, directAssignment, queue, queueHardening,
+  queueNotifications, queueVehicleCompatibility,
 ].join('\n');
 
 test('reviewed migration source defines every v191 driver RPC name', () => {
@@ -80,16 +83,18 @@ test('queue schema is declared before queue RPCs and later hardening remains pre
 });
 
 
-const assignmentModel = migration('20261014370000_phase1_driver_vehicle_assignments.sql');
-const deliveryIdempotency = migration('20261015120001_phase1_actual_weight_idempotency.sql');
 const tripIdentity = migration('20261011125652_20261011190000_direct_assignment_trip_identity.sql');
 
-test('canonical driver-vehicle assignment model is created before queue compatibility code', () => {
+test('reviewed clean-chain order includes canonical assignments and delivery idempotency before dependent RPCs', () => {
   assert.ok(assignmentModel.includes('create table if not exists public.driver_vehicle_assignments'));
   assert.ok(assignmentModel.includes('assigned_at timestamptz'));
   assert.ok(assignmentModel.includes('ended_at timestamptz'));
   assert.ok(!assignmentModel.includes('create table if not exists public.vehicle_driver_assignments'));
   assert.ok(queueVehicleCompatibility.includes('public.driver_vehicle_assignments'));
+  assert.ok(chain.indexOf(assignmentModel) < chain.indexOf(directAssignment),
+    'canonical driver_vehicle_assignments must exist before direct-assignment RPCs');
+  assert.ok(chain.indexOf(deliveryIdempotency) < chain.indexOf(queue),
+    'delivery idempotency guard must be installed before queue RPCs');
 });
 
 test('v191 schema evolution sources include delivery idempotency and trip identity changes', () => {
