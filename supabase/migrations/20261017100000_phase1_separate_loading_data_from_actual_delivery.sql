@@ -344,7 +344,7 @@ begin
   end if;
   if p_scale_image_path is not null and (
     p_scale_image_path like '/%' or p_scale_image_path like '%..%'
-    or p_scale_image_path like '%://%' or p_scale_image_path like '%\%'
+    or p_scale_image_path like '%://%' or position(chr(92) in p_scale_image_path) > 0
   ) then
     raise exception 'INVALID_SCALE_IMAGE_PATH';
   end if;
