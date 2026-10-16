@@ -214,7 +214,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = pg_catalog, public
-as $
+as $$
 declare
   v_date date;
   v_number bigint;
@@ -248,7 +248,7 @@ begin
   end if;
   return new;
 end;
-$;
+$$;
 
 drop trigger if exists actual_loading_assign_trip_identity on public.actual_loading_records;
 create trigger actual_loading_assign_trip_identity
