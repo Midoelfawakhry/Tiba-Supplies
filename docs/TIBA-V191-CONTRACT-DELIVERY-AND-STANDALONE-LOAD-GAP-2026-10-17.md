@@ -46,6 +46,12 @@ It:
 
 This is a **candidate migration on the review branch**, not an applied or production-approved migration.
 
+### Legacy weight reconciliation added
+
+A further review found that existing `LEGACY` actual-loading rows could still block factory delivery if the office-side weight differed from the driver's confirmed delivery weight. The candidate migration now promotes that existing row to `DRIVER_DELIVERY` during the authenticated delivery transaction and writes the prior source/weight into the audit details. This avoids a duplicate row and retains evidence of the previous value. The booking remains locked during the operation, and non-legacy conflicting weights still fail closed.
+
+The loading-data mirror no longer imposes its own narrow booking-status check, so future valid lifecycle states do not cause the sync trigger to reject a booking update.
+
 ## 5. Tests and remaining validation
 
 The review branch also updates:
