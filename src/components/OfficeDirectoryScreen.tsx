@@ -113,13 +113,22 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
       ]);
       if (directoryResult.error) throw directoryResult.error;
       if (waitingResult.error) throw waitingResult.error;
+      let liveData = data;
+      if (active === 'actual') {
+        const reportsResult = await supabase.rpc('get_vehicle_owner_reports', { p_from: null, p_to: null });
+        if (reportsResult.error) throw reportsResult.error;
+        liveData = {
+          ...data,
+          actual_loading_records: Array.isArray(reportsResult.data?.trips) ? reportsResult.data.trips : [],
+        };
+      }
       const directory = directoryResult.data ?? {};
       const factories = (directory.factories ?? []).map((r: Row) => ({ factory_id: r.id, code: r.code, factory_code: r.code, name: r.name, notes: r.notes, is_active: r.is_active }));
       const quarries = (directory.quarries ?? []).map((r: Row) => ({ quarry_id: r.id, code: r.code, quarry_code: r.code, name: r.name, notes: r.notes, is_active: r.is_active, latitude: r.latitude, longitude: r.longitude }));
       const drivers = (directory.drivers ?? []).map((r: Row) => ({ driver_id: r.id, driver_code: r.code, code: r.code, name: r.name, phone: r.phone, office_id: r.office_id, is_active: r.is_active, vehicle_id: r.vehicle_id, vehicle_code: r.vehicle_code, plate_number: r.plate_number }));
       const ownerById = new Map<string, Row>((directory.owners ?? []).map((owner: Row) => [String(owner.id), owner] as [string, Row]));
       const vehicles = (directory.vehicles ?? []).map((r: Row) => { const linkedOwner = ownerById.get(r.owner_id); return ({ vehicle_id: r.id, vehicle_code: r.code, plate_number: r.plate_number, owner_id: r.owner_id, owner_name: r.owner_name ?? linkedOwner?.name ?? null, owner_code: r.owner_code ?? linkedOwner?.code ?? null, owner_phone: r.owner_phone ?? linkedOwner?.phone ?? null, office_id: r.office_id, is_active: r.is_active, assigned_drivers: Array.isArray(r.assigned_drivers) ? r.assigned_drivers : (r.assigned_driver_id ? [{ id: r.assigned_driver_id, name: r.assigned_driver_name }] : []) }); });
-      setSnapshot({ ...data, factories, quarries, drivers, vehicles });
+      setSnapshot({ ...liveData, factories, quarries, drivers, vehicles });
       setWaiting(Array.isArray(waitingResult.data?.entries) ? waitingResult.data.entries : []);
       setWaitingWindow(waitingResult.data?.selection_window ?? null);
       setAvailableVehicles(vehicles.filter((v: Row) => v.is_active !== false));
@@ -129,7 +138,7 @@ export const OfficeDirectoryScreen: React.FC<{ initialSection?: ScreenKey; showS
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [active]);
   useEffect(() => { void load(); }, [load]);
 
   const refreshWaitingQueue = useCallback(async () => {
