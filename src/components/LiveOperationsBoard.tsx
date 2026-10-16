@@ -75,7 +75,19 @@ export const LiveOperationsBoard: React.FC = () => {
 
   const localNow = new Date();
   const todayKey = `${localNow.getFullYear()}-${String(localNow.getMonth() + 1).padStart(2, '0')}-${String(localNow.getDate()).padStart(2, '0')}`;
-  const todaysActualCount = (data?.actual_loading_records ?? []).filter((row: Record<string, any>) => String(row.loading_sequence_date ?? row.load_date ?? '').slice(0, 10) === todayKey).length;
+  const todaysActualCount = (data?.actual_loading_records ?? []).filter((row: Record<string, any>) => {
+    // Dashboard RPC returns loaded_at; report RPCs may instead return date-only fields.
+    const explicitDate = row.loading_sequence_date ?? row.load_date;
+    if (explicitDate != null && String(explicitDate).trim() !== '') {
+      return String(explicitDate).slice(0, 10) === todayKey;
+    }
+
+    if (row.loaded_at == null || String(row.loaded_at).trim() === '') return false;
+    const loadedAt = new Date(row.loaded_at);
+    if (Number.isNaN(loadedAt.getTime())) return false;
+    const loadedAtLocalKey = `${loadedAt.getFullYear()}-${String(loadedAt.getMonth() + 1).padStart(2, '0')}-${String(loadedAt.getDate()).padStart(2, '0')}`;
+    return loadedAtLocalKey === todayKey;
+  }).length;
 
   async function createLoadOrder(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
