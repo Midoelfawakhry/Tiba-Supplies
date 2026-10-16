@@ -37,6 +37,8 @@ test("CSV import validates source rows and has an idempotent Main Office RPC", (
   assert.match(importMigration, /FACTORY_CODE_NOT_FOUND/);
   assert.match(importMigration, /QUARRY_CODE_NOT_FOUND/);
   assert.match(importMigration, /actual_loading_records_import_source_id_unique/);
+  assert.match(importMigration, /SOURCE_IDENTITY_CONFLICT/);
+  assert.match(importMigration, /v_existing\.actual_weight is distinct from round\(v_weight,3\)/);
   assert.match(importMigration, /record_source,source_record_id,source_file_name,source_row_number,imported_at/);
   assert.match(importMigration, /grant execute on function public\.main_office_import_paper_loads\(text,jsonb\) to authenticated/i);
   assert.match(screen, /main_office_import_paper_loads/);
