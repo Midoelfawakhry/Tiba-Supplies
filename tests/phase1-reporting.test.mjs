@@ -6,7 +6,7 @@ const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 const [vehicleOwnerSql, reportsMigration, statementsMigration, vehicleReportsUi, accountStatementsUi] = await Promise.all([
   read("../supabase/migrations/20261014340000_phase1_vehicle_owner_and_vehicle_creation.sql"),
   read("../supabase/migrations/20261011001729_vehicle_owner_reports.sql"),
-  read("../supabase/migrations/20261011105953_account_statement_records_head_only.sql"),
+  read("../supabase/migrations/20261016010000_account_statement_trip_identifiers.sql"),
   read("../src/components/VehicleOwnerReportsScreen.tsx"),
   read("../src/components/AccountStatementsScreen.tsx"),
 ]);
@@ -29,6 +29,10 @@ test("owner and vehicle reports drill down to completed trips and actual tons", 
 
 test("factory and quarry statements filter by vehicle, its registered owner, and trip code", () => {
   assert.match(statementsMigration, /'vehicle_id', alr\.vehicle_id/i);
+  assert.ok(statementsMigration.toLowerCase().replace(/\s+/g, ' ').includes('left join public.vehicles v on v.vehicle_id = alr.vehicle_id'));
+  assert.match(statementsMigration, /'trip_code', alr\.trip_code/i);
+  assert.match(statementsMigration, /'daily_load_number', alr\.daily_load_number/i);
+  assert.match(statementsMigration, /'loading_sequence_date', alr\.loading_sequence_date/i);
   assert.ok(statementsMigration.toLowerCase().replace(/\s+/g, ' ').includes('left join public.vehicles v on v.vehicle_id = alr.vehicle_id'));
   assert.match(statementsMigration, /'trip_code', alr\.trip_code/i);
   assert.match(statementsMigration, /'daily_load_number', alr\.daily_load_number/i);
