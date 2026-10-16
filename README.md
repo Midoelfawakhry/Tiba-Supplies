@@ -41,7 +41,7 @@ Migration added:
 - The manual form validates date, vehicle, driver, factory, quarry, and positive actual weight, then calls the restricted `main_office_record_paper_actual_load` RPC.
 - Added CSV file reading, required-header validation, a row-count limit, and a preview before submitting the import through `main_office_import_paper_loads`.
 - CSV import requires `load_date, vehicle_code, driver_code, factory_code, quarry_code, actual_weight`; optional columns are `ticket_number, notes, source_record_id`.
-- The server validates the whole file before inserting rows, records source file/row provenance, skips previously imported source identities, assigns daily trip identity, and writes audit events.
+- The server validates the whole file before inserting rows, records source file/row provenance, skips exact repeats, rejects reused source identities whose business values changed, assigns daily trip identity, and writes audit events.
 - Added contract tests for the manual-entry authorization and provenance path.
 - **Not yet proven:** the new SQL has not been applied to the intended Shadow database; the CSV/manual flows are not ready for operational use until database migration reconciliation and authenticated integration testing are complete.
 
