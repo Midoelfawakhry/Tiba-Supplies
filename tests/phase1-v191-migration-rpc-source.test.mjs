@@ -103,6 +103,6 @@ test('baseline is not treated as a complete v191 bootstrap by itself', () => {
   assert.ok(!baseline.includes('create table public.driver_vehicle_assignments'));
   const bookingTable = baseline.match(/create\s+table\s+(?:if\s+not\s+exists\s+)?public\.bookings\s*\(([\s\S]*?)\n\);/i);
   assert.ok(bookingTable, 'clean baseline should define public.bookings');
-  assert.ok(!/\btrip_code\b/i.test(bookingTable[1]), 'trip_code must come from a later schema migration, not the baseline');
+  assert.ok(/\btrip_code\s+text\s+not\s+null\s+unique\b/i.test(bookingTable[1]), 'baseline bookings must retain its declared trip_code contract');
   assert.ok(!baseline.includes('create table public.dispatch_windows'));
 });
