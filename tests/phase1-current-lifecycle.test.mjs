@@ -3,10 +3,11 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
-const [lifecycle, baseline, assignmentUi] = await Promise.all([
+const [lifecycle, baseline, assignmentUi, separation] = await Promise.all([
   read("../supabase/migrations/20261015173000_phase1_direct_assignment_acceptance.sql"),
   read("../supabase/migrations/20261014190000_phase1_clean_baseline.sql"),
   read("../src/components/DirectLoadAssignmentScreen.tsx"),
+  read("../supabase/migrations/20261017100000_phase1_separate_loading_data_from_actual_delivery.sql"),
 ]);
 
 test("direct assignment creates a pending offer without recording actual loading", () => {
@@ -32,13 +33,26 @@ test("driver acceptance is ownership-checked and does not create a loading recor
   assert.doesNotMatch(accept, /insert into public\.actual_loading_records/i);
 });
 
-test("actual loading is created at LOADED and one booking cannot be counted twice", () => {
-  const advance = lifecycle.slice(
-    lifecycle.indexOf("create or replace function public.main_office_advance_booking"),
-    lifecycle.indexOf("-- Expose the acceptance state/time")
+test("LOADED is a workflow state; actual weight is recorded only at factory delivery", () => {
+  const advance = separation.slice(
+    separation.indexOf("create or replace function public.main_office_advance_booking"),
+    separation.indexOf("-- Final delivery is the only current-flow writer of actual weight")
   );
-  assert.match(advance, /v_booking\.assignment_type='DIRECT'.*DRIVER_ACCEPTANCE_REQUIRED/s);
-  assert.match(advance, /if v_next='LOADED' then[\s\S]*?insert into public\.actual_loading_records/i);
-  assert.match(advance, /POSITIVE_ACTUAL_WEIGHT_REQUIRED/);
+  const delivery = separation.slice(separation.indexOf("create or replace function public.driver_confirm_delivery"));
+  assert.match(advance, /DRIVER_ACCEPTANCE_REQUIRED/);
+  assert.match(advance, /ACTUAL_WEIGHT_CAPTURED_AT_DELIVERY/);
+  assert.doesNotMatch(advance, /insert into public\.actual_loading_records/i);
+  assert.match(delivery, /insert into public\.actual_loading_records/i);
+  assert.match(delivery, /'DRIVER_DELIVERY'/);
+  assert.match(delivery, /p_actual_weight numeric/);
   assert.match(baseline, /booking_id uuid not null unique references public\.bookings\(booking_id\)/i);
+});
+
+test("assignment loading data is separate and paper actual records can exist without bookings", () => {
+  assert.match(separation, /create table if not exists public\.loading_data_records/i);
+  assert.match(separation, /create trigger bookings_sync_loading_data/i);
+  assert.match(separation, /alter column booking_id drop not null/i);
+  assert.match(separation, /record_source in \('DRIVER_DELIVERY','PAPER_IMPORT','OFFICE_CORRECTION','LEGACY'\)/i);
+  assert.match(separation, /booking_id is not null\s+or \(load_date is not null and vehicle_id is not null and driver_id is not null/i);
+  assert.match(separation, /left join public\.bookings b on b\.booking_id=alr\.booking_id/i);
 });
