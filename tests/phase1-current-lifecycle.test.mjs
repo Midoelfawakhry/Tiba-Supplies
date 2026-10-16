@@ -45,6 +45,9 @@ test("LOADED is a workflow state; actual weight is recorded only at factory deli
   assert.match(delivery, /insert into public\.actual_loading_records/i);
   assert.match(delivery, /'DRIVER_DELIVERY'/);
   assert.match(delivery, /p_actual_weight numeric/);
+  assert.match(delivery, /v_actual\.record_source = 'LEGACY'/);
+  assert.match(delivery, /'previous_actual_weight',v_actual\.actual_weight/);
+  assert.match(delivery, /actual_weight_recorded_at=now\(\)/);
   assert.match(baseline, /booking_id uuid not null unique references public\.bookings\(booking_id\)/i);
 });
 
