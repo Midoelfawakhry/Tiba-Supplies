@@ -55,7 +55,7 @@ Deno.serve(async (req: Request) => {
     if (audience === "BRANCH") {
       const { data: branchOffice, error: branchOfficeError } = await admin.from("offices")
         .select("office_id").eq("office_id", profile.office_id)
-        .eq("office_type", "BRANCH").eq("is_active", true).maybeSingle();
+        .eq("office_code", "RAS_SEDR").eq("office_type", "BRANCH").eq("is_active", true).maybeSingle();
       if (branchOfficeError) throw branchOfficeError;
       if (!branchOffice) return json({ error: "BRANCH_OFFICE_REQUIRED" }, 403);
     }
