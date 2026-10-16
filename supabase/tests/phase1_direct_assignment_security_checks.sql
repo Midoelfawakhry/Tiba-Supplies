@@ -1,230 +1,28 @@
--- Static database-side regression checks for Phase 1 RPC definitions.
--- Prove the authorization regex catches role predicates but ignores ordinary
--- geofence references. These checks are safe to run without application fixtures.
+-- Retired legacy Phase 1 assertions.
+-- The old body asserted a superseded lifecycle (direct_assign_standalone_load,
+-- get_pending_direct_assignments, and creating actual_loading_records on driver
+-- acceptance). The current workflow is:
+--   main_office_create_direct_trip -> accept_direct_assignment
+--   -> main_office_advance_booking(LOADING) -> main_office_advance_booking(LOADED)
+-- Current definition-level lifecycle checks live in:
+--   supabase/tests/phase1_current_lifecycle_checks.sql
+-- Do not restore the legacy assertions; Git history retains the prior version.
+
+-- Keep only the standalone regex behavior smoke checks that remain valid.
 DO $regex_checks$
 BEGIN
   IF NOT ('IF R.NAME IN (''ADMIN'', ''HEAD_OFFICE'', ''BRANCH'') THEN NULL; END IF;'
       ~* $$R\.NAME\s+IN\s*\([^)]*'BRANCH'$$) THEN
     RAISE EXCEPTION 'REGEX_MUST_MATCH_BRANCH_ROLE_GATE';
   END IF;
+
   IF NOT ('AND R.NAME = ''BRANCH''' ~* $$R\.NAME\s*=\s*'BRANCH'$$) THEN
     RAISE EXCEPTION 'REGEX_MUST_MATCH_BRANCH_ROLE_EQUALITY';
   END IF;
+
   IF ('-- BRANCH is only a geofence reference; no role predicate here'
       ~* $$R\.NAME\s+IN\s*\([^)]*'BRANCH'$$) THEN
     RAISE EXCEPTION 'REGEX_MUST_IGNORE_GEOFENCE_COMMENT';
   END IF;
 END
 $regex_checks$;
-
--- Run only in isolated staging AFTER all intended Phase 1 migrations.
--- This script does not create bookings, drivers, GPS points, or loading records.
-
-DO $checks$
-DECLARE
-  v_def text;
-  v_sig text;
-  v_required text[] := ARRAY[
-    'public.direct_assign_standalone_load(uuid,uuid,uuid)',
-    'public.get_pending_direct_assignments()',
-    'public.accept_direct_assignment(uuid)',
-    'public.get_driver_portal_snapshot()',
-    'public.dispatch_load(uuid)',
-    'public.office_cancel_booking(uuid,text,boolean)',
-    'public.office_redirect_booking(uuid,uuid,text)'
-  ];
-  v_write_targets text[] := ARRAY[
-    'create_operational_driver',
-    'create_operational_vehicle',
-    'create_load_order',
-    'direct_assign_standalone_load',
-    'update_operational_driver',
-    'update_operational_vehicle',
-    'dispatch_load',
-    'office_cancel_booking',
-    'office_redirect_booking'
-  ];
-  r record;
-BEGIN
-  FOREACH v_sig IN ARRAY v_required LOOP
-    IF to_regprocedure(v_sig) IS NULL THEN
-      RAISE EXCEPTION 'REQUIRED_PHASE1_RPC_MISSING: %', v_sig;
-    END IF;
-  END LOOP;
-
-  -- Direct assignment must create a pending booking only; it must not write
-  -- an actual loading record before driver acceptance.
-  SELECT pg_get_functiondef(to_regprocedure(
-    'public.direct_assign_standalone_load(uuid,uuid,uuid)'
-  )) INTO v_def;
-  IF position('VALUES(NULL,V_DRIVER_ID,P_VEHICLE_ID,''BOOKED'',NOW())' in upper(v_def)) = 0
-     OR position('VALUES(NULL,V_DRIVER_ID,P_VEHICLE_ID,''LOADING_STATEMENT'',NOW())' in upper(v_def)) > 0
-     OR position('INSERT INTO PUBLIC.ACTUAL_LOADING_RECORDS' in upper(v_def)) > 0 THEN
-    RAISE EXCEPTION 'DIRECT_ASSIGNMENT_MUST_REMAIN_PENDING_UNTIL_ACCEPTED';
-  END IF;
-
-  -- Acceptance must lock the booking, enforce driver ownership, and create
-  -- the one actual record in the same transaction.
-  SELECT pg_get_functiondef(to_regprocedure(
-    'public.accept_direct_assignment(uuid)'
-  )) INTO v_def;
-  IF position('FOR UPDATE' in upper(v_def)) = 0
-     OR position('DIRECT_ASSIGNMENT_NOT_YOURS' in upper(v_def)) = 0
-     OR position('INSERT INTO PUBLIC.ACTUAL_LOADING_RECORDS' in upper(v_def)) = 0
-     OR position('ACCEPTED_AT' in upper(v_def)) = 0 THEN
-    RAISE EXCEPTION 'DIRECT_ACCEPTANCE_GUARDS_MISSING';
-  END IF;
-
-  -- Reject common role-gate forms that explicitly authorize BRANCH. Match
-  -- role comparisons, not every occurrence of the word BRANCH (which is also
-  -- used legitimately for geofence/location configuration).
-  FOR r IN
-    SELECT p.proname, pg_get_function_identity_arguments(p.oid) AS args,
-           pg_get_functiondef(p.oid) AS def
-    FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
-    WHERE n.nspname='public' AND p.proname = ANY(v_write_targets)
-  LOOP
-    IF upper(r.def) ~ $$R\.NAME\s+IN\s*\([^)]*'BRANCH'$$
-       OR upper(r.def) ~ $$R\.NAME\s*=\s*'BRANCH'$$
-       OR upper(r.def) ~ $$ROLE_NAME\s*=\s*'BRANCH'$$ THEN
-      RAISE EXCEPTION 'BRANCH_ROLE_STILL_PRESENT_IN_WRITE_RPC: %.%', r.proname, r.args;
-    END IF;
-  END LOOP;
-
-  -- Cancellation must never route queue ownership through the geofence BRANCH.
-  SELECT pg_get_functiondef(to_regprocedure(
-    'public.office_cancel_booking(uuid,text,boolean)'
-  )) INTO v_def;
-  IF position('OFFICE_TYPE = ''HEAD''' in upper(v_def)) = 0
-     OR position('OFFICE_TYPE = ''BRANCH''' in upper(v_def)) > 0
-     OR position('V_HEAD_OFFICE_ID' in upper(v_def)) = 0
-     OR position('QUEUE_ENTRY_ID' in upper(v_def)) = 0 THEN
-    RAISE EXCEPTION 'CANCELLATION_MUST_USE_HEAD_OPERATIONAL_QUEUE';
-  END IF;
-
-  -- Cancellation may allow IN_TRANSIT only when no weight/delivery evidence exists.
-  SELECT pg_get_functiondef(to_regprocedure(
-    'public.office_cancel_booking(uuid,text,boolean)'
-  )) INTO v_def;
-  IF position('ACTUAL_WEIGHT IS NOT NULL' in upper(v_def)) = 0
-     OR position('DELIVERY_CONFIRMED_AT IS NOT NULL' in upper(v_def)) = 0
-     OR position('V_BOOKING.STATUS IN (''IN_TRANSIT'', ''DELIVERED'', ''COMPLETED'')' in upper(v_def)) > 0 THEN
-    RAISE EXCEPTION 'CANCELLATION_MUST_USE_WEIGHT_DELIVERY_EVIDENCE_NOT_TRANSIT_STATUS';
-  END IF;
-
-  -- Dispatch must authorize only HEAD/ADMIN and consume the HEAD-owned queue.
-  SELECT pg_get_functiondef(to_regprocedure('public.dispatch_load(uuid)')) INTO v_def;
-  IF position('W.OFFICE_ID = V_LOAD.OFFICE_ID' in upper(v_def)) = 0
-     OR position('GEO.RESULT->>''ELIGIBLE'' = ''TRUE''' in upper(v_def)) = 0
-     OR position('W.OFFICE_ID = V_LOAD.CHECK_IN_OFFICE_ID' in upper(v_def)) > 0
-     OR upper(v_def) ~ $$R\.NAME\s+IN\s*\([^)]*'BRANCH'$$
-     OR upper(v_def) ~ $$R\.NAME\s*=\s*'BRANCH'$$ THEN
-    RAISE EXCEPTION 'DISPATCH_MUST_USE_HEAD_QUEUE_AND_GEOFENCE_ELIGIBILITY_ONLY';
-  END IF;
-
-  -- Redirect must reject BRANCH and validate the booking's HEAD ownership.
-  SELECT pg_get_functiondef(to_regprocedure('public.office_redirect_booking(uuid,uuid,text)')) INTO v_def;
-  IF upper(v_def) ~ $$R\.NAME\s+IN\s*\([^)]*'BRANCH'$$
-     OR upper(v_def) ~ $$R\.NAME\s*=\s*'BRANCH'$$
-     OR upper(v_def) ~ $$R\.NAME\s*=\s*'BRANCH'$$
-     OR position('LOAD_NOT_OWNED_BY_HEAD_OFFICE' in upper(v_def)) = 0
-     OR position('DIRECT_ASSIGNMENT_NOT_OWNED_BY_HEAD_OFFICE' in upper(v_def)) = 0 THEN
-    RAISE EXCEPTION 'REDIRECT_MUST_BE_HEAD_ONLY_AND_CHECK_OWNERSHIP';
-  END IF;
-
-  -- Redirect must remain available after weight/delivery and preserve the audit trail.
-  SELECT pg_get_functiondef(to_regprocedure('public.office_redirect_booking(uuid,uuid,text)')) INTO v_def;
-  IF position('''DELIVERED''' in upper(v_def)) = 0
-     OR position('''COMPLETED''' in upper(v_def)) = 0
-     OR position('CORRECTIVE_AFTER_DELIVERY' in upper(v_def)) = 0
-     OR position('FACTORY_ID' in upper(v_def)) = 0
-     OR position('ACTUAL_WEIGHT' in upper(v_def)) = 0 THEN
-    RAISE EXCEPTION 'REDIRECT_MUST_SUPPORT_POST_DELIVERY_CORRECTION_AND_AUDIT';
-  END IF;
-
-  -- Branch app must be read-only and must not receive the full HEAD snapshot.
-  IF to_regprocedure('public.get_branch_office_snapshot()') IS NULL
-     OR to_regprocedure('public.get_branch_employee_directory()') IS NULL
-     OR to_regprocedure('public.set_branch_employee_active(uuid,boolean)') IS NULL THEN
-    RAISE EXCEPTION 'BRANCH_APP_REQUIRED_RPC_MISSING';
-  END IF;
-  SELECT pg_get_functiondef(to_regprocedure('public.get_phase1_snapshot()')) INTO v_def;
-  IF position('R.NAME IN (''ADMIN'', ''HEAD_OFFICE'')' in upper(v_def)) = 0
-     OR position('R.NAME IN (''ADMIN'', ''HEAD_OFFICE'', ''BRANCH'')' in upper(v_def)) > 0 THEN
-    RAISE EXCEPTION 'BRANCH_MUST_NOT_READ_FULL_HEAD_SNAPSHOT';
-  END IF;
-  SELECT pg_get_functiondef(to_regprocedure('public.get_branch_office_snapshot()')) INTO v_def;
-  IF position('R.NAME = ''BRANCH''' in upper(v_def)) = 0
-     OR position('AU.OFFICE_ID' in upper(v_def)) = 0
-     OR position('OFFICE_TYPE = ''BRANCH''' in upper(v_def)) = 0 THEN
-    RAISE EXCEPTION 'BRANCH_SNAPSHOT_MUST_ENFORCE_BRANCH_OFFICE_SCOPE';
-  END IF;
-  IF position('SDA.OFFICE_ID = V_BRANCH_OFFICE_ID' in upper(v_def)) = 0
-     OR position('SDA.OFFICE_ID = V_HEAD_OFFICE_ID' in upper(v_def)) > 0 THEN
-    RAISE EXCEPTION 'BRANCH_SNAPSHOT_MUST_INCLUDE_ONLY_THIS_BRANCH_DIRECT_ASSIGNMENTS';
-  END IF;
-  SELECT pg_get_functiondef(to_regprocedure('public.get_branch_employee_directory()')) INTO v_def;
-  IF position('HEAD_OFFICE' in upper(v_def)) = 0
-     OR position('R.NAME IN (''ADMIN'', ''HEAD_OFFICE'', ''BRANCH'')' in upper(v_def)) > 0
-     OR position('R.NAME = ''BRANCH''' in upper(v_def)) > 0 THEN
-    RAISE EXCEPTION 'BRANCH_EMPLOYEE_MANAGEMENT_MUST_BE_HEAD_ONLY';
-  END IF;
-
-  -- Legacy broad read RPCs must not bypass the branch-scoped snapshot.
-  FOREACH v_sig IN ARRAY ARRAY[
-    'public.get_available_vehicles()',
-    'public.get_driver_edit_options(uuid)',
-    'public.get_office_waiting_list()',
-    'public.get_vehicle_live_locations()',
-    'public.get_vehicle_owner_directory()',
-    'public.get_vehicle_owner_reports(date,date)'
-  ] LOOP
-    IF to_regprocedure(v_sig) IS NULL THEN
-      RAISE EXCEPTION 'BRANCH_RESTRICTED_READ_RPC_MISSING: %', v_sig;
-    END IF;
-    SELECT pg_get_functiondef(to_regprocedure(v_sig)) INTO v_def;
-    IF position('R.NAME IN (''ADMIN'', ''HEAD_OFFICE'', ''BRANCH'')' in upper(v_def)) > 0 THEN
-      RAISE EXCEPTION 'LEGACY_READ_RPC_STILL_EXPOSED_TO_BRANCH: %', v_sig;
-    END IF;
-  END LOOP;
-
-  -- Critical SECURITY DEFINER entry points must pin search_path to public (or
-  -- an equivalently reviewed fixed path) to reduce object-shadowing risk.
-  FOREACH v_sig IN ARRAY ARRAY[
-    'public.direct_assign_standalone_load(uuid,uuid,uuid)',
-    'public.get_pending_direct_assignments()',
-    'public.accept_direct_assignment(uuid)',
-    'public.get_driver_portal_snapshot()',
-    'public.dispatch_load(uuid)',
-    'public.office_cancel_booking(uuid,text,boolean)',
-    'public.office_redirect_booking(uuid,uuid,text)'
-  ] LOOP
-    SELECT pg_get_functiondef(to_regprocedure(v_sig)) INTO v_def;
-    IF position('SECURITY DEFINER' in upper(v_def)) > 0
-       AND position('set search_path' in lower(v_def)) = 0 THEN
-      RAISE EXCEPTION 'SECURITY_DEFINER_WITHOUT_FIXED_SEARCH_PATH: %', v_sig;
-    END IF;
-  END LOOP;
-END
-$checks$;
-
--- Report grants for manual least-privilege review. This result is diagnostic;
--- it does not claim that every RPC has passed authorization testing.
-SELECT
-  p.proname,
-  pg_get_function_identity_arguments(p.oid) AS arguments,
-  p.prosecdef AS security_definer,
-  has_function_privilege('anon', p.oid, 'EXECUTE') AS anon_can_execute,
-  has_function_privilege('authenticated', p.oid, 'EXECUTE') AS authenticated_can_execute
-FROM pg_proc p
-JOIN pg_namespace n ON n.oid = p.pronamespace
-WHERE n.nspname = 'public'
-  AND p.proname IN (
-    'direct_assign_standalone_load',
-    'get_pending_direct_assignments',
-    'accept_direct_assignment',
-    'dispatch_load',
-    'office_cancel_booking',
-    'office_redirect_booking'
-  )
-ORDER BY p.proname, arguments;
