@@ -1,7 +1,7 @@
 # Phase 1 Clean-Chain CI Evidence — 2026-10-16
 
 ## Scope
-Evidence recorded from GitHub Actions on branch `shadow/phase1-hardening`, commit `e607174183e3232300441937614021056e5827ca`. This is a candidate branch only. No merge to `main), no production deployment, and no Supabase migration application were performed.
+Evidence recorded from GitHub Actions on branch `shadow/phase1-hardening`, commit `e607174183e3232300441937614021056e5827ca`. This is a candidate branch only. No merge to `main`, no production deployment, and no Supabase migration application were performed.
 
 ## Verified CI results
 
