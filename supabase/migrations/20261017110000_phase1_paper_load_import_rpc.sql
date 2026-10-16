@@ -99,7 +99,7 @@ begin
           and (alr.source_row_number=v_source_row
             or (v_source_id is not null and alr.source_record_id=v_source_id))
       ) then
-        v_duplicates := v_duplicates + 1;
+        null; -- Duplicate rows are counted once during the insert/idempotency pass.
       end if;
     exception when others then
       v_errors := v_errors || jsonb_build_array(jsonb_build_object(
