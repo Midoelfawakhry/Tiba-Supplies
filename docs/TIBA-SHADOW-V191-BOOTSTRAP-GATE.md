@@ -72,3 +72,12 @@ GitHub Actions run [Phase 1 Shadow CI #38974294393](https://github.com/Midoelfaw
 - No schema migrations were applied as part of this audit.
 - No changes to the operational Supabase project, signed release workflow, AI assistant, or native tracking code.
 - The prior RLS event-trigger permission remediation is applied and verified on Shadow, but it does not make the application schema ready.
+
+
+## Confirmed contract blocker — delivery and paper actual-loading (2026-10-17)
+
+Static comparison of the current v191 `DriverApp.tsx` with the clean-chain delivery migration confirmed that the client passes eight named arguments to `driver_confirm_delivery`, including actual weight and scale image path, while `20261014300000_phase1_harden_driver_delivery_confirmation.sql` defines only six arguments and does not persist or return actual weight. The standalone v191 contract gate is not currently run in the inspected CI workflow, so the green chain smoke does not catch this mismatch.
+
+The clean baseline also requires `actual_loading_records.booking_id` and `recorded_by` to be non-null and ties each record uniquely to a booking; this does not model paper actual-loading entries independent of bookings as seen in the Production inventory. Resolution must cover storage, identity, atomicity, and idempotency—not merely add unused RPC parameters.
+
+Detailed evidence and acceptance criteria: [Delivery and actual-loading gap report](TIBA-V191-CONTRACT-DELIVERY-AND-STANDALONE-LOAD-GAP-2026-10-17.md). Keep this a release blocker until the contract is reconciled and tested.
