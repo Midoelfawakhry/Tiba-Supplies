@@ -2,9 +2,10 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const [migration, mainOfficeMigration, liveData, dashboard, driverApp] = await Promise.all([
+const [migration, mainOfficeMigration, directoryGuardMigration, liveData, dashboard, driverApp] = await Promise.all([
   readFile(new URL("../supabase/migrations/20261016100000_phase1_branch_privacy_and_weight_notifications.sql", import.meta.url), "utf8"),
   readFile(new URL("../supabase/migrations/20261016102000_phase1_main_office_weight_notifications.sql", import.meta.url), "utf8"),
+  readFile(new URL("../supabase/migrations/20261016103000_phase1_branch_directory_availability_guard.sql", import.meta.url), "utf8"),
   readFile(new URL("../src/services/liveData.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/components/LiveOperationsBoard.tsx", import.meta.url), "utf8"),
   readFile(new URL("../src/components/DriverApp.tsx", import.meta.url), "utf8"),
@@ -38,4 +39,10 @@ test("driver outcome notifications render outside the geofence-only load selecti
   assert.match(driverApp, /إشعارات نتيجة التوزيع|إشعارات التوزيع/);
   assert.match(driverApp, /تظهر إشعارات نتيجة التوزيع حتى لو كنت خارج نطاق الـ 10 كم/);
   assert.match(driverApp, /LOAD_REQUEST_NOT_ALLOCATED|notifications\.map/);
+});
+
+test("branch privacy does not falsely label a pending direct-assignment driver as available", () => {
+  assert.match(directoryGuardMigration, /pending\.direct_acceptance_status='PENDING'/i);
+  assert.match(directoryGuardMigration, /'availability',CASE WHEN d\.is_active AND v\.is_active AND NOT EXISTS/i);
+  assert.doesNotMatch(directoryGuardMigration, /AND NOT \(bx\.assignment_type='DIRECT' AND bx\.direct_acceptance_status='PENDING'/i);
 });
