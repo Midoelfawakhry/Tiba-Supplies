@@ -32,6 +32,12 @@ test("paper loading form validates weight and uses the scoped server RPC", () =>
 test("CSV import validates source rows and has an idempotent Main Office RPC", () => {
   assert.match(importMigration, /v_actor := public\.current_main_office_user\(\)/i);
   assert.match(importMigration, /jsonb_array_length\(p_rows\) > 2000/);
+  assert.match(importMigration, /DUPLICATE_SOURCE_ROW_NUMBER_IN_FILE/);
+  assert.match(importMigration, /DUPLICATE_SOURCE_RECORD_ID_IN_FILE/);
+  assert.match(importMigration, /v_date > current_date \+ 1/);
+  assert.match(importMigration, /vehicle_code\)=upper\(trim\(v_row->>'vehicle_code'\)\) and is_active=true/);
+  assert.match(importMigration, /driver_code\)=upper\(trim\(v_row->>'driver_code'\)\) and is_active=true/);
+  assert.match(importMigration, /v_actor,v_notes/);
   assert.match(importMigration, /VEHICLE_CODE_NOT_FOUND/);
   assert.match(importMigration, /DRIVER_CODE_NOT_FOUND/);
   assert.match(importMigration, /FACTORY_CODE_NOT_FOUND/);
