@@ -155,7 +155,7 @@ BEGIN
       WHERE driver_id=v_choice.driver_id AND is_active=true
       FOR UPDATE;
 
-      IF NOT FOUND OR v_entry.status<>'WAITING' THEN
+      IF NOT FOUND OR v_entry.entry_id IS NULL OR v_entry.status<>'WAITING' THEN
         v_reason := 'DRIVER_OR_QUEUE_NO_LONGER_ELIGIBLE';
       END IF;
 
