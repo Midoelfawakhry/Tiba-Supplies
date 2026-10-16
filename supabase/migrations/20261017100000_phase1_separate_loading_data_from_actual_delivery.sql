@@ -126,6 +126,128 @@ begin
 end;
 $constraints$;
 
+
+-- Allocate a stable per-day identity for every actual-loading record, including paper rows.
+-- This is separate from the booking's trip_code and is concurrency-safe under concurrent inserts.
+create table if not exists public.daily_loading_counters (
+  loading_date date primary key,
+  last_number bigint not null default 0 check (last_number >= 0),
+  updated_at timestamptz not null default now()
+);
+alter table public.daily_loading_counters enable row level security;
+revoke all on table public.daily_loading_counters from public, anon, authenticated;
+
+with numbered as (
+  select alr.actual_load_id,
+         coalesce(alr.loading_sequence_date,alr.load_date,alr.loaded_at::date,alr.created_at::date) as seq_date,
+         row_number() over (
+           partition by coalesce(alr.loading_sequence_date,alr.load_date,alr.loaded_at::date,alr.created_at::date)
+           order by alr.created_at,alr.actual_load_id
+         ) as rn
+  from public.actual_loading_records alr
+  where alr.daily_load_number is null
+), maxima as (
+  select coalesce(loading_sequence_date,load_date,loaded_at::date,created_at::date) as seq_date,
+         coalesce(max(daily_load_number),0) as max_number
+  from public.actual_loading_records
+  group by coalesce(loading_sequence_date,load_date,loaded_at::date,created_at::date)
+)
+update public.actual_loading_records alr
+set loading_sequence_date=numbered.seq_date,
+    daily_load_number=maxima.max_number+numbered.rn
+from numbered
+join maxima on maxima.seq_date=numbered.seq_date
+where alr.actual_load_id=numbered.actual_load_id;
+
+update public.actual_loading_records alr
+set trip_code=coalesce(
+  alr.trip_code,
+  (select b.trip_code from public.bookings b where b.booking_id=alr.booking_id),
+  format('TIBA-%s-X%s',to_char(alr.loading_sequence_date,'YYYYMMDD'),lpad(alr.daily_load_number::text,6,'0'))
+)
+where alr.trip_code is null;
+
+do $identity_checks$
+begin
+  if exists (
+    select 1 from public.actual_loading_records
+    group by trip_code having count(*)>1
+  ) then
+    raise exception 'ACTUAL_LOADING_DUPLICATE_TRIP_CODES_REQUIRE_RECONCILIATION';
+  end if;
+  if exists (
+    select 1 from public.actual_loading_records
+    group by loading_sequence_date,daily_load_number having count(*)>1
+  ) then
+    raise exception 'ACTUAL_LOADING_DUPLICATE_DAILY_NUMBERS_REQUIRE_RECONCILIATION';
+  end if;
+end;
+$identity_checks$;
+
+alter table public.actual_loading_records
+  alter column trip_code set not null,
+  alter column daily_load_number set not null,
+  alter column loading_sequence_date set not null;
+
+insert into public.daily_loading_counters(loading_date,last_number)
+select loading_sequence_date,max(daily_load_number)
+from public.actual_loading_records
+group by loading_sequence_date
+on conflict(loading_date) do update
+set last_number=greatest(public.daily_loading_counters.last_number,excluded.last_number),
+    updated_at=now();
+
+create unique index if not exists actual_loading_records_daily_number_unique
+  on public.actual_loading_records(loading_sequence_date,daily_load_number);
+
+create or replace function public.assign_actual_loading_trip_code()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $
+declare
+  v_date date;
+  v_number bigint;
+  v_booking_trip_code text;
+begin
+  if tg_op='INSERT' then
+    v_date:=coalesce(new.load_date,new.created_at::date,current_date);
+    insert into public.daily_loading_counters(loading_date,last_number)
+    values(v_date,1)
+    on conflict(loading_date) do update
+      set last_number=public.daily_loading_counters.last_number+1,updated_at=now()
+    returning last_number into v_number;
+
+    new.loading_sequence_date:=v_date;
+    new.daily_load_number:=v_number;
+    if new.booking_id is not null then
+      select b.trip_code into v_booking_trip_code
+      from public.bookings b where b.booking_id=new.booking_id;
+      if v_booking_trip_code is null then raise exception 'BOOKING_TRIP_CODE_MISSING'; end if;
+      new.trip_code:=v_booking_trip_code;
+    else
+      new.trip_code:=format('TIBA-%s-X%s',to_char(v_date,'YYYYMMDD'),lpad(v_number::text,6,'0'));
+    end if;
+    return new;
+  end if;
+
+  if new.trip_code is distinct from old.trip_code
+     or new.daily_load_number is distinct from old.daily_load_number
+     or new.loading_sequence_date is distinct from old.loading_sequence_date then
+    raise exception 'TRIP_IDENTITY_IS_IMMUTABLE';
+  end if;
+  return new;
+end;
+$;
+
+drop trigger if exists actual_loading_assign_trip_identity on public.actual_loading_records;
+create trigger actual_loading_assign_trip_identity
+before insert or update on public.actual_loading_records
+for each row execute function public.assign_actual_loading_trip_code();
+
+revoke all on function public.assign_actual_loading_trip_code() from public,anon,authenticated;
+
 create index if not exists actual_loading_records_load_date_idx
   on public.actual_loading_records(load_date desc, actual_load_id);
 create index if not exists actual_loading_records_vehicle_date_idx
@@ -380,7 +502,6 @@ begin
           factory_id=v_order.factory_id,
           trip_code=v_booking.trip_code,
           load_date=current_date,
-          loading_sequence_date=current_date,
           actual_weight_recorded_at=now(),
           record_source='DRIVER_DELIVERY',
           loaded_at=now(),
