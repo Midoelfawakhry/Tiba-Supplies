@@ -19,11 +19,12 @@ const queue = migration('20261015180000_phase1_queue_selection_and_atomic_dispat
 const queueHardening = migration('20261015181000_phase1_queue_ui_and_concurrency_hardening.sql');
 const queueNotifications = migration('20261015182000_phase1_queue_driver_notifications.sql');
 const queueVehicleCompatibility = migration('20261015184000_phase1_queue_vehicle_compatibility.sql');
+const queueOfficeVisibility = migration('20261015185000_phase1_queue_office_selection_visibility.sql');
 
 const chain = [
   baseline, mainOffice, locationArrival, driverSnapshot, assignmentModel,
   delivery, deliveryIdempotency, directAssignment, queue, queueHardening,
-  queueNotifications, queueVehicleCompatibility,
+  queueNotifications, queueVehicleCompatibility, queueOfficeVisibility,
 ].join('\n');
 
 test('reviewed migration source defines every v191 driver RPC name', () => {
@@ -91,6 +92,9 @@ test('reviewed clean-chain order includes canonical assignments and delivery ide
   assert.ok(assignmentModel.includes('ended_at timestamptz'));
   assert.ok(!assignmentModel.includes('create table if not exists public.vehicle_driver_assignments'));
   assert.ok(queueVehicleCompatibility.includes('public.driver_vehicle_assignments'));
+  assert.ok(queueOfficeVisibility.includes('public.waiting_list_entries'));
+  assert.ok(chain.indexOf(queueVehicleCompatibility) < chain.indexOf(queueOfficeVisibility),
+    'queue visibility RPC must follow queue compatibility setup');
   assert.ok(chain.indexOf(assignmentModel) < chain.indexOf(directAssignment),
     'canonical driver_vehicle_assignments must exist before direct-assignment RPCs');
   assert.ok(chain.indexOf(deliveryIdempotency) < chain.indexOf(queue),
