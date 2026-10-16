@@ -212,3 +212,8 @@ jobs:
             end if;
           end $chain$;
           SQL
+
+      - name: Run full v191 SQL contract gate
+        env:
+          PGPASSWORD: postgres
+        run: psql -h localhost -U postgres -d tiba_chain_test -v ON_ERROR_STOP=1 -f supabase/tests/phase1_v191_contract_gate.sql
