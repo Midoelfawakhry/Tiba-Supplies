@@ -1,31 +1,33 @@
 # Shadow Phase 1 Audit — 2026-10-16
 
 ## Scope and safety
-Read-only review of `Midoelfawakhry/Tiba-Supplies` branch `shadow/phase1-hardening` and the connected Supabase project `awgppfjxegognuqozldl` (Tiba Supplies Shadow). No database migrations, operational rows, branch merges, deployments, or production changes were performed during this audit.
+Read-only review of `Midoelfawakhry/Tiba-Supplies` branch `shadow/phase1-hardening` and connected Supabase project `awgppfjxegognuqozldl` (Tiba Supplies Shadow). No operational rows, branch merges, production deployments, or Primary database changes were performed.
 
 ## Verified findings
 
-### Repository state
-- `shadow/phase1-hardening` differs from `main`: GitHub compare reports **296 commits ahead and 9 behind**; status is `diverged`.
-- PR #63 remains open and Draft. It is not mergeable (`dirty`) and must not be merged as part of this audit.
-- The repository migration reconciliation note already records that the SQL migration directory is not a reproducible clean bootstrap: duplicated/date-only version prefixes, ledger entries without matching files, and the early live-core migration is not a complete schema.
-- The branch contains a Shadow CI workflow for npm install, `npm run test:phase1`, `npm run lint`, and `npm run build`; however, the connected GitHub workflow-run lookup returned **no runs for commit `bf742e3999f3e857ec1299dd01dfffefbb303797`**. Therefore no CI pass is verified in this audit.
-- The Android signed-release workflow is configured to build office, branch, and driver APKs and requires Android signing secrets. APK creation/signing is not verified by this audit.
+### Repository and CI
+- The branch differs from `main`: GitHub compare reported **296 commits ahead and 9 behind** at the time of comparison; status is `diverged`.
+- PR #63 remains open and Draft; do not merge while migration history is unreconciled.
+- A real GitHub Actions run has now completed successfully for commit `72e64069d114a2a7f39683e2646519c700af9f50`: [Phase 1 Shadow CI run #232](https://github.com/Midoelfawakhry/Tiba-Supplies/actions/runs/38859892352).
+- Verified successful workflow steps: dependency installation, `npm run test:phase1`, `npm run lint` (TypeScript check), and `npm run build`. This confirms those checks passed for that exact commit, not runtime behavior against real authenticated users.
+- The Android signed-release workflow is configured for office, branch, and driver APKs and requires signing secrets. Signed APK generation/install/native tracking acceptance are still unverified.
 
-### Supabase Shadow state
-- Read-only migration ledger inspection shows a sequence of applied migrations, including manually named compatibility/repair entries and repeated direct-trip migration names. This confirms the live Shadow schema has history beyond a simple replay of the repository folder; do not recreate a fresh project by blindly applying the folder.
-- The Shadow security advisor reports many `SECURITY DEFINER` RPCs executable by `authenticated`, plus leaked-password protection disabled. SECURITY DEFINER is not automatically a vulnerability, but each exposed function must be checked for server-side role/office authorization before production use.
-- The performance advisor reports 28 foreign keys without covering indexes and one unused index. These are optimization follow-ups, not proof of functional failure.
-- The current database has the expected dispatch functions and the actual-weight notification trigger. The notification/dispatch functions reviewed are not granted to anon; the two internal dispatch finalizer functions are not executable by authenticated users.
-- An initial policy inventory query returned no rows for a set of table names; this does not establish that the tables lack security because policies may use other names or be enforced through RPCs. A complete RLS review is still required.
+### Supabase Shadow
+- Migration ledger contains applied compatibility/repair entries and repeated direct-trip migration names. The live database is not safely reproducible by blindly replaying the repository migration folder into a fresh project.
+- Read-only metadata checks confirm:
+  - The dispatch finalizer functions are not executable by `anon` or `authenticated`.
+  - Key office/driver RPCs are executable by authenticated users but not anon.
+  - Direct table SELECT/INSERT/UPDATE/DELETE privileges are not granted to anon/authenticated for the reviewed operational tables (`bookings`, `actual_loading_records`, `dispatch_windows`, `driver_load_choices`, `notifications`, `office_notifications`, `waiting_list_entries`); RLS is enabled on these tables. The policy inventory returned zero policies for these tables, so direct client access appears intentionally closed and access is through guarded RPCs/service role. Confirm the complete intended access model before adding policies.
+  - The one-minute dispatch scheduler is active; recent runs through 2026-10-16 06:13 UTC succeeded.
+- The Supabase security advisor reports a number of `SECURITY DEFINER` RPCs callable by authenticated users and leaked-password protection disabled. SECURITY DEFINER is not inherently unsafe, but each function must enforce the intended role and office scope.
+- The performance advisor reports 28 foreign keys without covering indexes and one unused index; these are optimization follow-ups.
 
 ## Release gates still open
-1. Reconcile the complete schema and migration history into a deterministic, uniquely versioned bootstrap strategy for a fresh, separate Supabase project.
-2. Verify every exposed SECURITY DEFINER function has explicit authorization and safe `search_path`; remediate findings only after reviewing intended office/driver access.
-3. Run the Shadow CI workflow and record actual run IDs and outcomes. No passing run is claimed here.
-4. Build and install the Android APKs, including native driver tracking validation, against Shadow configuration.
-5. Perform end-to-end acceptance using dedicated test identities and synthetic records only: direct assignment acceptance/privacy, queue eligibility/geofence, winner/loser outcomes, actual-weight notifications, delivery gate, reports, and cancellation/redirect lifecycle.
-6. Only after the above gates pass, transfer the verified application and canonical schema to the new isolated project/repository.
+1. Reconcile the full schema and migration history into a deterministic, uniquely versioned bootstrap for a separate fresh project.
+2. Finish function-by-function authorization review of exposed `SECURITY DEFINER` RPCs and verify the exact role/office checks.
+3. Build, install, and validate signed Android APKs against Shadow, including native driver tracking.
+4. Run end-to-end acceptance with dedicated test identities and synthetic records only: direct assignment privacy/acceptance, queue eligibility/geofence, winner/loser outcomes, actual-weight notifications, delivery gate, reports, cancellation and redirect lifecycle.
+5. After these gates pass, transfer the verified app and canonical schema to the intended isolated project.
 
 ## Decision
-**Not ready for clean-project transfer or release yet.** Keep the existing Primary project untouched. Keep PR #63 Draft and do not merge.
+**CI passed for the audited commit; release and clean-project transfer remain blocked** by migration reconciliation, function-level authorization review, and Android/runtime acceptance. Keep Primary untouched and PR #63 Draft.
