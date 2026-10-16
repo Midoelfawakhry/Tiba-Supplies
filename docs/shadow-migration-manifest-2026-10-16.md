@@ -99,3 +99,14 @@ The expected file paths have been checked on `main` and across the currently rea
 - Clean bootstrap: **not run**.
 - Tiba Shadow application schema: **still empty** (latest read-only table inventory); one remediation migration is recorded in its ledger.
 - Production mutations / merge to main: **none**.
+
+
+## Actual-weight lifecycle correction candidate — 2026-10-17
+
+Candidate migration added on the review branch:
+- `supabase/migrations/20261017100000_phase1_separate_loading_data_from_actual_delivery.sql`
+
+It creates a separate assignment/loading-data ledger synced from bookings; makes actual-loading rows support standalone paper entries with date/vehicle/driver/factory/quarry/trip fields; changes the office `LOADED` transition to stop writing actual weight; and makes the existing eight-argument v191 delivery RPC the current-flow writer of actual weight and scale evidence. It also updates the two reporting RPCs to include paper records.
+
+The source-level tests and `supabase/tests/phase1_v191_contract_gate.sql` were updated, and the clean PostgreSQL workflow now invokes the SQL contract gate after replay. These are **review-branch candidate changes only**. The latest workflow runs were queued/in progress at last check, so the migration is not yet declared validated. Do not apply it to live Shadow or Production until CI completes and the full schema/source reconciliation is approved.
+
