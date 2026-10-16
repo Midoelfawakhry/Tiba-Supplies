@@ -78,9 +78,6 @@ begin
  );
 end $$;
 
--- The create-driver RPC takes four arguments, including the linked vehicle UUID.
-revoke all on function public.main_office_update_driver(uuid,text,text,text) from public,anon,authenticated;
-
 revoke all on function public.main_office_create_driver(text,text,text,uuid) from public,anon,authenticated;
 revoke all on function public.main_office_update_driver(uuid,text,text,text,uuid) from public,anon,authenticated;
 grant execute on function public.main_office_create_driver(text,text,text,uuid) to authenticated;
