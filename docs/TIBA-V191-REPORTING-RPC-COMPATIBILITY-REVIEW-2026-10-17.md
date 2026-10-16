@@ -48,6 +48,11 @@ All three functions exist in `public`, are `SECURITY DEFINER`, use `search_path=
 5. Keep the Shadow target isolated. Production remains read-only; no migration, reset, restore, merge to `main`, or deployment is authorized by this review.
 6. Preserve the v191 AI assistant, native background tracking, and signed Android release workflow unchanged.
 
+
+## v191 source pin confirmation
+
+The reviewed `src/components/DriverApp.tsx` blob on `shadow/phase1-hardening` is identical to the blob at signed Shadow APK build commit `d969c35f44b6abe06748e3c155cb932a8a2f53bb` (blob SHA `6839504bfc99cce040b0bcedc167ba855043541b`). This pins the inspected driver client file to that build commit; it does not by itself prove database RPC compatibility or on-device workflow correctness.
+
 ## Source references
 
 - `src/components/AccountStatementsScreen.tsx`
