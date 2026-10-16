@@ -75,19 +75,26 @@ export const LiveOperationsBoard: React.FC = () => {
 
   const localNow = new Date();
   const todayKey = `${localNow.getFullYear()}-${String(localNow.getMonth() + 1).padStart(2, '0')}-${String(localNow.getDate()).padStart(2, '0')}`;
-  const todaysActualCount = (data?.actual_loading_records ?? []).filter((row: Record<string, any>) => {
-    // Dashboard RPC returns loaded_at; report RPCs may instead return date-only fields.
-    const explicitDate = row.loading_sequence_date ?? row.load_date;
-    if (explicitDate != null && String(explicitDate).trim() !== '') {
-      return String(explicitDate).slice(0, 10) === todayKey;
-    }
+  const todaysActualCount = new Set(
+    (data?.actual_loading_records ?? [])
+      .filter((row: Record<string, any>) => {
+        // Count only trips that have an actual-loading record, regardless of normal/direct assignment.
+        // Dashboard RPC returns loaded_at; report RPCs may instead return date-only fields.
+        const explicitDate = row.loading_sequence_date ?? row.load_date;
+        if (explicitDate != null && String(explicitDate).trim() !== '') {
+          return String(explicitDate).slice(0, 10) === todayKey;
+        }
 
-    if (row.loaded_at == null || String(row.loaded_at).trim() === '') return false;
-    const loadedAt = new Date(row.loaded_at);
-    if (Number.isNaN(loadedAt.getTime())) return false;
-    const loadedAtLocalKey = `${loadedAt.getFullYear()}-${String(loadedAt.getMonth() + 1).padStart(2, '0')}-${String(loadedAt.getDate()).padStart(2, '0')}`;
-    return loadedAtLocalKey === todayKey;
-  }).length;
+        if (row.loaded_at == null || String(row.loaded_at).trim() === '') return false;
+        const loadedAt = new Date(row.loaded_at);
+        if (Number.isNaN(loadedAt.getTime())) return false;
+        const loadedAtLocalKey = `${loadedAt.getFullYear()}-${String(loadedAt.getMonth() + 1).padStart(2, '0')}-${String(loadedAt.getDate()).padStart(2, '0')}`;
+        return loadedAtLocalKey === todayKey;
+      })
+      // A booking represents one trip; avoid counting duplicate records for the same trip twice.
+      .map((row: Record<string, any>) => String(row.booking_id ?? row.actual_load_id ?? ''))
+      .filter((tripId: string) => tripId !== '')
+  ).size;
 
   async function createLoadOrder(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
