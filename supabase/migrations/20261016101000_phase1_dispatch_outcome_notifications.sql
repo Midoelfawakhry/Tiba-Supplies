@@ -175,7 +175,7 @@ BEGIN
             power(sin(radians(v_location.latitude-v_office.latitude)/2),2)
             +cos(radians(v_office.latitude))*cos(radians(v_location.latitude))
             *power(sin(radians(v_location.longitude-v_office.longitude)/2),2)
-          )))));
+          ))));
           IF v_distance_m>coalesce(v_office.geofence_radius_m,10000) THEN
             v_reason := 'OUTSIDE_GEOFENCE';
           END IF;
