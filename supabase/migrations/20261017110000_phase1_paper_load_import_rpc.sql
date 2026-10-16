@@ -46,6 +46,18 @@ begin
     raise exception 'PAPER_IMPORT_ROW_COUNT_OUT_OF_RANGE';
   end if;
 
+  -- Reject repeated row identities inside the uploaded file before touching data.
+  if exists (
+    select 1 from jsonb_array_elements(p_rows) e
+    group by nullif(trim(e->>'source_row_number'),'')
+    having nullif(trim(e->>'source_row_number'),'') is not null and count(*) > 1
+  ) then raise exception 'DUPLICATE_SOURCE_ROW_NUMBER_IN_FILE'; end if;
+  if exists (
+    select 1 from jsonb_array_elements(p_rows) e
+    group by nullif(trim(e->>'source_record_id'),'')
+    having nullif(trim(e->>'source_record_id'),'') is not null and count(*) > 1
+  ) then raise exception 'DUPLICATE_SOURCE_RECORD_ID_IN_FILE'; end if;
+
   -- Validate the entire file before inserting anything, so a bad row cannot leave a partial import.
   for v_row in select value from jsonb_array_elements(p_rows)
   loop
@@ -55,6 +67,7 @@ begin
       if v_source_row is null or v_source_row < 1 then raise exception 'SOURCE_ROW_NUMBER_REQUIRED'; end if;
       v_date := nullif(trim(v_row->>'load_date'),'')::date;
       if v_date is null then raise exception 'LOAD_DATE_REQUIRED'; end if;
+      if v_date > current_date + 1 then raise exception 'LOAD_DATE_IN_FUTURE'; end if;
       v_weight := nullif(trim(v_row->>'actual_weight'),'')::numeric;
       if v_weight is null or v_weight <= 0 or v_weight > 1000 then raise exception 'ACTUAL_WEIGHT_OUT_OF_RANGE'; end if;
       if nullif(trim(v_row->>'vehicle_code'),'') is null
@@ -77,19 +90,19 @@ begin
       end if;
 
       select vehicle_id into v_vehicle_id from public.vehicles
-      where upper(trim(vehicle_code))=upper(trim(v_row->>'vehicle_code'));
+      where upper(trim(vehicle_code))=upper(trim(v_row->>'vehicle_code')) and is_active=true;
       if v_vehicle_id is null then raise exception 'VEHICLE_CODE_NOT_FOUND'; end if;
 
       select driver_id into v_driver_id from public.drivers
-      where upper(trim(driver_code))=upper(trim(v_row->>'driver_code'));
+      where upper(trim(driver_code))=upper(trim(v_row->>'driver_code')) and is_active=true;
       if v_driver_id is null then raise exception 'DRIVER_CODE_NOT_FOUND'; end if;
 
       select factory_id into v_factory_id from public.factories
-      where upper(trim(factory_code))=upper(trim(v_row->>'factory_code'));
+      where upper(trim(factory_code))=upper(trim(v_row->>'factory_code')) and is_active=true;
       if v_factory_id is null then raise exception 'FACTORY_CODE_NOT_FOUND'; end if;
 
       select quarry_id into v_quarry_id from public.quarries
-      where upper(trim(quarry_code))=upper(trim(v_row->>'quarry_code'));
+      where upper(trim(quarry_code))=upper(trim(v_row->>'quarry_code')) and is_active=true;
       if v_quarry_id is null then raise exception 'QUARRY_CODE_NOT_FOUND'; end if;
 
       -- A source identity is idempotent only when the existing business values match.
@@ -142,13 +155,13 @@ begin
     end if;
 
     select vehicle_id into v_vehicle_id from public.vehicles
-      where upper(trim(vehicle_code))=upper(trim(v_row->>'vehicle_code'));
+      where upper(trim(vehicle_code))=upper(trim(v_row->>'vehicle_code')) and is_active=true;
     select driver_id into v_driver_id from public.drivers
-      where upper(trim(driver_code))=upper(trim(v_row->>'driver_code'));
+      where upper(trim(driver_code))=upper(trim(v_row->>'driver_code')) and is_active=true;
     select factory_id into v_factory_id from public.factories
-      where upper(trim(factory_code))=upper(trim(v_row->>'factory_code'));
+      where upper(trim(factory_code))=upper(trim(v_row->>'factory_code')) and is_active=true;
     select quarry_id into v_quarry_id from public.quarries
-      where upper(trim(quarry_code))=upper(trim(v_row->>'quarry_code'));
+      where upper(trim(quarry_code))=upper(trim(v_row->>'quarry_code')) and is_active=true;
 
     v_date := (v_row->>'load_date')::date;
     v_weight := (v_row->>'actual_weight')::numeric;
@@ -160,7 +173,7 @@ begin
       load_date,vehicle_id,driver_id,quarry_id,factory_id,actual_weight_recorded_at,
       record_source,source_record_id,source_file_name,source_row_number,imported_at
     ) values (
-      null,round(v_weight,3),v_ticket,null,(v_date::timestamp at time zone 'UTC'),null,v_notes,
+      null,round(v_weight,3),v_ticket,null,(v_date::timestamp at time zone 'Africa/Cairo'),v_actor,v_notes,
       v_date,v_vehicle_id,v_driver_id,v_quarry_id,v_factory_id,now(),
       'PAPER_IMPORT',v_source_id,trim(p_source_file_name),v_source_row,now()
     ) returning actual_load_id into v_load_id;
