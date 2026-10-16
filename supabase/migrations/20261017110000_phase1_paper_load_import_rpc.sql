@@ -30,6 +30,7 @@ declare
   v_ticket text;
   v_notes text;
   v_load_id uuid;
+  v_existing public.actual_loading_records%rowtype;
   v_errors jsonb := '[]'::jsonb;
 begin
   v_actor := public.current_main_office_user();
@@ -91,15 +92,25 @@ begin
       where upper(trim(quarry_code))=upper(trim(v_row->>'quarry_code'));
       if v_quarry_id is null then raise exception 'QUARRY_CODE_NOT_FOUND'; end if;
 
-      -- Existing source identity is a harmless idempotent duplicate; conflicting mappings are rejected.
+      -- A source identity is idempotent only when the existing business values match.
+      -- Reusing a filename/row number for changed content must never silently hide a correction.
       v_source_id := nullif(trim(v_row->>'source_record_id'),'');
-      if exists (
-        select 1 from public.actual_loading_records alr
-        where alr.source_file_name=trim(p_source_file_name)
-          and (alr.source_row_number=v_source_row
-            or (v_source_id is not null and alr.source_record_id=v_source_id))
+      select alr.* into v_existing
+      from public.actual_loading_records alr
+      where alr.source_file_name=trim(p_source_file_name)
+        and (alr.source_row_number=v_source_row
+          or (v_source_id is not null and alr.source_record_id=v_source_id))
+      limit 1;
+      if found and (
+        v_existing.load_date is distinct from v_date
+        or v_existing.actual_weight is distinct from round(v_weight,3)
+        or v_existing.vehicle_id is distinct from v_vehicle_id
+        or v_existing.driver_id is distinct from v_driver_id
+        or v_existing.factory_id is distinct from v_factory_id
+        or v_existing.quarry_id is distinct from v_quarry_id
+        or v_existing.ticket_number is distinct from nullif(trim(v_row->>'ticket_number'),'')
       ) then
-        null; -- Duplicate rows are counted once during the insert/idempotency pass.
+        raise exception 'SOURCE_IDENTITY_CONFLICT';
       end if;
     exception when others then
       v_errors := v_errors || jsonb_build_array(jsonb_build_object(
