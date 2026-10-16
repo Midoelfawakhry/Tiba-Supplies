@@ -1,0 +1,130 @@
+-- Tiba-Supplies v191 contract gate.
+-- Run only against a disposable clean PostgreSQL database after applying the proposed
+-- clean migration chain. This is an assertion script, not a migration.
+-- Expected to FAIL while v191 RPCs are unresolved; do not run against Production.
+
+begin;
+
+do $gate$
+declare
+  missing text[];
+  rpc_name text;
+  required_rpcs text[] := array[
+    'driver_get_pending_assignments',
+    'driver_get_dispatch_state',
+    'driver_get_portal_snapshot',
+    'driver_select_load',
+    'driver_confirm_delivery',
+    'accept_direct_assignment',
+    'driver_update_live_location',
+    'driver_confirm_arrival',
+    'driver_check_in_queue'
+  ];
+begin
+  select array_agg(x) into missing
+  from unnest(required_rpcs) as x
+  where not exists (
+    select 1 from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = x
+  );
+
+  if missing is not null then
+    raise exception 'V191_RPC_MISSING: %', array_to_string(missing, ', ');
+  end if;
+
+  -- The eight-argument delivery contract is what the v191 client calls by named args.
+  if not exists (
+    select 1
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname = 'driver_confirm_delivery'
+      and p.proargnames @> array[
+        'p_booking_id','p_latitude','p_longitude','p_accuracy_m',
+        'p_captured_at','p_actual_weight','p_scale_image_path','p_notes'
+      ]::text[]
+  ) then
+    raise exception 'V191_DELIVERY_SIGNATURE_MISMATCH: expected named arguments booking, lat/lon, accuracy, captured_at, actual_weight, scale_image_path, notes';
+  end if;
+
+  if not exists (
+    select 1
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname = 'driver_confirm_arrival'
+      and p.proargnames @> array[
+        'p_booking_id','p_latitude','p_longitude','p_accuracy_m','p_captured_at'
+      ]::text[]
+  ) then
+    raise exception 'V191_ARRIVAL_SIGNATURE_MISMATCH';
+  end if;
+
+  if not exists (
+    select 1
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname = 'driver_select_load'
+      and p.proargnames @> array['p_load_order_id']::text[]
+  ) then
+    raise exception 'V191_SELECT_LOAD_SIGNATURE_MISMATCH';
+  end if;
+end
+$gate$;
+
+do $schema$
+declare
+  missing text[];
+  required_columns text[][] := array[
+    array['public','bookings','booking_id'],
+    array['public','bookings','driver_id'],
+    array['public','bookings','vehicle_id'],
+    array['public','bookings','status'],
+    array['public','bookings','trip_code'],
+    array['public','actual_loading_records','booking_id'],
+    array['public','actual_loading_records','actual_weight'],
+    array['public','actual_loading_records','scale_image_path'],
+    array['public','driver_live_locations','driver_id'],
+    array['public','driver_live_locations','latitude'],
+    array['public','driver_live_locations','longitude'],
+    array['public','driver_live_locations','accuracy_m'],
+    array['public','driver_live_locations','captured_at']
+  ];
+  item text[];
+begin
+  foreach item slice 1 in array required_columns loop
+    if not exists (
+      select 1
+      from information_schema.columns c
+      where c.table_schema = item[1]
+        and c.table_name = item[2]
+        and c.column_name = item[3]
+    ) then
+      missing := array_append(missing, item[2] || '.' || item[3]);
+    end if;
+  end loop;
+
+  if missing is not null then
+    raise exception 'V191_REQUIRED_COLUMN_MISSING: %', array_to_string(missing, ', ');
+  end if;
+end
+$schema$;
+
+-- Assignment model is deliberately asserted as a single canonical relation.
+-- This gate currently accepts the newer name only; if source pinning proves that
+-- v191 requires the historical name instead, update this test with a documented decision.
+do $assignment$
+begin
+  if to_regclass('public.driver_vehicle_assignments') is null then
+    raise exception 'V191_ASSIGNMENT_MODEL_UNRESOLVED: public.driver_vehicle_assignments is absent';
+  end if;
+
+  if to_regclass('public.vehicle_driver_assignments') is not null then
+    raise exception 'DUPLICATE_ASSIGNMENT_MODELS: both assignment table names exist; reconcile instead of maintaining two sources of truth';
+  end if;
+end
+$assignment$;
+
+rollback;
