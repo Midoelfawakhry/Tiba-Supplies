@@ -529,16 +529,7 @@ grant execute on function public.get_office_waiting_list() to authenticated;
 revoke all on function public.main_office_publish_load_order(uuid) from public,anon,authenticated;
 grant execute on function public.main_office_publish_load_order(uuid) to authenticated;
 
--- A minute-level scheduler closes expired windows even if no user opens the app.
-create extension if not exists pg_cron with schema pg_catalog;
-do $$
-begin
-  if exists(select 1 from cron.job where jobname='tiba-finalize-expired-dispatch-windows') then
-    perform cron.unschedule(jobid) from cron.job where jobname='tiba-finalize-expired-dispatch-windows';
-  end if;
-  perform cron.schedule('tiba-finalize-expired-dispatch-windows','* * * * *',
-    $job$select public.finalize_expired_dispatch_windows();$job$);
-end;
-$$;
+-- Scheduling is isolated in 20261015186000_phase1_queue_scheduler.sql so the
+-- schema/RPC chain can be validated on plain PostgreSQL without pg_cron.
 
 notify pgrst, 'reload schema';
