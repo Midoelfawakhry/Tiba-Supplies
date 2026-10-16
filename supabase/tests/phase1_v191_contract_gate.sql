@@ -184,6 +184,37 @@ begin
     raise exception 'V191_LOADING_DATA_DIRECT_ACCESS_EXPOSED';
   end if;
 
+  -- Storage predicates must use narrow SECURITY DEFINER helpers because direct
+  -- SELECT on bookings/drivers/app_users is intentionally revoked from client roles.
+  if not has_function_privilege('authenticated','public.can_upload_scale_ticket(text)','EXECUTE')
+     or not has_function_privilege('authenticated','public.can_read_scale_ticket(text)','EXECUTE')
+     or not has_function_privilege('authenticated','public.can_delete_scale_ticket(text)','EXECUTE') then
+    raise exception 'V191_SCALE_TICKET_POLICY_HELPER_GRANTS_MISSING';
+  end if;
+  if has_function_privilege('anon','public.can_upload_scale_ticket(text)','EXECUTE')
+     or has_function_privilege('anon','public.can_read_scale_ticket(text)','EXECUTE')
+     or has_function_privilege('anon','public.can_delete_scale_ticket(text)','EXECUTE') then
+    raise exception 'V191_SCALE_TICKET_POLICY_HELPERS_EXPOSED_TO_ANON';
+  end if;
+  if not exists (
+    select 1 from pg_policies
+    where schemaname='storage' and tablename='objects'
+      and policyname='driver_upload_own_scale_ticket'
+      and position('can_upload_scale_ticket' in lower(coalesce(with_check,'')))>0
+  ) or not exists (
+    select 1 from pg_policies
+    where schemaname='storage' and tablename='objects'
+      and policyname='read_scale_tickets_for_driver_or_office'
+      and position('can_read_scale_ticket' in lower(coalesce(qual,'')))>0
+  ) or not exists (
+    select 1 from pg_policies
+    where schemaname='storage' and tablename='objects'
+      and policyname='driver_delete_unconfirmed_scale_ticket'
+      and position('can_delete_scale_ticket' in lower(coalesce(qual,'')))>0
+  ) then
+    raise exception 'V191_SCALE_TICKET_STORAGE_POLICIES_MISSING_OR_UNSCOPED';
+  end if;
+
   v_office_def := upper(pg_get_functiondef(
     'public.main_office_advance_booking(uuid,text,numeric,text,text)'::regprocedure
   ));
