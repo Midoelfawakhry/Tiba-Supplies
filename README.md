@@ -1,175 +1,124 @@
-# Tiba-Supplies — Phase 1 Shadow Handover
+# Tiba-Supplies — Latest Phase 1 Handover
 
-**Last updated:** 2026-10-17  
+**Updated:** 2026-10-17  
 **Working branch:** `shadow/phase1-hardening`  
-**Latest reviewed commit:** `ab3f7b3d64e3d52f0ad66f853adaaed2da05867b`  
-**Status:** Phase 1 hardening checks pass. This is **not** authorization to deploy, merge to `main`, or change Production.
+**Latest Phase 1 CI/build commit:** `ab3f7b3d64e3d52f0ad66f853adaaed2da05867b`  
+**Latest README update before this revision:** `d2f921757ca4d80090a776a0437c9b89576ca843`
 
-> هذا الملف هو سجل التسليم الحالي: ما تم تنفيذه، وما تم اختباره، وما لا يزال مطلوبًا قبل اعتماد الإصدار.
+## Latest work completed
 
-## 1. Safety boundaries — do not bypass
+- Updated the project handover with the implementation summary, build status, artifacts, safety boundaries, and remaining tasks.
+- Rechecked that Phase 1 Shadow CI and Phase 1 build succeeded on commit `ab3f7b3d`.
+- Verified that migration-integrity, signed Android, and Windows packaging workflows completed successfully on commit `ecd39f6d`.
+- Changes remain on `shadow/phase1-hardening`; no merge to `main` was performed.
 
-- Work on `shadow/phase1-hardening` only unless a separate instruction authorizes another branch.
-- Do **not** merge to `main` without explicit approval.
-- Production Supabase project: `tnlcvwtphbunteifoonc`. Treat as **read-only** for this work; do not apply migrations or write SQL there.
-- Intended Shadow project: `bvyxiahpxogblkmtjxyx`. Verify its schema and migration ledger before any migration is applied.
-- Do not reset Shadow, remove its existing migration-ledger row, or drop its `ensure_rls` event trigger.
-- Do not use the unrelated project `awgppfjxegognuqozldl` as the Shadow target.
-- Never place service-role credentials in browser, web, or Android client configuration.
-- Preserve the working v191 AI assistant, native driver background tracking, and signed Android workflow. This schema work does not authorize deploying an AI Edge Function or changing native tracking.
-- Do not use PR 63 as a shortcut.
-- Never create fake operational records in a shared database to make the UI look populated. Use isolated synthetic fixtures for tests.
-
-## 2. Work completed on the review branch
-
-### A. Phase 1 loading-data and actual-delivery separation
-
-Migration added:
-
-`supabase/migrations/20261017100000_phase1_separate_loading_data_from_actual_delivery.sql`
-
-- Introduces `loading_data_records` as a separate record of assignment/loading-sheet information linked to a booking, load order, driver, vehicle, factory, quarry, and trip code.
-- Allows `actual_loading_records` to represent historical paper records that have no booking, while requiring the associated date, vehicle, driver, quarry, and factory identity.
-- Adds source/provenance fields such as `record_source`, `source_record_id`, `source_file_name`, `source_row_number`, and `imported_at`.
-- Distinguishes driver-confirmed delivery from paper imports, office corrections, and legacy rows. Existing records are labeled `LEGACY` rather than being misrepresented as new driver-confirmed deliveries.
-- Adds per-day loading numbers and a concurrency-safe daily counter, plus uniqueness checks for daily identity and trip codes.
-- Preserves the distinction between a load assignment/status and the actual weight recorded at the factory. Do not infer actual weight merely from an assignment.
-
-### B. Paper-loading entry and CSV import
-
-- Added a Main Office screen inside the existing **التحميل الفعلي** workflow for entering a paper-recorded load without creating a fake booking or driver delivery confirmation.
-- The manual form validates date, vehicle, driver, factory, quarry, and positive actual weight, then calls the restricted `main_office_record_paper_actual_load` RPC.
-- Added CSV file reading, required-header validation, a row-count limit, and a preview before submitting the import through `main_office_import_paper_loads`.
-- CSV import requires `load_date, vehicle_code, driver_code, factory_code, quarry_code, actual_weight`; optional columns are `ticket_number, notes, source_record_id`.
-- The server validates the whole file before inserting rows, records source file/row provenance, skips exact repeats, rejects reused source identities whose business values changed, assigns daily trip identity, and writes audit events.
-- Added contract tests for the manual-entry authorization and provenance path.
-- **Not yet proven:** the new SQL has not been applied to the intended Shadow database; the CSV/manual flows are not ready for operational use until database migration reconciliation and authenticated integration testing are complete.
-
-### C. Scale-ticket storage authorization
-
-- Added narrowly scoped `SECURITY DEFINER` predicates: `can_upload_scale_ticket(text)`, `can_read_scale_ticket(text)`, and `can_delete_scale_ticket(text)`.
-- Pinned function search paths and limited execution grants to authenticated users; public/anonymous execution is revoked.
-- Updated Storage policies to use these predicates rather than relying on direct access to RPC-only tables.
-- Deletion is restricted to the active driver who owns the relevant booking, while the booking is in transit and delivery has not been confirmed.
-
-### D. Test and SQL corrections
-
-- Fixed malformed SQL dollar quoting in `assign_actual_loading_trip_code()`.
-- Corrected lifecycle test assertions so each reporting RPC's Main Office scope is checked explicitly.
-- Added v191 contract-gate checks for the scale-ticket helper grants and Storage-policy references.
-- Added/retained contract coverage for paper-import provenance and duplicate-source protection.
-
-### E. Documentation and traceability
-
-- Recorded paper-import provenance and the remaining import-workflow gap in commit history.
-- Kept the changes isolated to the review branch; no merge to `main` was performed as part of this work.
-
-## 3. Verified checks and build outputs
-
-Latest confirmed CI on commit `ab3f7b3d`:
+### CI links
 
 - [Phase 1 Shadow CI — success](https://github.com/Midoelfawakhry/Tiba-Supplies/actions/runs/38976381080)
 - [Phase 1 build — success](https://github.com/Midoelfawakhry/Tiba-Supplies/actions/runs/38976380844)
-
-Additional checks on the preceding application-code commit `ecd39f6d`:
-
 - [Migration integrity — success](https://github.com/Midoelfawakhry/Tiba-Supplies/actions/runs/38976368567)
 - [Signed Android builds — success](https://github.com/Midoelfawakhry/Tiba-Supplies/actions/runs/38976368540)
 - [Windows Main Office build — success](https://github.com/Midoelfawakhry/Tiba-Supplies/actions/runs/38976368645)
 
-The signed Android workflow produced these artifacts (built from `ecd39f6d`; artifact retention is time-limited):
+## Implementation completed on the review branch
+
+### Loading data and actual delivery
+
+Migration: `supabase/migrations/20261017100000_phase1_separate_loading_data_from_actual_delivery.sql`
+
+- Added `loading_data_records` for booking/assignment/loading-sheet information, kept separate from actual factory-delivery weight.
+- Supports paper-origin actual-load rows without a booking when the date, vehicle, driver, quarry, and factory are identified.
+- Adds provenance fields: `record_source`, `source_record_id`, `source_file_name`, `source_row_number`, and `imported_at`.
+- Distinguishes driver-confirmed delivery, paper import, office correction, and legacy records. Existing records remain labeled as legacy evidence.
+- Adds concurrency-safe daily numbering and duplicate-identity checks.
+
+### Scale-ticket authorization
+
+- Added scoped helper functions for upload, read, and delete authorization.
+- Restricted helper execution to authenticated users and revoked public/anonymous execution.
+- Updated Storage policies to use the scoped predicates.
+- Limits deletion to the owning active driver for an in-transit booking before delivery confirmation.
+
+### Test and SQL fixes
+
+- Corrected SQL dollar quoting in the daily trip identity trigger.
+- Corrected tests that check Main Office scope per reporting RPC.
+- Added contract checks for scale-ticket grants and Storage policy references.
+
+## Build artifacts
+
+These artifacts were built from commit `ecd39f6d3af107f55ee13c4906997775d05188a2`, not the later contract-test commit `ab3f7b3d`.
 
 - [Driver signed APK artifact](https://api.github.com/repos/Midoelfawakhry/Tiba-Supplies/actions/artifacts/12079515399)
 - [Main Office signed APK artifact](https://api.github.com/repos/Midoelfawakhry/Tiba-Supplies/actions/artifacts/12079227414)
 - [Ras Sedr Branch signed APK artifact](https://api.github.com/repos/Midoelfawakhry/Tiba-Supplies/actions/artifacts/12078613955)
 - [Main Office Windows x64 artifact](https://api.github.com/repos/Midoelfawakhry/Tiba-Supplies/actions/artifacts/12078024834)
 
-**Important:** workflow success proves that the configured checks/build jobs completed. It does not prove that the APKs install and work on a real device, that all database RPC authorization paths pass against the intended Shadow database, or that the application is production-ready. The artifact binaries above are from `ecd39f6d`; the later `ab3f7b3d` commit adds contract-gate checks and does not itself represent a newly rebuilt artifact set.
+Successful build jobs do not replace installation/device smoke tests or authenticated database acceptance tests. GitHub artifact retention is time-limited.
 
-## 4. Remaining work — recommended order
+## Remaining work — prioritized
 
-### P0 — paper-loading UI and RPCs added; runtime validation remains
+### P0 — paper-load entry and import
 
-The schema supports paper-only actual-load records, but a complete office-facing entry/import workflow is still missing. Implement:
+The schema is prepared, but the complete office-facing workflow is still missing.
 
-1. A Main Office screen to enter a paper load manually and import a spreadsheet/CSV.
-2. A server-authorized RPC for create/import; do not grant clients broad direct table-write access.
-3. Strict Main Office authorization, field validation, and explicit mapping of vehicle, driver, factory, quarry, date, weight, and source.
-4. Idempotency using stable source identity (file + row/source ID); detect duplicates and report rejected rows without silently duplicating data.
-5. Audit metadata and a preview/validation report before committing an import.
-6. Safe daily trip-number allocation and clear handling of corrections/re-imports.
-7. Tests for duplicate files/rows, invalid references, unauthorized roles, partial failures, and concurrent inserts.
+1. Build a Main Office screen for manual paper-load entry and CSV/spreadsheet import.
+2. Add a server-authorized RPC; do not grant broad direct client write access to actual-load tables.
+3. Validate Main Office role, load date, weight, vehicle, driver, factory, quarry, and source identity.
+4. Add import preview, row-level validation errors, and audit metadata.
+5. Make imports idempotent using stable source/file-row identity; report duplicates instead of silently inserting them.
+6. Define correction/re-import behavior and test daily-number concurrency.
+7. Test invalid references, unauthorized users, duplicate rows/files, partial failures, and concurrent inserts.
 
-### P1 — reconcile and test Shadow database safely
+### P1 — safe Shadow database reconciliation
 
-1. Read the current intended Shadow schema and migration ledger again.
-2. Reconcile the existing ledger and schema against the repository's clean migration chain; document drift before proposing a change.
-3. Run the migration and database acceptance tests against a disposable PostgreSQL database first.
-4. Only after that review, decide whether and how to apply the migration to the intended Shadow project. Do not touch Production.
-5. Run authenticated integration tests for Main Office, Branch Office, drivers, scale-ticket upload/read/delete, reporting RPCs, and paper-import permissions.
+1. Re-read the intended Shadow schema and migration ledger.
+2. Compare schema/ledger with the repository migration chain and document drift before repair.
+3. Run migrations and database acceptance tests on disposable PostgreSQL first.
+4. Only after review, decide whether to apply changes to the intended Shadow project.
+5. Test office scope, driver delivery, reporting, scale-ticket upload/read/delete, and paper-import authorization with authenticated sessions.
 
 ### P1 — release validation
 
-- Install and smoke-test all three signed Android APKs (Main Office, Ras Sedr Branch, Driver).
-- Verify login/logout, Android location permissions, background tracking, stale/low-accuracy location behavior, and driver-to-vehicle assignment on a real device.
-- Smoke-test the Windows Main Office package.
-- Verify that all builds point to the intended Shadow environment and contain no Production URL/key.
-- Re-run the release checks on the final commit and archive the resulting artifacts and checksums.
-- Verify v191 AI assistant behavior and existing native tracking remain intact.
+- Install and smoke-test Driver, Main Office, and Ras Sedr Branch APKs on Android.
+- Verify login/logout, location permissions, background tracking, stale/inaccurate location behavior, and driver/vehicle assignment.
+- Smoke-test the Windows package.
+- Verify builds target Shadow, not Production.
+- Rebuild final artifacts from the final candidate commit.
+- Recheck the v191 AI assistant and native driver tracking remain intact.
 
-### P2 — operational data and rollout
+### P2 — controlled data rollout
 
-- Design the controlled import/migration of real paper records; keep source files and row-level provenance for audit.
-- Validate truck/vehicle, driver, owner, factory, quarry, and office mappings before importing operational data.
-- Test realistic daily volumes using isolated fixtures (the project target discussed includes around 100 trucks/day and a 15-day trial); do not seed the shared database with invented business records.
-- Prepare a rollback/recovery plan and a separate, explicit Production migration review before any live rollout.
+- Validate vehicle, driver, owner, factory, quarry, and office mappings before importing real paper records.
+- Preserve source files and row-level provenance.
+- Use isolated synthetic fixtures for volume tests; never seed shared databases with fake business records.
+- Prepare rollback/recovery and a separate Production review before any live rollout.
 
-## 5. Acceptance checklist
+## Safety boundaries
+
+- Production Supabase remains read-only for this work; do not apply migrations or write SQL there.
+- Work only on `shadow/phase1-hardening` unless explicitly authorized otherwise.
+- Do not merge to `main` without explicit approval.
+- Do not reset Shadow, remove its existing migration-ledger row, or drop the `ensure_rls` event trigger.
+- Do not use the unrelated Supabase project as the Shadow target.
+- Never put service-role credentials in client configuration.
+- Preserve v191 AI assistant and native driver tracking; do not deploy an AI Edge Function or modify tracking as part of this schema task.
+- Do not use PR 63 as a shortcut.
+
+## Acceptance checklist
 
 - [x] Phase 1 Shadow CI passed on `ab3f7b3d`.
 - [x] Phase 1 build passed on `ab3f7b3d`.
-- [x] Migration-integrity, signed Android, and Windows build workflows completed successfully on `ecd39f6d`.
-- [x] Scale-ticket authorization helper and Storage-policy contract checks added.
-- [x] Changes remain on `shadow/phase1-hardening`; no merge to `main` in this work.
-- [x] No Production migration or write was performed in this work.
-- [x] Paper-load manual entry form and CSV import UI/RPC added on the review branch (runtime database validation remains pending).
-- [ ] Intended Shadow schema/ledger reconciled and migration safely validated.
-- [ ] Authenticated database acceptance tests passed against the intended Shadow target.
-- [ ] Android and Windows real-device/installation smoke tests passed.
-- [ ] Final artifact set rebuilt and validated on the final release candidate.
-- [ ] Explicit Production deployment review and authorization completed.
+- [x] Migration integrity, signed Android, and Windows workflows succeeded on `ecd39f6d`.
+- [x] Scoped scale-ticket authorization helpers and contract checks added.
+- [x] No Production database writes or migration were performed.
+- [x] No merge to `main` was performed.
+- [ ] Paper-load entry/import UI and secure RPC implemented.
+- [ ] Duplicate prevention and import validation tests pass.
+- [ ] Shadow schema/ledger reconciled and migration tested safely.
+- [ ] Authenticated database acceptance tests pass against intended Shadow.
+- [ ] Android and Windows smoke tests pass.
+- [ ] Final release artifacts rebuilt and checked.
+- [ ] Separate Production review and explicit authorization completed.
 
-## 6. Change history highlights
-
-Recent branch commits include:
-
-- `ab3f7b3d` — enforce scoped scale-ticket Storage policies in contract tests.
-- `ecd39f6d` — authorize scale-ticket Storage through scoped RPC predicates.
-- `8e5f56c4` — correct SQL dollar quoting in the trip identity trigger.
-- `8ea011aa` — assert office scope per reporting RPC.
-- `60b11470` — document paper-import provenance and remaining workflow gap.
-- `01427b28` — retain paper-import source identifiers and provenance.
-- `b0377b2c` — document daily loading identity and concurrency-safe counter.
-
-## 7. Working principle
-
-**Keep the real operational data safe.** Complete the paper-import workflow and Shadow reconciliation first; verify database permissions and app behavior with controlled tests; only then consider a separately approved release. A green build is necessary, but not sufficient, for production deployment.
-
-
-## 8. Paper-load CSV contract
-
-Use UTF-8 CSV with a header row. A blank header-only template is available at [docs/paper-load-import-template.csv](docs/paper-load-import-template.csv). Required columns:
-
-```csv
-load_date,vehicle_code,driver_code,factory_code,quarry_code,actual_weight
-2026-10-17,TRK-001,DRV-001,FAC-01,QUA-01,32.500
-```
-
-Optional columns: `ticket_number`, `notes`, `source_record_id`.
-
-- `load_date` must be an ISO date (`YYYY-MM-DD`).
-- Codes must match the existing directory codes exactly (case-insensitive matching is performed server-side).
-- Weight is in tons and must be greater than zero and no more than 1000.
-- The CSV filename plus logical data-row number is retained as import provenance; re-importing the same file name skips already imported source rows.
-- Do not rename/relabel a different spreadsheet to the same filename unless it is intentionally the same source file. Preserve the original source file and the import summary for audit.
-- The screen currently offers a first-row preview and whole-file server validation. Real-world spreadsheet acceptance and authenticated database tests remain release gates.
+**Next action:** implement the secure Main Office paper-load entry/import workflow, then validate it against disposable PostgreSQL before changing Shadow.
