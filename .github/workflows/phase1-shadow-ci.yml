@@ -150,7 +150,7 @@ jobs:
           );
           create function storage.foldername(name text) returns text[]
             language sql immutable as $folder$
-              select string_to_array(trim(both '/' from name), '/')[1:1]
+              select (string_to_array(trim(both '/' from name), '/'))[1:1]
             $folder$;
           SQL
       - name: Apply reviewed v191 schema and RPC chain
