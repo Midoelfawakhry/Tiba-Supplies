@@ -103,7 +103,7 @@ Deno.serve(async (req: Request) => {
 
     let result: any = null;
     let lastProviderError = "";
-    const models = ["gemini-3.8-flash"];
+    const models = ["gemini-2.5-flash", "gemini-2.0-flash"];
 
     for (const model of models) {
       const response = await fetch(
@@ -114,7 +114,7 @@ Deno.serve(async (req: Request) => {
           body: JSON.stringify({
             systemInstruction: { parts: [{ text: systemInstruction }] },
             contents,
-            generationConfig: { thinkingConfig: { thinkingLevel: "low" }, maxOutputTokens: 900 },
+            generationConfig: { maxOutputTokens: 900, temperature: 0.3 },
           }),
         },
       );
@@ -132,9 +132,8 @@ Deno.serve(async (req: Request) => {
         details: providerError.slice(0, 500),
       });
 
-      // Try the lighter fallback if the primary model is temporarily unavailable
-      // or is not available to this API project.
-      if ((response.status === 503 || response.status === 404) && model !== models[models.length - 1]) {
+      // Try the compatible fallback when a model is unavailable or temporarily overloaded.
+      if ([404, 429, 500, 503].includes(response.status) && model !== models[models.length - 1]) {
         continue;
       }
       if (response.status === 429) return json({ error: "AI_RATE_LIMITED" }, 429);
