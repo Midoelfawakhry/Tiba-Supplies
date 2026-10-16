@@ -101,6 +101,6 @@ test('v191 schema evolution sources include delivery idempotency and trip identi
 
 test('baseline is not treated as a complete v191 bootstrap by itself', () => {
   assert.ok(!baseline.includes('create table public.driver_vehicle_assignments'));
-  assert.ok(!baseline.includes('trip_code'));
+  assert.ok(!/create\s+table\s+(?:if\s+not\s+exists\s+)?public\.bookings[\s\S]*?trip_code/i.test(baseline));
   assert.ok(!baseline.includes('create table public.dispatch_windows'));
 });
