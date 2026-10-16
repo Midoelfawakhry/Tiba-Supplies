@@ -132,6 +132,9 @@ export const PaperLoadingEntryScreen: React.FC = () => {
       if (rpcError) throw rpcError;
       if (data?.ok !== true) {
         const first = Array.isArray(data?.errors) ? data.errors[0] : null;
+        if (String(first?.error ?? '').includes('SOURCE_IDENTITY_CONFLICT')) {
+          throw new Error(`تعارض في الصف ${first.source_row_number ?? first.row}: اسم الملف ورقم الصف مستخدمان سابقًا ببيانات مختلفة. غيّر اسم الملف فقط إذا كان مصدرًا مختلفًا فعلًا، وراجع السجل قبل إعادة المحاولة.`);
+        }
         throw new Error(first ? `رفض الاستيراد دون حفظ أي صف. الصف ${first.source_row_number ?? first.row}: ${first.error}` : 'فشل التحقق من بيانات الملف؛ لم يتم حفظ أي صف.');
       }
       setImportMessage(`اكتمل الاستيراد: ${data.inserted} سجل جديد، ${data.duplicates} صف مكرر تم تخطيه، من إجمالي ${data.received} صف.`);
