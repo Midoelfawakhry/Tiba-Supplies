@@ -53,6 +53,11 @@ Static comparison of the candidate baseline against the read-only Production sch
 
 The current candidate baseline creates 14 tables and no v191 RPCs. It is a planning artifact, not a source-faithful Production clone. The queue migration is now present on the review branch, but its availability does not resolve the core-schema or assignment-model conflicts.
 
+
+## CI evidence update — 2026-10-17
+
+GitHub Actions run [Phase 1 Shadow CI #38974294393](https://github.com/Midoelfawakhry/Tiba-Supplies/actions/runs/38974294393) and [Phase 1 build #38974294299](https://github.com/Midoelfawakhry/Tiba-Supplies/actions/runs/38974294299) passed on commit `7e96394cb18a303258a29e9a7f79cfdb9611bd61`. The Shadow CI workflow successfully replayed its configured numeric-prefix v191 chain on disposable PostgreSQL 16 and asserted RPC names and queue/assignment objects. This is useful evidence, but not the final bootstrap gate: the standalone `supabase/tests/phase1_v191_contract_gate.sql` is not invoked by the inspected workflow, non-standard legacy filenames are excluded from the replay, and no authenticated live Shadow or Android device end-to-end test is established. Full details: [CI evidence report](TIBA-SHADOW-CI-EVIDENCE-2026-10-17.md).
+
 ## Required implementation sequence
 
 1. Freeze the v191 RPC names and exact argument/result contracts from the client and tests.
