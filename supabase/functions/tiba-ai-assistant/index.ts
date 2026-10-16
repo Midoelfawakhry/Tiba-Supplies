@@ -147,11 +147,43 @@ Deno.serve(async (req: Request) => {
       console.error("All Gemini models unavailable", { details: lastProviderError.slice(0, 500) });
       return json({ error: "AI_TEMPORARILY_UNAVAILABLE" }, 503);
     }
-    const answer = result?.candidates?.[0]?.content?.parts
+    const draftAnswer = result?.candidates?.[0]?.content?.parts
       ?.map((part: any) => typeof part.text === "string" ? part.text : "")
       .join("")
       .trim();
-    if (!answer) return json({ error: "AI_EMPTY_RESPONSE" }, 502);
+    if (!draftAnswer) return json({ error: "AI_EMPTY_RESPONSE" }, 502);
+
+    // Final dialect pass: conversation history can pull the model back into formal Arabic.
+    // Rewrite only the wording; preserve every fact, number, name, code, and limitation.
+    const dialectInstruction = [
+      "أعد صياغة الرد التالي بالمصري القاهري اليومي الطبيعي فقط، زي كلام الناس في الشغل.",
+      "ممنوع الفصحى والأسلوب الرسمي تمامًا. أمثلة: «مفيش» بدل «لا يوجد»، «دلوقتي» بدل «حاليًا»، «هراجع» بدل «سأراجع»، «ابعتلي» بدل «يرجى الإرسال».",
+      "حافظ بدقة على كل الأرقام والأسماء والأكواد والمعنى والتحفظات. ما تضيفش أي معلومة جديدة وما تحذفش معلومة مهمة.",
+      "اكتب الرد النهائي فقط، من غير مقدمة أو شرح لعملية إعادة الصياغة."
+    ].join("\n");
+    let answer = draftAnswer;
+    const dialectResponse = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=" + encodeURIComponent(geminiApiKey),
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: dialectInstruction }] },
+          contents: [{ role: "user", parts: [{ text: "حوّل الرد ده للمصري الطبيعي مع الحفاظ على معناه بالكامل:\n\n" + draftAnswer }] }],
+          generationConfig: { maxOutputTokens: 900, temperature: 0.1 },
+        }),
+      },
+    );
+    if (dialectResponse.ok) {
+      const dialectResult: any = await dialectResponse.json();
+      const rewritten = dialectResult?.candidates?.[0]?.content?.parts
+        ?.map((part: any) => typeof part.text === "string" ? part.text : "")
+        .join("")
+        .trim();
+      if (rewritten) answer = rewritten;
+    } else {
+      console.error("Egyptian dialect rewrite failed", { status: dialectResponse.status });
+    }
     return json({ answer });
   } catch (error) {
     console.error("tiba-ai-assistant failed", error);
