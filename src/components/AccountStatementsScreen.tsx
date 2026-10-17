@@ -36,7 +36,7 @@ export const AccountStatementsScreen: React.FC<{ kind: StatementKind }> = ({ kin
       ]);
       if (statementResult.error) throw statementResult.error;
       // The statement RPC already includes owner details; keep the report usable if the optional owner summary RPC is unavailable.
-      const ownerReport = ownerReportResult.error ? {} : (ownerReportResult.data ?? {});
+      const ownerReport: Row = ownerReportResult.error ? {} : ((ownerReportResult.data ?? {}) as Row);
       const ownerVehicles: Row[] = Array.isArray(ownerReport.vehicles) ? ownerReport.vehicles : [];
       const dashboardVehicles: Row[] = Array.isArray((snapshotResult as any).vehicles)
         ? (snapshotResult as any).vehicles
@@ -79,7 +79,7 @@ export const AccountStatementsScreen: React.FC<{ kind: StatementKind }> = ({ kin
   const Icon = kind === 'factory' ? Building2 : Mountain;
   const vehicles: Row[] = snapshot?.vehicles ?? [];
   const vehicleKey = (v: Row) => String(v.vehicle_id ?? v.id ?? '');
-  const vehicleById = new Map(vehicles.map(v => [vehicleKey(v), v] as const).filter(([id]) => Boolean(id)));
+  const vehicleEntries: Array<[string, Row]> = vehicles\n    .map((v): [string, Row] => [vehicleKey(v), v])\n    .filter(([id]) => Boolean(id));\n  const vehicleById = new Map<string, Row>(vehicleEntries);
   const owners = [...new Map(vehicles.filter(v => v.owner_id).map(v => [String(v.owner_id), { owner_id: String(v.owner_id), name: String(v.owner_name ?? v.owner?.name ?? 'مالك بدون اسم') }])).values()];
   const records = useMemo(() => statementRows.filter((row: Row) => {
     if (entityId && String(row[entityKey] ?? '') !== entityId) return false;
