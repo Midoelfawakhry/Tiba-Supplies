@@ -131,6 +131,17 @@ Do not use older Windows artifacts built before `.github/workflows/windows-offic
 **Next action:** provision real users and load validated factory/quarry/owner/vehicle/driver directories, then run authenticated acceptance tests and device smoke tests. Do not import synthetic business data or merge to `main`.
 
 
+## AI assistant recovery — 2026-10-17
+
+- Confirmed the app-connected Edge Function had been deployed only to the older Shadow project `awgppfjxegognuqozldl`; the current Tiba Shadow project `bvyxiahpxogblkmtjxyx` did not list `tiba-ai-assistant`.
+- Deployed `tiba-ai-assistant` directly to current Tiba Shadow as active version 1 with JWT verification enabled.
+- Corrected `supabase/functions/tiba-ai-assistant/index.ts` to authorize against the current schema's `app_users.role` field instead of the obsolete `user_roles` join.
+- Corrected `.github/workflows/deploy-tiba-ai-assistant-shadow.yml` to target current Tiba Shadow.
+- Gemini model IDs reviewed against current Google AI developer documentation on 2026-10-17: `gemini-3.8-flash` is current and documented; `gemini-3.5-flash-lite` is also a current stable Flash-Lite model. The model strings were not the apparent cause of the reported Edge Function connection error.
+- GitHub Actions auto-deploy job is currently failing because the configured Supabase access token lacks the `edge_functions_read` permission. Direct deployment via the authorized Supabase connection succeeded. Fix token permissions before relying on automated deployment.
+- Still required: test from an authenticated app session; verify `GEMINI_API_KEY` is set in Shadow function secrets without exposing it; inspect function logs and run one real question. The deployed function's presence alone does not prove Gemini generation is configured or the UI request succeeds.
+- Production remains untouched; no merge to `main`.
+
 ## Live tracking and Egypt time — handover 2026-10-17
 
 ### Updated on `shadow/phase1-hardening`
