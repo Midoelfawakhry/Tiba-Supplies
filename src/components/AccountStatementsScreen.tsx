@@ -39,8 +39,8 @@ export const AccountStatementsScreen: React.FC<{ kind: StatementKind }> = ({ kin
       const ownerReport = ownerReportResult.data ?? {};
       const ownerVehicles: Row[] = Array.isArray(ownerReport.vehicles) ? ownerReport.vehicles : [];
       const keyOf = (v: Row) => String(v.vehicle_id ?? v.id ?? '');
-      const ownerByVehicle = new Map(ownerVehicles.map((v: Row) => [keyOf(v), v]).filter(([id]) => id));
-      const dashboardByVehicle = new Map(((snapshotResult as any).vehicles ?? []).map((v: Row) => [keyOf(v), v]).filter(([id]) => id));
+      const ownerByVehicle = new Map(ownerVehicles.map((v: Row) => [keyOf(v), v] as const).filter(([id]) => Boolean(id)));
+      const dashboardByVehicle = new Map(((snapshotResult as any).vehicles ?? []).map((v: Row) => [keyOf(v), v] as const).filter(([id]) => Boolean(id)));
       const vehicleIds = new Set([...dashboardByVehicle.keys(), ...ownerByVehicle.keys()]);
       const vehicles = [...vehicleIds].map(id => {
         const dashboardVehicle = dashboardByVehicle.get(id) ?? {};
@@ -70,7 +70,7 @@ export const AccountStatementsScreen: React.FC<{ kind: StatementKind }> = ({ kin
   const Icon = kind === 'factory' ? Building2 : Mountain;
   const vehicles: Row[] = snapshot?.vehicles ?? [];
   const vehicleKey = (v: Row) => String(v.vehicle_id ?? v.id ?? '');
-  const vehicleById = new Map(vehicles.map(v => [vehicleKey(v), v]).filter(([id]) => id));
+  const vehicleById = new Map(vehicles.map(v => [vehicleKey(v), v] as const).filter(([id]) => Boolean(id)));
   const owners = [...new Map(vehicles.filter(v => v.owner_id).map(v => [String(v.owner_id), { owner_id: String(v.owner_id), name: String(v.owner_name ?? v.owner?.name ?? 'مالك بدون اسم') }])).values()];
   const records = useMemo(() => statementRows.filter((row: Row) => {
     if (entityId && String(row[entityKey] ?? '') !== entityId) return false;
@@ -96,7 +96,7 @@ export const AccountStatementsScreen: React.FC<{ kind: StatementKind }> = ({ kin
     .map((row: Row) => [String(row[relatedEntityKey]), {
       [relatedEntityKey]: String(row[relatedEntityKey]),
       name: row[relatedEntityName] ?? lookupName(kind === 'factory' ? quarries : factories, relatedEntityKey, row[relatedEntityKey], 'جهة مرتبطة'),
-    }]))].map(([, value]) => value as Row);
+    } as Row] as const))].map(([, value]) => value);
   const selectClass = 'mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal';
 
   return <section dir="rtl" className="space-y-4 rounded-3xl bg-white p-4 shadow-sm sm:p-5">
