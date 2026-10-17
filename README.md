@@ -124,7 +124,7 @@ Do not use older Windows artifacts built before `.github/workflows/windows-offic
 - [x] Phase 1 CI, disposable PostgreSQL baseline, and v191 clean-chain tests passed on commit `a394531e`.
 - [ ] Provision real application users and import validated real directory data.
 - [ ] Authenticated database acceptance tests pass against intended Shadow.
-- [ ] Android and Windows device/package smoke tests pass.
+- [ ] Android and Windows device/package smoke tests pass (vehicle tracking is user-confirmed working; remaining release checks are listed in the tracking handover).
 - [ ] Final release artifacts rebuilt from the final candidate commit and checked.
 - [ ] Separate Production review and explicit authorization completed.
 
@@ -145,9 +145,9 @@ Do not use older Windows artifacts built before `.github/workflows/windows-offic
 - The changes are on `shadow/phase1-hardening`; `main` and Production were not changed.
 
 ### Not yet verified / remaining
-- Physical Android end-to-end GPS upload and map display are **not yet confirmed**.
-- Rebuild and install the Driver APK from this branch; sign in as a linked active driver, confirm an active vehicle assignment, and grant precise/background location permissions.
-- Test with screen on and locked. Confirm `captured_at` and `received_at` advance plausibly, stale status after 10 minutes is correct, and displayed time matches Cairo.
-- Run `npm run lint` and `npm run build`; inspect the corresponding GitHub Actions result before distributing an APK.
-- If tracking fails, record the exact UI error and inspect matching PostgREST/Edge logs before changing RPC names again.
+- **User-confirmed status (2026-10-17):** the user reported that vehicle tracking is now working in the app.
+- The user's confirmation establishes that the tracking issue is resolved in their current test; a separate physical-device audit of timestamps and background operation is not documented here.
+- Remaining validation: confirm `captured_at` and `received_at` advance plausibly, stale status after 10 minutes is correct, and timestamps display in Egypt time.
+- Run `npm run lint` and `npm run build`; inspect the corresponding GitHub Actions result before distributing a final APK.
+- If the tracking issue recurs, record the exact UI error and inspect matching PostgREST/Edge logs before changing RPC names again.
 - Keep work on `shadow/phase1-hardening`; do not merge to `main` or write to Production without explicit approval.
