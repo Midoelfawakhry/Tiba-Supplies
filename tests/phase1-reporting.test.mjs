@@ -18,7 +18,7 @@ test("vehicle identity is generated and permanently associated with its register
 });
 
 test("owner and vehicle reports drill down to completed trips and actual tons", () => {
-  assert.ok(statementsMigration.toLowerCase().replace(/\s+/g, ' ').includes('left join public.vehicles v on v.vehicle_id = coalesce(alr.vehicle_id, b.vehicle_id)'));
+  assert.ok(reportsMigration.toLowerCase().replace(/\s+/g, ' ').includes('left join public.vehicles v on v.vehicle_id = alr.vehicle_id'));
   assert.ok(reportsMigration.toLowerCase().replace(/\s+/g, ' ').includes('left join public.vehicle_owners vo on vo.owner_id = v.owner_id'));
   assert.match(vehicleReportsUi, /setOwnerVehicle/);
   assert.match(vehicleReportsUi, /tripCode/);
