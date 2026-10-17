@@ -18,7 +18,7 @@ test("vehicle identity is generated and permanently associated with its register
 });
 
 test("owner and vehicle reports drill down to completed trips and actual tons", () => {
-  assert.ok(reportsMigration.toLowerCase().replace(/\s+/g, ' ').includes('left join public.vehicles v on v.vehicle_id = alr.vehicle_id'));
+  assert.ok(statementsMigration.toLowerCase().replace(/\s+/g, ' ').includes('left join public.vehicles v on v.vehicle_id = coalesce(alr.vehicle_id, b.vehicle_id)'));
   assert.ok(reportsMigration.toLowerCase().replace(/\s+/g, ' ').includes('left join public.vehicle_owners vo on vo.owner_id = v.owner_id'));
   assert.match(vehicleReportsUi, /setOwnerVehicle/);
   assert.match(vehicleReportsUi, /tripCode/);
@@ -28,14 +28,14 @@ test("owner and vehicle reports drill down to completed trips and actual tons", 
 });
 
 test("factory and quarry statements filter by vehicle, its registered owner, and trip code", () => {
-  assert.match(statementsMigration, /'vehicle_id', COALESCE\\(alr\\.vehicle_id, b\\.vehicle_id\\)/i);
-  assert.ok(statementsMigration.toLowerCase().replace(/\\s+/g, ' ').includes('left join public.vehicles v on v.vehicle_id = coalesce(alr.vehicle_id, b.vehicle_id)'));
+  assert.match(statementsMigration, /'vehicle_id', COALESCE\(alr\.vehicle_id, b\.vehicle_id\)/i);
+  assert.ok(statementsMigration.toLowerCase().replace(/\s+/g, ' ').includes('left join public.vehicles v on v.vehicle_id = coalesce(alr.vehicle_id, b.vehicle_id)'));
   assert.ok(statementsMigration.toLowerCase().includes('perform public.current_main_office_user()'));
-  assert.match(statementsMigration, /'owner_id', v\\.owner_id/i);
-  assert.match(statementsMigration, /'owner_name', vo\\.name/i);
-  assert.match(statementsMigration, /'trip_code', alr\.trip_code/i);
-  assert.match(statementsMigration, /'daily_load_number', alr\.daily_load_number/i);
-  assert.match(statementsMigration, /'loading_sequence_date', alr\.loading_sequence_date/i);
+  assert.match(statementsMigration, /'owner_id', v\.owner_id/i);
+  assert.match(statementsMigration, /'owner_name', vo\.name/i);
+  assert.match(statementsMigration, /'trip_code', COALESCE\(alr\.trip_code, b\.trip_code\)/i);
+  assert.match(statementsMigration, /'daily_load_number', COALESCE\(alr\.daily_load_number, lo\.order_number\)/i);
+  assert.match(statementsMigration, /'loading_sequence_date', COALESCE\(alr\.loading_sequence_date/i);
   assert.match(accountStatementsUi, /row\.trip_code/);
   assert.match(accountStatementsUi, /setOwnerId/);
   assert.match(accountStatementsUi, /get_vehicle_owner_reports/);
