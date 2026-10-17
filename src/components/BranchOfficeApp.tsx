@@ -14,7 +14,7 @@ const tabs: {key:Tab; label:string; icon:React.ElementType}[] = [
   {key:'directory',label:'دليل التواصل',icon:Users},
   {key:'assistant',label:'مساعد النظام AI',icon:Bot},
 ];
-const dateTime=(v:any)=>v?new Date(v).toLocaleString('ar-EG'):'—';
+const dateTime=(v:any)=>v?new Date(v).toLocaleString('ar-EG', { timeZone: 'Africa/Cairo' }):'—';
 const phoneLink=(v:any)=>v? <a href={'tel:'+v} className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-black text-emerald-800"><Phone size={15}/>{v}</a> : <span className="text-slate-400">لا يوجد رقم</span>;
 
 export const BranchOfficeApp: React.FC = () => {
