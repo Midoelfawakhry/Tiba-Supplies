@@ -35,8 +35,8 @@ export const AccountStatementsScreen: React.FC<{ kind: StatementKind }> = ({ kin
         supabase.rpc('get_vehicle_owner_reports', { p_from: fromDate || null, p_to: toDate || null }),
       ]);
       if (statementResult.error) throw statementResult.error;
-      if (ownerReportResult.error) throw ownerReportResult.error;
-      const ownerReport = ownerReportResult.data ?? {};
+      // The statement RPC already includes owner details; keep the report usable if the optional owner summary RPC is unavailable.
+      const ownerReport = ownerReportResult.error ? {} : (ownerReportResult.data ?? {});
       const ownerVehicles: Row[] = Array.isArray(ownerReport.vehicles) ? ownerReport.vehicles : [];
       const keyOf = (v: Row) => String(v.vehicle_id ?? v.id ?? '');
       const ownerByVehicle = new Map(ownerVehicles.map((v: Row) => [keyOf(v), v] as const).filter(([id]) => Boolean(id)));
