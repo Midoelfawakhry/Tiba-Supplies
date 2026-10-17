@@ -36,20 +36,17 @@ Deno.serve(async (req: Request) => {
     if (authError || !authData.user) return json({ error: "AUTH_REQUIRED" }, 401);
 
     const { data: profile, error: profileError } = await admin.from("app_users")
-      .select("user_id,is_active,office_id").eq("auth_user_id", authData.user.id).eq("is_active", true).maybeSingle();
+      .select("user_id,is_active,office_id,role").eq("auth_user_id", authData.user.id).eq("is_active", true).maybeSingle();
     if (profileError) throw profileError;
     if (!profile) return json({ error: "ACTIVE_APP_PROFILE_REQUIRED" }, 403);
 
-    const { data: roleLinks, error: rolesError } = await admin.from("user_roles")
-      .select("roles!inner(name)").eq("user_id", profile.user_id);
-    if (rolesError) throw rolesError;
-    const roles = (roleLinks ?? []).map((item: any) => item.roles?.name).filter(Boolean);
+    const role = profile.role;
     const body = await req.json();
     const audience = body?.audience;
-    if (audience === "HEAD_OFFICE" && !roles.some((role: string) => ["ADMIN", "HEAD_OFFICE"].includes(role))) {
+    if (audience === "HEAD_OFFICE" && !["ADMIN", "HEAD_OFFICE"].includes(role)) {
       return json({ error: "INSUFFICIENT_ROLE" }, 403);
     }
-    if (audience === "BRANCH" && !roles.includes("BRANCH")) {
+    if (audience === "BRANCH" && role !== "BRANCH") {
       return json({ error: "INSUFFICIENT_ROLE" }, 403);
     }
     if (audience === "BRANCH") {
