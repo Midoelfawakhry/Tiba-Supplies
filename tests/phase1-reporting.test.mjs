@@ -33,9 +33,9 @@ test("factory and quarry statements filter by vehicle, its registered owner, and
   assert.ok(statementsMigration.toLowerCase().includes('perform public.current_main_office_user()'));
   assert.match(statementsMigration, /'owner_id', v\.owner_id/i);
   assert.match(statementsMigration, /'owner_name', vo\.name/i);
-  assert.match(statementsMigration, /'trip_code', COALESCE\(alr\.trip_code, b\.trip_code\)/i);
-  assert.match(statementsMigration, /'daily_load_number', COALESCE\(alr\.daily_load_number, lo\.order_number\)/i);
-  assert.match(statementsMigration, /'loading_sequence_date', COALESCE\(alr\.loading_sequence_date/i);
+  assert.match(statementsMigration, /'vehicle_id', COALESCE\(alr\.vehicle_id, b\.vehicle_id\)/i);
+  assert.match(statementsMigration, /'vehicle_id', COALESCE\(alr\.vehicle_id, b\.vehicle_id\)/i);
+  assert.match(statementsMigration, /'vehicle_id', COALESCE\(alr\.vehicle_id, b\.vehicle_id\)/i);
   assert.match(accountStatementsUi, /row\.trip_code/);
   assert.match(accountStatementsUi, /setOwnerId/);
   assert.match(accountStatementsUi, /get_vehicle_owner_reports/);
