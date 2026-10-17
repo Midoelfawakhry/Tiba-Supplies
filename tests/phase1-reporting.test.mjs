@@ -12,9 +12,9 @@ const [vehicleOwnerSql, reportsMigration, statementsMigration, vehicleReportsUi,
 ]);
 
 test("vehicle identity is generated and permanently associated with its registered owner", () => {
-  assert.match(vehicleOwnerSql, /v_code:='VH-'\|\|lpad\(nextval\('public\.vehicle_code_seq'/);
-  assert.match(vehicleOwnerSql, /insert into public\.vehicles\(vehicle_code,plate_number,owner_id,office_id/);
-  assert.match(vehicleOwnerSql, /'vehicle_code',v_code,'plate_number',v_plate,'owner_id',p_owner_id/);
+  assert.ok(vehicleOwnerSql.includes("v_code:='VH-'||lpad(nextval('public.vehicle_code_seq'"));
+  assert.ok(vehicleOwnerSql.includes("insert into public.vehicles(vehicle_code,plate_number,owner_id,office_id"));
+  assert.ok(vehicleOwnerSql.includes("'vehicle_code',v_code,'plate_number',v_plate,'owner_id',p_owner_id"));
 });
 
 test("owner and vehicle reports drill down to completed trips and actual tons", () => {
