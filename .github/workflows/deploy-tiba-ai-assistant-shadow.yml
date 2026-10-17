@@ -29,4 +29,4 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           test -n "$SUPABASE_ACCESS_TOKEN" || (echo "::error::Missing repository secret SUPABASE_ACCESS_TOKEN" && exit 1)
-          supabase functions deploy tiba-ai-assistant --project-ref "awgppfjxegognuqozldl"
+          supabase functions deploy tiba-ai-assistant --project-ref "bvyxiahpxogblkmtjxyx"
