@@ -24,7 +24,7 @@ function timeLabel(value?: string) {
   if (!value) return 'غير معروف';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'غير معروف';
-  return date.toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' });
+  return date.toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Africa/Cairo' });
 }
 
 export const VehicleTrackingScreen: React.FC = () => {
