@@ -280,7 +280,7 @@ export const DriverApp: React.FC = () => {
       if (!data?.accepted || data?.acceptance_status !== 'ACCEPTED' || !data?.accepted_at) {
         throw new Error('لم يؤكد النظام تسجيل قبول التخصيص ووقته.');
       }
-      setAcceptanceMessage(`تم قبول التخصيص بنجاح. كود النقلة: ${data.trip_code || '—'} · وقت القبول: ${new Date(data.accepted_at).toLocaleString('ar-EG')}.`);
+      setAcceptanceMessage(`تم قبول التخصيص بنجاح. كود النقلة: ${data.trip_code || '—'} · وقت القبول: ${new Date(data.accepted_at).toLocaleString('ar-EG', { timeZone: 'Africa/Cairo' })}.`);
       await refreshPortal();
     } catch (e: any) {
       const raw = String(e?.message || '');
@@ -371,7 +371,7 @@ export const DriverApp: React.FC = () => {
                 latitude: location.latitude,
                 longitude: location.longitude,
                 accuracy: location.accuracy,
-                capturedAt: new Date(location.time ?? Date.now()).toLocaleString('ar-EG'),
+                capturedAt: new Date(location.time ?? Date.now()).toLocaleString('ar-EG', { timeZone: 'Africa/Cairo' }),
               });
             }
           });
@@ -438,7 +438,7 @@ export const DriverApp: React.FC = () => {
               latitude: location.latitude,
               longitude: location.longitude,
               accuracy: location.accuracy,
-              capturedAt: new Date(locationTimestamp).toLocaleString('ar-EG'),
+              capturedAt: new Date(locationTimestamp).toLocaleString('ar-EG', { timeZone: 'Africa/Cairo' }),
             });
 
             // Ignore poor GPS fixes and reduce uploads while stopped or moving slowly.
