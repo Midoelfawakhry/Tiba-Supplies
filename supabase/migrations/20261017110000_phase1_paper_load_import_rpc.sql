@@ -1,5 +1,6 @@
--- Main Office paper-load import RPC. Apply only after reviewing the complete clean Shadow migration chain.
--- This migration is deliberately not applied to any Supabase project by this commit.
+-- Main Office paper-load import RPC.
+-- Shadow migration ledger records this migration as applied under the clean Phase 1 chain.
+-- Keep this source comment aligned with the reviewed Shadow state; never apply to Production without separate approval.
 
 create unique index if not exists actual_loading_records_import_source_id_unique
   on public.actual_loading_records(source_file_name, source_record_id)
@@ -105,8 +106,6 @@ begin
       where upper(trim(quarry_code))=upper(trim(v_row->>'quarry_code')) and is_active=true;
       if v_quarry_id is null then raise exception 'QUARRY_CODE_NOT_FOUND'; end if;
 
-      -- A source identity is idempotent only when the existing business values match.
-      -- Reusing a filename/row number for changed content must never silently hide a correction.
       v_source_id := nullif(trim(v_row->>'source_record_id'),'');
       select alr.* into v_existing
       from public.actual_loading_records alr
