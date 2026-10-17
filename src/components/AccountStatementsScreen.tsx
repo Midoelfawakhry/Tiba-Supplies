@@ -38,11 +38,25 @@ export const AccountStatementsScreen: React.FC<{ kind: StatementKind }> = ({ kin
       if (ownerReportResult.error) throw ownerReportResult.error;
       const ownerReport = ownerReportResult.data ?? {};
       const ownerVehicles = Array.isArray(ownerReport.vehicles) ? ownerReport.vehicles : [];
-      const ownerByVehicle = new Map(ownerVehicles.map((v: Row) => [String(v.vehicle_id), v]));
-      const snapshotData = {
-        ...snapshotResult,
-        vehicles: (snapshotResult.vehicles ?? []).map((v: Row) => ({ ...v, ...(ownerByVehicle.get(String(v.vehicle_id)) ?? {}) })),
-      };
+      // The dashboard and owner-report RPCs can expose different vehicle key shapes.
+      // Merge by a normalized ID and keep all vehicles present in either result.
+      const ownerByVehicle = new Map(ownerVehicles.map((v: Row) => [String(v.vehicle_id ?? v.id ?? ''), v]).filter(([id]) => id));
+      const dashboardByVehicle = new Map((snapshotResult.vehicles ?? []).map((v: Row) => [String(v.vehicle_id ?? v.id ?? ''), v]).filter(([id]) => id));
+      const vehicleIds = new Set([...ownerByVehicle.keys(), ...dashboardByVehicle.keys()]);
+      const mergedVehicles = [...vehicleIds].map(id => {
+        const dashboardVehicle = dashboardByVehicle.get(id) ?? {};
+        const ownerVehicle = ownerByVehicle.get(id) ?? {};
+        return {
+          ...dashboardVehicle,
+          ...ownerVehicle,
+          vehicle_id: ownerVehicle.vehicle_id ?? dashboardVehicle.vehicle_id ?? dashboardVehicle.id ?? ownerVehicle.id ?? id,
+          plate_number: ownerVehicle.plate_number ?? dashboardVehicle.plate_number ?? dashboardVehicle.plate ?? null,
+          vehicle_code: ownerVehicle.vehicle_code ?? dashboardVehicle.vehicle_code ?? dashboardVehicle.code ?? null,
+          owner_id: ownerVehicle.owner_id ?? dashboardVehicle.owner_id ?? dashboardVehicle.owner?.id ?? null,
+          owner_name: ownerVehicle.owner_name ?? dashboardVehicle.owner_name ?? dashboardVehicle.owner?.name ?? null,
+        };
+      });
+      const snapshotData = { ...snapshotResult, vehicles: mergedVehicles };
       setSnapshot(snapshotData);
       setStatementRows(Array.isArray(statementResult.data) ? statementResult.data : []);
     } catch (e: any) { setError(e?.message || 'تعذر تحميل كشف الحساب.'); }
