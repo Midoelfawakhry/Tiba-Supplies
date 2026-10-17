@@ -19,6 +19,7 @@ export const AccountStatementsScreen: React.FC<{ kind: StatementKind }> = ({ kin
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [entityId, setEntityId] = useState('');
+  const [relatedEntityId, setRelatedEntityId] = useState('');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [tripCode, setTripCode] = useState('');
@@ -28,11 +29,20 @@ export const AccountStatementsScreen: React.FC<{ kind: StatementKind }> = ({ kin
   const load = useCallback(async () => {
     setLoading(true); setError('');
     try {
-      const [snapshotData, statementResult] = await Promise.all([
+      const [snapshotResult, statementResult, ownerReportResult] = await Promise.all([
         getLiveSnapshot(),
         supabase.rpc('get_account_statement_records', { p_from: fromDate || null, p_to: toDate || null }),
+        supabase.rpc('get_vehicle_owner_reports', { p_from: fromDate || null, p_to: toDate || null }),
       ]);
       if (statementResult.error) throw statementResult.error;
+      if (ownerReportResult.error) throw ownerReportResult.error;
+      const ownerReport = ownerReportResult.data ?? {};
+      const ownerVehicles = Array.isArray(ownerReport.vehicles) ? ownerReport.vehicles : [];
+      const ownerByVehicle = new Map(ownerVehicles.map((v: Row) => [String(v.vehicle_id), v]));
+      const snapshotData = {
+        ...snapshotResult,
+        vehicles: (snapshotResult.vehicles ?? []).map((v: Row) => ({ ...v, ...(ownerByVehicle.get(String(v.vehicle_id)) ?? {}) })),
+      };
       setSnapshot(snapshotData);
       setStatementRows(Array.isArray(statementResult.data) ? statementResult.data : []);
     } catch (e: any) { setError(e?.message || 'تعذر تحميل كشف الحساب.'); }
@@ -43,11 +53,14 @@ export const AccountStatementsScreen: React.FC<{ kind: StatementKind }> = ({ kin
   const entities = kind === 'factory' ? (snapshot?.factories ?? []) : (snapshot?.quarries ?? []);
   const entityKey = kind === 'factory' ? 'factory_id' : 'quarry_id';
   const entityName = kind === 'factory' ? 'factory_name' : 'quarry_name';
+  const relatedEntityKey = kind === 'factory' ? 'quarry_id' : 'factory_id';
+  const relatedEntityName = kind === 'factory' ? 'quarry_name' : 'factory_name';
   const Icon = kind === 'factory' ? Building2 : Mountain;
   const vehicles: Row[] = snapshot?.vehicles ?? [];
   const owners = [...new Map(vehicles.filter(v => v.owner_id).map(v => [String(v.owner_id), { owner_id: String(v.owner_id), name: String(v.owner_name ?? v.owner?.name ?? 'مالك بدون اسم') }])).values()];
   const records = useMemo(() => statementRows.filter((row: Row) => {
     if (entityId && String(row[entityKey] ?? '') !== entityId) return false;
+    if (relatedEntityId && String(row[relatedEntityKey] ?? '') !== relatedEntityId) return false;
     const date = dateValue(row);
     if (fromDate && (!date || date < fromDate)) return false;
     if (toDate && (!date || date > toDate)) return false;
@@ -58,12 +71,13 @@ export const AccountStatementsScreen: React.FC<{ kind: StatementKind }> = ({ kin
       if (String(vehicles.find(v => String(v.vehicle_id) === String(row.vehicle_id))?.owner_id ?? '') !== ownerId) return false;
     }
     return true;
-  }).sort((a: Row, b: Row) => dateValue(b).localeCompare(dateValue(a))), [statementRows, entityId, entityKey, fromDate, toDate, tripCode, vehicleId, ownerId, vehicles]);
+  }).sort((a: Row, b: Row) => dateValue(b).localeCompare(dateValue(a))), [statementRows, entityId, entityKey, relatedEntityId, relatedEntityKey, fromDate, toDate, tripCode, vehicleId, ownerId, vehicles]);
 
   const totalWeight = records.reduce((sum: number, row: Row) => sum + numericWeight(row), 0);
   const selectedEntity = entities.find((entity: Row) => String(entity[entityKey]) === entityId);
   const factories = snapshot?.factories ?? [];
   const quarries = snapshot?.quarries ?? [];
+  const relatedEntities = kind === 'factory' ? quarries : factories;
   const drivers = snapshot?.drivers ?? [];
   const lookupName = (items: Row[], key: string, id: unknown, fallback = '—') => items.find(item => String(item[key]) === String(id))?.name ?? fallback;
   const selectClass = 'mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal';
@@ -84,12 +98,15 @@ export const AccountStatementsScreen: React.FC<{ kind: StatementKind }> = ({ kin
       <label className="text-xs font-bold text-slate-700">{kind === 'factory' ? 'المصنع / العميل' : 'المحجر'}
         <select value={entityId} onChange={e => setEntityId(e.target.value)} className={selectClass}><option value="">كل {kind === 'factory' ? 'المصانع' : 'المحاجر'}</option>{entities.map((entity: Row) => <option key={entity[entityKey]} value={entity[entityKey]}>{entity.name ?? entity[entityName] ?? 'بدون اسم'}</option>)}</select>
       </label>
+      <label className="text-xs font-bold text-slate-700">{kind === 'factory' ? 'المحجر المرتبط' : 'المصنع / العميل المرتبط'}
+        <select value={relatedEntityId} onChange={e => setRelatedEntityId(e.target.value)} className={selectClass}><option value="">{kind === 'factory' ? 'كل المحاجر' : 'كل المصانع والعملاء'}</option>{relatedEntities.map((entity: Row) => <option key={entity[kind === 'factory' ? 'quarry_id' : 'factory_id']} value={entity[kind === 'factory' ? 'quarry_id' : 'factory_id']}>{entity.name ?? 'بدون اسم'}</option>)}</select>
+      </label>
       <label className="text-xs font-bold text-slate-700">من تاريخ<input type="date" value={fromDate} max={toDate || undefined} onChange={e => setFromDate(e.target.value)} className={selectClass}/></label>
       <label className="text-xs font-bold text-slate-700">إلى تاريخ<input type="date" value={toDate} min={fromDate || undefined} onChange={e => setToDate(e.target.value)} className={selectClass}/></label>
       <label className="text-xs font-bold text-slate-700">كود النقلة<input value={tripCode} onChange={e => setTripCode(e.target.value)} placeholder="اكتب كود النقلة" className={selectClass}/></label>
       <label className="text-xs font-bold text-slate-700">العربية<select value={vehicleId} onChange={e => setVehicleId(e.target.value)} className={selectClass}><option value="">كل العربيات</option>{vehicles.map(v => <option key={v.vehicle_id} value={v.vehicle_id}>{v.plate_number ?? v.vehicle_code ?? 'عربية بدون رقم'}</option>)}</select></label>
       <label className="text-xs font-bold text-slate-700">مالك العربية<select value={ownerId} onChange={e => setOwnerId(e.target.value)} className={selectClass}><option value="">كل الملاك</option>{owners.map(o => <option key={o.owner_id} value={o.owner_id}>{o.name}</option>)}</select></label>
-      <div className="flex items-end gap-2"><button type="button" onClick={() => void load()} className="w-full rounded-xl bg-blue-700 px-3 py-2.5 text-sm font-bold text-white">عرض الفترة</button><button type="button" onClick={() => {setEntityId('');setTripCode('');setVehicleId('');setOwnerId('');setFromDate('');setToDate('');}} className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm font-bold">مسح الفلاتر</button></div>
+      <div className="flex items-end gap-2"><button type="button" onClick={() => void load()} className="w-full rounded-xl bg-blue-700 px-3 py-2.5 text-sm font-bold text-white">عرض الفترة</button><button type="button" onClick={() => {setEntityId('');setRelatedEntityId('');setTripCode('');setVehicleId('');setOwnerId('');setFromDate('');setToDate('');}} className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm font-bold">مسح الفلاتر</button></div>
     </div>
 
     {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div>}
