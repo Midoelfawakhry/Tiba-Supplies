@@ -1,0 +1,2 @@
+-- Repair live vehicle tracking RPCs for the current Tiba Shadow schema.
+-- Implementation follows after schema/role compatibility review.
