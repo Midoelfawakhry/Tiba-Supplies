@@ -1,0 +1,32 @@
+name: Phase 1 validation
+
+on:
+  pull_request:
+    branches:
+      - shadow/phase1-hardening
+  push:
+    branches:
+      - shadow/phase1-hardening
+      - fix/shadow-account-statement-contract
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install
+      - name: TypeScript check
+        run: npm run lint
+      - name: Production build
+        run: npm run build
+      - name: Phase 1 regression tests
+        run: npm run test:phase1
