@@ -129,3 +129,25 @@ Do not use older Windows artifacts built before `.github/workflows/windows-offic
 - [ ] Separate Production review and explicit authorization completed.
 
 **Next action:** provision real users and load validated factory/quarry/owner/vehicle/driver directories, then run authenticated acceptance tests and device smoke tests. Do not import synthetic business data or merge to `main`.
+
+
+## Live tracking and Egypt time — handover 2026-10-17
+
+### Updated on `shadow/phase1-hardening`
+- `supabase/migrations/20261017120000_repair_live_vehicle_tracking_current_schema.sql`: aligns tracking RPCs with Shadow's current schema. `driver_live_locations` has no `vehicle_id`; the active vehicle is resolved through `driver_vehicle_assignments`.
+- `src/components/VehicleTrackingScreen.tsx`: renders map timestamps explicitly in `Africa/Cairo`.
+- `src/components/OfficeDirectoryScreen.tsx`: renders arrival, load-order and actual-load timestamps in `Africa/Cairo`.
+- Timestamp policy: keep instants in UTC/`timestamptz`; display with `Africa/Cairo`. Do not add/subtract hours manually. Compare device `captured_at` with server `received_at` to diagnose clock skew or upload delay.
+
+### Verified
+- Shadow contains `get_vehicle_live_locations()` and `update_driver_live_location(...)`; authenticated execution grants were checked.
+- The migration was adjusted after finding that `driver_live_locations` has no `vehicle_id` column.
+- The changes are on `shadow/phase1-hardening`; `main` and Production were not changed.
+
+### Not yet verified / remaining
+- Physical Android end-to-end GPS upload and map display are **not yet confirmed**.
+- Rebuild and install the Driver APK from this branch; sign in as a linked active driver, confirm an active vehicle assignment, and grant precise/background location permissions.
+- Test with screen on and locked. Confirm `captured_at` and `received_at` advance plausibly, stale status after 10 minutes is correct, and displayed time matches Cairo.
+- Run `npm run lint` and `npm run build`; inspect the corresponding GitHub Actions result before distributing an APK.
+- If tracking fails, record the exact UI error and inspect matching PostgREST/Edge logs before changing RPC names again.
+- Keep work on `shadow/phase1-hardening`; do not merge to `main` or write to Production without explicit approval.
