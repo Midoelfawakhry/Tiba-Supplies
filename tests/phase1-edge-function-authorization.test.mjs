@@ -85,7 +85,7 @@ test("Tiba AI assistant requires an authenticated active profile and checks role
   assert.match(aiFunctionSource, /callerClient\.auth\.getUser\(token\)/);
   assert.match(aiFunctionSource, /\.from\("app_users"\)[\s\S]*?\.eq\("is_active", true\)/);
   assert.match(aiFunctionSource, /audience === "HEAD_OFFICE"[\s\S]*?\["ADMIN", "HEAD_OFFICE"\]/);
-  assert.match(aiFunctionSource, /audience === "BRANCH"[\s\S]*?roles\.includes\("BRANCH"\)/);
+  assert.match(aiFunctionSource, /audience === "BRANCH"[\s\S]*?role !== "BRANCH"/);
   assert.match(aiFunctionSource, /\.eq\("office_id", profile\.office_id\)[\s\S]*?\.eq\("office_type", "BRANCH"\)[\s\S]*?\.eq\("is_active", true\)/);
   assert.match(aiFunctionSource, /GEMINI_API_KEY/);
   assert.match(aiFunctionSource, /contextText\.length > 12000/);
