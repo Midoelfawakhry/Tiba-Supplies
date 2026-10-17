@@ -38,9 +38,18 @@ export const AccountStatementsScreen: React.FC<{ kind: StatementKind }> = ({ kin
       // The statement RPC already includes owner details; keep the report usable if the optional owner summary RPC is unavailable.
       const ownerReport = ownerReportResult.error ? {} : (ownerReportResult.data ?? {});
       const ownerVehicles: Row[] = Array.isArray(ownerReport.vehicles) ? ownerReport.vehicles : [];
-      const keyOf = (v: Row) => String(v.vehicle_id ?? v.id ?? '');
-      const ownerByVehicle = new Map(ownerVehicles.map((v: Row) => [keyOf(v), v] as const).filter(([id]) => Boolean(id)));
-      const dashboardByVehicle = new Map(((snapshotResult as any).vehicles ?? []).map((v: Row) => [keyOf(v), v] as const).filter(([id]) => Boolean(id)));
+      const dashboardVehicles: Row[] = Array.isArray((snapshotResult as any).vehicles)
+        ? (snapshotResult as any).vehicles
+        : [];
+      const keyOf = (v: Row): string => String(v.vehicle_id ?? v.id ?? '');
+      const ownerEntries: Array<[string, Row]> = ownerVehicles
+        .map((v): [string, Row] => [keyOf(v), v])
+        .filter(([id]) => Boolean(id));
+      const dashboardEntries: Array<[string, Row]> = dashboardVehicles
+        .map((v): [string, Row] => [keyOf(v), v])
+        .filter(([id]) => Boolean(id));
+      const ownerByVehicle = new Map<string, Row>(ownerEntries);
+      const dashboardByVehicle = new Map<string, Row>(dashboardEntries);
       const vehicleIds = new Set([...dashboardByVehicle.keys(), ...ownerByVehicle.keys()]);
       const vehicles = [...vehicleIds].map(id => {
         const dashboardVehicle = dashboardByVehicle.get(id) ?? {};
