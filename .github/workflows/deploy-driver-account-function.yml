@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   deploy:
-    name: Deploy create-driver-account to Shadow
+    name: Deploy create-driver-account to Tiba Shadow only
     runs-on: ubuntu-latest
     steps:
       - name: Check out Shadow application
@@ -34,9 +34,9 @@ jobs:
             echo "::error::This workflow may deploy only from shadow/phase1-hardening"
             exit 1
           }
-          echo "Target is the dedicated Tiba Supplies Shadow project."
+          echo "Target is Tiba Shadow (bvyxiahpxogblkmtjxyx)."
 
-      - name: Deploy create-driver-account to Shadow only
+      - name: Deploy create-driver-account to Tiba Shadow only
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         shell: bash
@@ -45,4 +45,4 @@ jobs:
             echo "::error::Missing repository secret: SUPABASE_ACCESS_TOKEN"
             exit 1
           }
-          supabase functions deploy create-driver-account --project-ref "awgppfjxegognuqozldl"
+          supabase functions deploy create-driver-account --project-ref "bvyxiahpxogblkmtjxyx"
