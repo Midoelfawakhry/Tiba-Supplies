@@ -80,10 +80,22 @@ export const AccountStatementsScreen: React.FC<{ kind: StatementKind }> = ({ kin
   const vehicles: Row[] = snapshot?.vehicles ?? [];
   const vehicleKey = (v: Row) => String(v.vehicle_id ?? v.id ?? '');
   const vehicleEntries: Array<[string, Row]> = vehicles
-    .map((v): [string, Row] => [vehicleKey(v), v])
-    .filter(([id]) => Boolean(id));
+    .map((vehicle): [string, Row] => [vehicleKey(vehicle), vehicle])
+    .filter((entry): entry is [string, Row] => entry[0].length > 0);
   const vehicleById = new Map<string, Row>(vehicleEntries);
-  const owners = [...new Map(vehicles.filter(v => v.owner_id).map(v => [String(v.owner_id), { owner_id: String(v.owner_id), name: String(v.owner_name ?? v.owner?.name ?? 'مالك بدون اسم') }])).values()];
+
+  const ownersById = new Map<string, { owner_id: string; name: string }>();
+  for (const vehicle of vehicles) {
+    if (!vehicle.owner_id) continue;
+    const id = String(vehicle.owner_id);
+    if (ownersById.has(id)) continue;
+    ownersById.set(id, {
+      owner_id: id,
+      name: String(vehicle.owner_name ?? vehicle.owner?.name ?? 'مالك بدون اسم'),
+    });
+  }
+  const owners = [...ownersById.values()];
+
   const records = useMemo(() => statementRows.filter((row: Row) => {
     if (entityId && String(row[entityKey] ?? '') !== entityId) return false;
     if (relatedEntityId && String(row[relatedEntityKey] ?? '') !== relatedEntityId) return false;
